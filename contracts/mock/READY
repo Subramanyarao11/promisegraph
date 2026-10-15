@@ -1,0 +1,1 @@
+23 passed in 1.91s; contract-validated responses: 439; routes exercised: 36/36 (cd contracts/mock && uv run pytest -q)
