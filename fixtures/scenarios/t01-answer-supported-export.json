@@ -1,0 +1,141 @@
+{
+  "id": "t01-answer-supported-export",
+  "acceptance_ids": [
+    "T01"
+  ],
+  "workspace_id": "ws_demo",
+  "description": "J1: a new request about scheduling a supported export (monthly PDF to email) gets a sourced answer draft that reuses the verified weekly-XLSX resolution; no work is created; the answer alone does not resolve the request until the operator records verification.",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "create_request",
+      "input": {
+        "customer_id": "customer_corvid",
+        "subject": "Monthly PDF of the bed occupancy dashboard",
+        "body": "Could the Bed Occupancy dashboard be sent automatically as a PDF on the 1st of every month at 06:00 Berlin time to finance@corvid.example? Who on our side is allowed to set this up?",
+        "channel": "manual",
+        "capability_ids": [],
+        "external_ref": null,
+        "auto_start": true,
+        "planner_mode": "scripted"
+      }
+    },
+    {
+      "id": "s2",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s3",
+      "action": "get_request",
+      "input": {
+        "request_id": "${s1.request.id}"
+      }
+    },
+    {
+      "id": "s4",
+      "action": "record_observation",
+      "input": {
+        "request_id": "${s1.request.id}",
+        "body": {
+          "action_id": "${s2.latest_action.id}",
+          "kind": "customer_confirmation",
+          "verification": "passed",
+          "body": "Customer confirmed the first monthly PDF arrived.",
+          "evidence_ids": [],
+          "expected_request_version": "${s3.request.version}"
+        }
+      }
+    }
+  ],
+  "expectations": [
+    {
+      "assert": "run_status",
+      "step": "s2",
+      "values": [
+        "succeeded"
+      ]
+    },
+    {
+      "assert": "proposal_kind",
+      "step": "s2",
+      "values": [
+        "answer"
+      ]
+    },
+    {
+      "assert": "proposal_validity",
+      "step": "s2",
+      "values": [
+        "valid"
+      ]
+    },
+    {
+      "assert": "evidence_sources_include_any",
+      "step": "s2",
+      "source_ids": [
+        "20-docs-scheduled-exports"
+      ]
+    },
+    {
+      "assert": "context_includes",
+      "step": "s2",
+      "field": "attempts",
+      "ids": [
+        "attempt_corvid_weekly_xlsx"
+      ]
+    },
+    {
+      "assert": "action_status",
+      "step": "s2",
+      "values": [
+        "succeeded"
+      ]
+    },
+    {
+      "assert": "action_verification",
+      "step": "s2",
+      "values": [
+        "pending"
+      ]
+    },
+    {
+      "assert": "no_action_kinds",
+      "step": "s2",
+      "kinds": [
+        "create_work",
+        "link_work",
+        "escalate"
+      ]
+    },
+    {
+      "assert": "work_item_count_delta",
+      "step": "s2",
+      "value": 0
+    },
+    {
+      "assert": "request_status",
+      "step": "s3",
+      "values": [
+        "awaiting_verification"
+      ]
+    },
+    {
+      "assert": "request_status",
+      "step": "s4",
+      "values": [
+        "resolved"
+      ]
+    }
+  ]
+}

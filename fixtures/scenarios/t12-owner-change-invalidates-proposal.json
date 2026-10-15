@@ -1,0 +1,181 @@
+{
+  "id": "t12-owner-change-invalidates-proposal",
+  "acceptance_ids": [
+    "T12"
+  ],
+  "workspace_id": "ws_demo",
+  "description": "Helix reports missed webhooks again; the agent proposes link_work to work_webhook_retry_queue (awaiting review). Before the operator commits, the work item's owner changes. Committing the old proposal must fail (stale), nothing is dispatched, and a replan uses the new revision.",
+  "preconditions": [
+    "fresh_seed"
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "action": "create_request",
+      "input": {
+        "customer_id": "customer_helix",
+        "subject": "Webhook events lost again during maintenance",
+        "body": "Events sent during last Sunday's maintenance window are missing again. We need them redelivered and this fixed permanently.",
+        "channel": "manual",
+        "capability_ids": [],
+        "external_ref": null,
+        "auto_start": true,
+        "planner_mode": "scripted"
+      }
+    },
+    {
+      "id": "s2",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s3",
+      "action": "get_work_item",
+      "input": {
+        "work_item_id": "work_webhook_retry_queue"
+      }
+    },
+    {
+      "id": "s4",
+      "action": "patch_work_item",
+      "input": {
+        "work_item_id": "work_webhook_retry_queue",
+        "body": {
+          "expected_version": "${s3.work_item.version}",
+          "status": "in_progress",
+          "owner_id": "person_leo",
+          "forecast_at": "2026-11-15T00:00:00Z",
+          "reason": "Ownership moved from Ines to Leo (synthetic reorg)."
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "action": "commit_proposal",
+      "input": {
+        "proposal_id": "${s2.proposal.id}",
+        "idempotency_key": "scenario-s5",
+        "body": {
+          "expected_revision": "${s2.proposal.based_on_revision}",
+          "authorization_id": null
+        }
+      }
+    },
+    {
+      "id": "s6",
+      "action": "get_proposal",
+      "input": {
+        "proposal_id": "${s2.proposal.id}"
+      }
+    },
+    {
+      "id": "s7",
+      "action": "list_actions",
+      "input": {
+        "request_id": "${s1.request.id}"
+      }
+    },
+    {
+      "id": "s8",
+      "action": "start_run",
+      "input": {
+        "request_id": "${s1.request.id}",
+        "body": {
+          "mode": "scripted",
+          "instruction": "Replan after owner change.",
+          "authorization_id": null
+        }
+      }
+    },
+    {
+      "id": "s9",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s8.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    }
+  ],
+  "expectations": [
+    {
+      "assert": "proposal_kind",
+      "step": "s2",
+      "values": [
+        "link_work"
+      ]
+    },
+    {
+      "assert": "proposal_payload_equals",
+      "step": "s2",
+      "path": "work_item_id",
+      "value": "work_webhook_retry_queue"
+    },
+    {
+      "assert": "context_includes",
+      "step": "s2",
+      "field": "attempts",
+      "ids": [
+        "attempt_helix_webhook_retry_backoff"
+      ]
+    },
+    {
+      "assert": "http_error",
+      "step": "s5",
+      "status": [
+        409,
+        422
+      ],
+      "codes": [
+        "REVISION_CONFLICT",
+        "POLICY_VIOLATION"
+      ]
+    },
+    {
+      "assert": "proposal_validity",
+      "step": "s6",
+      "values": [
+        "stale"
+      ]
+    },
+    {
+      "assert": "no_action_status",
+      "step": "s7",
+      "statuses": [
+        "dispatching",
+        "succeeded"
+      ]
+    },
+    {
+      "assert": "revision_gt",
+      "a": "${s9.proposal.based_on_revision}",
+      "b": "${s2.proposal.based_on_revision}"
+    },
+    {
+      "assert": "text_matches",
+      "step": "s9",
+      "fields": [
+        "explanation",
+        "payload.comment_text"
+      ],
+      "regex": "(?i)(leo|person_leo)",
+      "optional": true
+    }
+  ]
+}

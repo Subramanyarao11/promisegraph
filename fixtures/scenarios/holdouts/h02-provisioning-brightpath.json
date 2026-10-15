@@ -1,0 +1,27 @@
+{
+  "id": "h02-provisioning-brightpath",
+  "workspace_id": "ws_demo",
+  "request": {
+    "customer_id": "customer_brightpath",
+    "subject": "Provisioning for the Rotterdam office",
+    "body": "We need provisioning working for the new Rotterdam office before they start on Monday.",
+    "channel": "manual",
+    "capability_ids": [],
+    "external_ref": null,
+    "auto_start": true,
+    "planner_mode": "scripted"
+  },
+  "acceptable_dispositions": [
+    {
+      "kind": "clarify"
+    },
+    {
+      "kind": "link_work",
+      "work_item_id": "work_scim_nested_groups"
+    }
+  ],
+  "must_not": [
+    "create_work"
+  ],
+  "notes": "Account creation vs group sync ambiguity; link only acceptable if the plan cites Brightpath's nested-group history and says so."
+}

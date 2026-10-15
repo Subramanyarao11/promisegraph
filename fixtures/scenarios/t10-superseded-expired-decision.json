@@ -1,0 +1,208 @@
+{
+  "id": "t10-superseded-expired-decision",
+  "acceptance_ids": [
+    "T10"
+  ],
+  "workspace_id": "ws_demo",
+  "description": "Brightpath is under an allowed_action_types decision without create_work, so a request needing new work (Parquet export format) is escalated. Superseding the decision to allow create_work changes the next plan; the old decision is preserved as superseded. Separately, Helix's expired scope_reduction_allowed decision must not be applied as active.",
+  "preconditions": [
+    "fresh_seed"
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "action": "create_request",
+      "input": {
+        "customer_id": "customer_brightpath",
+        "subject": "Nightly export in Parquet format",
+        "body": "Our data team wants the nightly shipments scheduled export delivered as Parquet instead of CSV so it can load straight into our lakehouse.",
+        "channel": "manual",
+        "capability_ids": [],
+        "external_ref": null,
+        "auto_start": true,
+        "planner_mode": "scripted"
+      }
+    },
+    {
+      "id": "s2",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s3",
+      "action": "decision_command",
+      "input": {
+        "operation": "supersede",
+        "decision_id": "decision_brightpath_actions",
+        "rule_type": "allowed_action_types",
+        "value": [
+          "answer",
+          "clarify",
+          "link_work",
+          "create_work",
+          "escalate"
+        ],
+        "scope": {
+          "entity_type": "customer",
+          "entity_id": "customer_brightpath"
+        },
+        "rationale": "Account team lifted the Brightpath contract freeze (synthetic).",
+        "effective_at": "2026-10-16T04:30:00Z",
+        "expires_at": null,
+        "evidence_ids": [],
+        "expected_revision": "${knowledge_revision}"
+      }
+    },
+    {
+      "id": "s4",
+      "action": "get_proposal",
+      "input": {
+        "proposal_id": "${s2.proposal.id}"
+      }
+    },
+    {
+      "id": "s5",
+      "action": "start_run",
+      "input": {
+        "request_id": "${s1.request.id}",
+        "body": {
+          "mode": "scripted",
+          "instruction": "Re-plan after decision change.",
+          "authorization_id": null
+        }
+      }
+    },
+    {
+      "id": "s6",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s5.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s7",
+      "action": "list_decisions",
+      "input": {
+        "scope_entity_type": "customer",
+        "scope_entity_id": "customer_brightpath",
+        "active": false
+      }
+    },
+    {
+      "id": "s8",
+      "action": "create_request",
+      "input": {
+        "customer_id": "customer_helix",
+        "subject": "Daily summaries only for the new subsidiary",
+        "body": "For our new subsidiary can we again limit scheduled exports to daily summaries instead of the hourly detail, like we did in the pilot?",
+        "channel": "manual",
+        "capability_ids": [],
+        "external_ref": null,
+        "auto_start": true,
+        "planner_mode": "scripted"
+      }
+    },
+    {
+      "id": "s9",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s8.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    }
+  ],
+  "expectations": [
+    {
+      "assert": "context_includes",
+      "step": "s2",
+      "field": "decisions",
+      "ids": [
+        "decision_brightpath_actions"
+      ]
+    },
+    {
+      "assert": "proposal_kind",
+      "step": "s2",
+      "values": [
+        "escalate"
+      ]
+    },
+    {
+      "assert": "proposal_validity",
+      "step": "s4",
+      "values": [
+        "stale"
+      ]
+    },
+    {
+      "assert": "proposal_kind",
+      "step": "s6",
+      "values": [
+        "create_work"
+      ]
+    },
+    {
+      "assert": "proposal_payload_in",
+      "step": "s6",
+      "path": "capability_id",
+      "values": [
+        "cap_scheduled_exports"
+      ]
+    },
+    {
+      "assert": "decision_state",
+      "step": "s7",
+      "id": "decision_brightpath_actions",
+      "status": "superseded"
+    },
+    {
+      "assert": "decision_state",
+      "step": "s7",
+      "id": "${s3.decision.id}",
+      "status": "active",
+      "supersedes_id": "decision_brightpath_actions"
+    },
+    {
+      "assert": "context_excludes_active",
+      "step": "s9",
+      "field": "decisions",
+      "ids": [
+        "decision_helix_scope_reduction"
+      ]
+    },
+    {
+      "assert": "text_not_matches",
+      "step": "s9",
+      "fields": [
+        "explanation",
+        "payload.draft_text"
+      ],
+      "regex": "(?i)scope reduction (is )?(allowed|approved|permitted)"
+    }
+  ]
+}

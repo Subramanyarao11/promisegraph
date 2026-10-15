@@ -1,0 +1,313 @@
+{
+  "workspace_id": "ws_demo",
+  "observed_at": "2026-10-15T18:00:00Z",
+  "decisions": [
+    {
+      "id": "decision_exports_001",
+      "rule_type": "forbidden_workaround",
+      "value": "manual_public_export_link",
+      "scope": {
+        "entity_type": "customer",
+        "entity_id": "customer_acme"
+      },
+      "status": "active",
+      "rationale": "Synthetic policy: export links must remain authenticated. Acme's security review forbids unauthenticated public links as an export workaround.",
+      "author_id": "person_ops",
+      "effective_at": "2026-08-14T00:00:00Z",
+      "expires_at": null,
+      "supersedes_id": null
+    },
+    {
+      "id": "decision_exports_routing_v1",
+      "rule_type": "routing_owner",
+      "value": "person_dana",
+      "scope": {
+        "entity_type": "capability",
+        "entity_id": "cap_scheduled_exports"
+      },
+      "status": "superseded",
+      "rationale": "Route scheduled-export infrastructure escalations to the queue owner.",
+      "author_id": "person_ines",
+      "effective_at": "2026-05-01T00:00:00Z",
+      "expires_at": null,
+      "supersedes_id": null
+    },
+    {
+      "id": "decision_exports_routing_v2",
+      "rule_type": "routing_owner",
+      "value": "person_maya",
+      "scope": {
+        "entity_type": "capability",
+        "entity_id": "cap_scheduled_exports"
+      },
+      "status": "active",
+      "rationale": "Dana left on 2026-09-30. Scheduled-export escalations, including queue v2 blockers, route to Maya (Data Platform lead).",
+      "author_id": "person_ines",
+      "effective_at": "2026-10-01T00:00:00Z",
+      "expires_at": null,
+      "supersedes_id": "decision_exports_routing_v1"
+    },
+    {
+      "id": "decision_helix_scope_reduction",
+      "rule_type": "scope_reduction_allowed",
+      "value": true,
+      "scope": {
+        "entity_type": "customer",
+        "entity_id": "customer_helix"
+      },
+      "status": "expired",
+      "rationale": "Helix accepted daily-summary-only exports for the pilot phase.",
+      "author_id": "person_ops",
+      "effective_at": "2026-08-15T00:00:00Z",
+      "expires_at": "2026-09-30T23:59:59Z",
+      "supersedes_id": null
+    },
+    {
+      "id": "decision_tamarind_scope_reduction",
+      "rule_type": "scope_reduction_allowed",
+      "value": true,
+      "scope": {
+        "entity_type": "customer",
+        "entity_id": "customer_tamarind"
+      },
+      "status": "active",
+      "rationale": "Tamarind agreed to phased delivery: daily cadence first, hourly cadence later.",
+      "author_id": "person_ops",
+      "effective_at": "2026-09-12T00:00:00Z",
+      "expires_at": null,
+      "supersedes_id": null
+    },
+    {
+      "id": "decision_corvid_retention_extension",
+      "rule_type": "date_extension_allowed",
+      "value": true,
+      "scope": {
+        "entity_type": "customer",
+        "entity_id": "customer_corvid"
+      },
+      "status": "active",
+      "rationale": "Account team agreed Corvid may receive up to 60-day extensions on purge deadlines for audit purposes.",
+      "author_id": "person_ops",
+      "effective_at": "2026-09-01T00:00:00Z",
+      "expires_at": null,
+      "supersedes_id": null
+    },
+    {
+      "id": "decision_retention_no_extension",
+      "rule_type": "date_extension_allowed",
+      "value": false,
+      "scope": {
+        "entity_type": "capability",
+        "entity_id": "cap_data_retention"
+      },
+      "status": "active",
+      "rationale": "Legal: no extensions to retention purge dates for any customer while the purge job rewrite is in progress (2026-Q4).",
+      "author_id": "person_ines",
+      "effective_at": "2026-10-05T00:00:00Z",
+      "expires_at": null,
+      "supersedes_id": null
+    },
+    {
+      "id": "decision_brightpath_actions",
+      "rule_type": "allowed_action_types",
+      "value": [
+        "answer",
+        "clarify",
+        "link_work",
+        "escalate"
+      ],
+      "scope": {
+        "entity_type": "customer",
+        "entity_id": "customer_brightpath"
+      },
+      "status": "active",
+      "rationale": "Brightpath contract freeze: no new engineering work may be opened on their behalf without account-team review.",
+      "author_id": "person_ops",
+      "effective_at": "2026-09-20T00:00:00Z",
+      "expires_at": null,
+      "supersedes_id": null
+    }
+  ],
+  "attempts": [
+    {
+      "id": "attempt_exports_001",
+      "request_id": "request_exports_prior",
+      "work_item_id": "work_export_issue",
+      "procedure_key": "retry_schedule",
+      "context_signature": "cap_scheduled_exports:worker-v1",
+      "scope": {
+        "entity_type": "capability",
+        "entity_id": "cap_scheduled_exports"
+      },
+      "outcome": "failed",
+      "verification": "failed",
+      "summary": "Retrying did not restore exports in the recorded configuration.",
+      "observed_at": "2026-10-12T15:00:00Z"
+    },
+    {
+      "id": "attempt_exports_acme_rerun",
+      "request_id": "request_exports_acme_retry",
+      "work_item_id": "work_export_issue",
+      "procedure_key": "manual_run_now",
+      "context_signature": "customer_acme:cap_scheduled_exports:v4.2:worker-v1",
+      "scope": {
+        "entity_type": "customer",
+        "entity_id": "customer_acme"
+      },
+      "outcome": "failed",
+      "verification": "failed",
+      "summary": "'Run now' queued the job on queue v1 which no worker consumes; nothing was delivered.",
+      "observed_at": "2026-10-13T09:00:00Z"
+    },
+    {
+      "id": "attempt_acme_utc_recreate",
+      "request_id": "request_acme_dst_skip",
+      "work_item_id": "work_export_dst_skip",
+      "procedure_key": "recreate_schedule_utc",
+      "context_signature": "customer_acme:cap_scheduled_exports:v4.2:fiscal-calendar",
+      "scope": {
+        "entity_type": "customer",
+        "entity_id": "customer_acme"
+      },
+      "outcome": "failed",
+      "verification": "failed",
+      "summary": "Recreating the schedule in UTC did not prevent the skipped run for Acme's fiscal-calendar schedule on product version 4.2; Acme confirmed the next transition still skipped.",
+      "observed_at": "2026-04-02T10:00:00Z"
+    },
+    {
+      "id": "attempt_corvid_weekly_xlsx",
+      "request_id": "request_corvid_schedule_howto",
+      "work_item_id": null,
+      "procedure_key": "configure_weekly_schedule_email",
+      "context_signature": "cap_scheduled_exports:v4.2:xlsx:email",
+      "scope": {
+        "entity_type": "capability",
+        "entity_id": "cap_scheduled_exports"
+      },
+      "outcome": "succeeded",
+      "verification": "passed",
+      "summary": "Guided customer through Schedule > Weekly > Monday 07:00 Europe/Berlin > XLSX > 3 recipients. Customer confirmed the first export arrived.",
+      "observed_at": "2026-08-25T08:00:00Z"
+    },
+    {
+      "id": "attempt_helix_webhook_retry_backoff",
+      "request_id": "request_helix_webhook_retries",
+      "work_item_id": "work_webhook_retry_queue",
+      "procedure_key": "enable_retry_backoff",
+      "context_signature": "customer_helix:cap_webhooks:v4.2:30min-retry-window",
+      "scope": {
+        "entity_type": "request",
+        "entity_id": "request_helix_webhook_retries"
+      },
+      "outcome": "succeeded",
+      "verification": "failed",
+      "summary": "Retry with backoff was enabled, but events from the 2-hour maintenance window exceeded the 30-minute retry window; customer reports events still missing.",
+      "observed_at": "2026-09-29T10:00:00Z"
+    },
+    {
+      "id": "attempt_corvid_429_bulk",
+      "request_id": "request_corvid_rate_limit_429",
+      "work_item_id": null,
+      "procedure_key": "use_bulk_endpoint_and_retry_after",
+      "context_signature": "cap_api_rate_limits:v4.2",
+      "scope": {
+        "entity_type": "capability",
+        "entity_id": "cap_api_rate_limits"
+      },
+      "outcome": "succeeded",
+      "verification": "passed",
+      "summary": "Switching the backfill to the bulk metrics endpoint and honouring Retry-After removed the 429s; customer confirmed.",
+      "observed_at": "2026-08-07T10:00:00Z"
+    },
+    {
+      "id": "attempt_helix_scim_accounts",
+      "request_id": "request_helix_scim_accounts",
+      "work_item_id": "work_scim_user_provisioning_ga",
+      "procedure_key": "enable_scim_user_provisioning",
+      "context_signature": "customer_helix:cap_scim_user_provisioning:v4.2",
+      "scope": {
+        "entity_type": "customer",
+        "entity_id": "customer_helix"
+      },
+      "outcome": "succeeded",
+      "verification": "passed",
+      "summary": "Enabled SCIM /Users provisioning with a scoped token; new-hire accounts created automatically. Customer confirmed.",
+      "observed_at": "2026-07-20T10:00:00Z"
+    },
+    {
+      "id": "attempt_brightpath_flatten_groups",
+      "request_id": "request_brightpath_group_sync",
+      "work_item_id": "work_scim_nested_groups",
+      "procedure_key": "flatten_nested_groups_in_idp",
+      "context_signature": "customer_brightpath:cap_scim_group_sync:v4.2:nested",
+      "scope": {
+        "entity_type": "customer",
+        "entity_id": "customer_brightpath"
+      },
+      "outcome": "unknown",
+      "verification": "inconclusive",
+      "summary": "Suggested flattening nested groups in the IdP; customer has not confirmed whether roles now map correctly.",
+      "observed_at": "2026-10-01T10:00:00Z"
+    },
+    {
+      "id": "attempt_tamarind_split_export",
+      "request_id": "request_tamarind_csv_large",
+      "work_item_id": "work_csv_async_large",
+      "procedure_key": "split_export_by_date_range",
+      "context_signature": "customer_tamarind:cap_csv_export:v4.2",
+      "scope": {
+        "entity_type": "customer",
+        "entity_id": "customer_tamarind"
+      },
+      "outcome": "succeeded",
+      "verification": "passed",
+      "summary": "Splitting the export into monthly date ranges completed within the timeout; customer confirmed as an interim workaround.",
+      "observed_at": "2026-09-22T10:00:00Z"
+    },
+    {
+      "id": "attempt_acme_sso_jit",
+      "request_id": "request_acme_sso_jit",
+      "work_item_id": null,
+      "procedure_key": "enable_jit_provisioning",
+      "context_signature": "customer_acme:cap_sso_saml:v4.2",
+      "scope": {
+        "entity_type": "customer",
+        "entity_id": "customer_acme"
+      },
+      "outcome": "succeeded",
+      "verification": "passed",
+      "summary": "Enabled just-in-time account creation on SAML login; affected users could sign in. Customer confirmed.",
+      "observed_at": "2026-08-29T10:00:00Z"
+    },
+    {
+      "id": "attempt_corvid_scim_v2",
+      "request_id": "request_corvid_scim_deprovision",
+      "work_item_id": "work_scim_deprovision_fix",
+      "procedure_key": "upgrade_scim_connector_v2",
+      "context_signature": "customer_corvid:cap_scim_user_provisioning:v4.2:connector-v1",
+      "scope": {
+        "entity_type": "customer",
+        "entity_id": "customer_corvid"
+      },
+      "outcome": "succeeded",
+      "verification": "passed",
+      "summary": "Upgraded to SCIM connector v2; deactivation now revokes sessions. Customer confirmed.",
+      "observed_at": "2026-09-12T10:00:00Z"
+    },
+    {
+      "id": "attempt_helix_alert_sensitivity",
+      "request_id": "request_helix_alert_noise",
+      "work_item_id": "work_alert_sensitivity",
+      "procedure_key": "lower_anomaly_sensitivity",
+      "context_signature": "customer_helix:cap_metric_alerts:v4.2",
+      "scope": {
+        "entity_type": "customer",
+        "entity_id": "customer_helix"
+      },
+      "outcome": "succeeded",
+      "verification": "pending",
+      "summary": "Set sensitivity to low on the ledger volume alert; awaiting customer confirmation that noise is reduced.",
+      "observed_at": "2026-10-09T10:00:00Z"
+    }
+  ]
+}

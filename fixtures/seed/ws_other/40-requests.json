@@ -1,0 +1,70 @@
+{
+  "workspace_id": "ws_other",
+  "observed_at": "2026-10-15T10:00:00Z",
+  "requests": [
+    {
+      "id": "request_ox_quill_exports",
+      "customer_id": "customer_ox_quill",
+      "subject": "Scheduled exports stopped working",
+      "body": "Our scheduled exports stopped working after Tuesday. We need them before Friday.",
+      "status": "awaiting_work",
+      "owner_id": "person_ox_tomas",
+      "capability_ids": [
+        "cap_ox_scheduled_exports"
+      ],
+      "linked_work_ids": [
+        "work_ox_export_outage"
+      ],
+      "related_request_ids": [],
+      "created_at": "2026-10-14T08:00:00Z"
+    },
+    {
+      "id": "request_ox_ferro_sftp",
+      "customer_id": "customer_ox_ferro",
+      "subject": "Deliver scheduled exports over SFTP",
+      "body": "We need scheduled exports delivered to our SFTP server.",
+      "status": "awaiting_work",
+      "owner_id": "person_ox_tomas",
+      "capability_ids": [
+        "cap_ox_scheduled_exports"
+      ],
+      "linked_work_ids": [
+        "work_ox_sftp_delivery"
+      ],
+      "related_request_ids": [],
+      "created_at": "2026-10-13T08:00:00Z"
+    },
+    {
+      "id": "request_ox_ferro_provisioning",
+      "customer_id": "customer_ox_ferro",
+      "subject": "We need provisioning",
+      "body": "We need provisioning for our IdP groups.",
+      "status": "resolved",
+      "owner_id": "person_ox_tomas",
+      "capability_ids": [
+        "cap_ox_sso"
+      ],
+      "linked_work_ids": [
+        "work_ox_sso_okta"
+      ],
+      "related_request_ids": [],
+      "created_at": "2026-10-09T08:00:00Z"
+    },
+    {
+      "id": "request_ox_quill_webhooks",
+      "customer_id": "customer_ox_quill",
+      "subject": "Webhook signature verification",
+      "body": "How do we verify your webhook signatures?",
+      "status": "open",
+      "owner_id": null,
+      "capability_ids": [
+        "cap_ox_webhooks"
+      ],
+      "linked_work_ids": [],
+      "related_request_ids": [
+        "request_ox_quill_exports"
+      ],
+      "created_at": "2026-10-15T08:00:00Z"
+    }
+  ]
+}

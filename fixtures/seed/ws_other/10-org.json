@@ -1,0 +1,90 @@
+{
+  "workspace_id": "ws_other",
+  "observed_at": "2026-10-15T00:00:00Z",
+  "customers": [
+    {
+      "id": "customer_ox_quill",
+      "name": "Quill Media Group (synthetic)",
+      "plan": "growth",
+      "constraints": []
+    },
+    {
+      "id": "customer_ox_ferro",
+      "name": "Ferro Fabrication (synthetic)",
+      "plan": "enterprise",
+      "constraints": [
+        "Scheduled exports must be delivered before 06:00 UTC."
+      ]
+    }
+  ],
+  "teams": [
+    {
+      "id": "team_ox_platform",
+      "name": "Platform (other workspace)"
+    }
+  ],
+  "people": [
+    {
+      "id": "person_ox_rhea",
+      "name": "Rhea Castellan",
+      "role": "Platform engineer",
+      "team_id": "team_ox_platform",
+      "active": true
+    },
+    {
+      "id": "person_ox_tomas",
+      "name": "Tomas Brenner",
+      "role": "Support engineer",
+      "team_id": "team_ox_platform",
+      "active": true
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "cap_ox_scheduled_exports",
+      "name": "Scheduled exports",
+      "aliases": [
+        "scheduled export",
+        "recurring export",
+        "nightly export"
+      ],
+      "status": "active",
+      "product_version": "2.1",
+      "owner_id": "person_ox_rhea",
+      "customer_ids": [
+        "customer_ox_quill",
+        "customer_ox_ferro"
+      ]
+    },
+    {
+      "id": "cap_ox_sso",
+      "name": "Single sign-on",
+      "aliases": [
+        "sso",
+        "saml",
+        "provisioning"
+      ],
+      "status": "active",
+      "product_version": "2.1",
+      "owner_id": "person_ox_rhea",
+      "customer_ids": [
+        "customer_ox_quill",
+        "customer_ox_ferro"
+      ]
+    },
+    {
+      "id": "cap_ox_webhooks",
+      "name": "Webhooks",
+      "aliases": [
+        "webhook",
+        "event callbacks"
+      ],
+      "status": "beta",
+      "product_version": "2.1",
+      "owner_id": null,
+      "customer_ids": [
+        "customer_ox_ferro"
+      ]
+    }
+  ]
+}

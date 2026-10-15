@@ -1,0 +1,405 @@
+{
+  "workspace_id": "ws_demo",
+  "observed_at": "2026-10-15T00:00:00Z",
+  "customers": [
+    {
+      "id": "customer_acme",
+      "name": "Acme (synthetic)",
+      "plan": "enterprise",
+      "constraints": [
+        "Export and dashboard links must remain authenticated (synthetic security review, 2026-Q3).",
+        "All scheduled exports run in the America/Chicago timezone."
+      ]
+    },
+    {
+      "id": "customer_brightpath",
+      "name": "Brightpath Logistics (synthetic)",
+      "plan": "growth",
+      "constraints": [
+        "Uses Okta-style IdP with nested groups for role mapping."
+      ]
+    },
+    {
+      "id": "customer_corvid",
+      "name": "Corvid Health Analytics (synthetic)",
+      "plan": "enterprise",
+      "constraints": [
+        "Data residency: EU region only.",
+        "Retention changes require customer DPO sign-off."
+      ]
+    },
+    {
+      "id": "customer_helix",
+      "name": "Helix Ledger (synthetic)",
+      "plan": "enterprise",
+      "constraints": [
+        "Webhook consumer has a weekly 2-hour maintenance window (Sunday 01:00-03:00 UTC)."
+      ]
+    },
+    {
+      "id": "customer_tamarind",
+      "name": "Tamarind Retail Co. (synthetic)",
+      "plan": "growth",
+      "constraints": [
+        "Receives files only through SFTP on their side of the firewall; no inbound S3 access."
+      ]
+    }
+  ],
+  "teams": [
+    {
+      "id": "team_data_platform",
+      "name": "Data Platform"
+    },
+    {
+      "id": "team_identity",
+      "name": "Identity & Access"
+    },
+    {
+      "id": "team_support_ops",
+      "name": "Support Operations"
+    }
+  ],
+  "people": [
+    {
+      "id": "person_maya",
+      "name": "Maya Raman",
+      "role": "Engineering lead, exports and pipelines",
+      "team_id": "team_data_platform",
+      "active": true
+    },
+    {
+      "id": "person_leo",
+      "name": "Leo Okafor",
+      "role": "Software engineer, exports",
+      "team_id": "team_data_platform",
+      "active": true
+    },
+    {
+      "id": "person_dana",
+      "name": "Dana Whitlock",
+      "role": "Former infrastructure engineer (left 2026-09-30)",
+      "team_id": "team_data_platform",
+      "active": false
+    },
+    {
+      "id": "person_ines",
+      "name": "Ines Duarte",
+      "role": "Product manager, analytics platform",
+      "team_id": "team_data_platform",
+      "active": true
+    },
+    {
+      "id": "person_priya",
+      "name": "Priya Natarajan",
+      "role": "Engineering lead, identity",
+      "team_id": "team_identity",
+      "active": true
+    },
+    {
+      "id": "person_jonas",
+      "name": "Jonas Lindqvist",
+      "role": "Software engineer, SCIM and audit",
+      "team_id": "team_identity",
+      "active": true
+    },
+    {
+      "id": "person_ops",
+      "name": "Ola Petersen",
+      "role": "Support operations policy lead",
+      "team_id": "team_support_ops",
+      "active": true
+    },
+    {
+      "id": "person_sam",
+      "name": "Sam Achebe",
+      "role": "Senior support engineer",
+      "team_id": "team_support_ops",
+      "active": true
+    },
+    {
+      "id": "person_operator",
+      "name": "Demo Operator",
+      "role": "Support operator (demo actor)",
+      "team_id": "team_support_ops",
+      "active": true
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "cap_scheduled_exports",
+      "name": "Scheduled exports",
+      "aliases": [
+        "scheduled export",
+        "recurring export",
+        "export schedule",
+        "automated exports",
+        "nightly export",
+        "weekly export"
+      ],
+      "status": "active",
+      "product_version": "4.2",
+      "owner_id": "person_maya",
+      "customer_ids": [
+        "customer_acme",
+        "customer_brightpath",
+        "customer_corvid",
+        "customer_helix",
+        "customer_tamarind"
+      ]
+    },
+    {
+      "id": "cap_csv_export",
+      "name": "Manual CSV/XLSX export",
+      "aliases": [
+        "download csv",
+        "ad hoc export",
+        "export to excel",
+        "xlsx download"
+      ],
+      "status": "active",
+      "product_version": "4.2",
+      "owner_id": "person_leo",
+      "customer_ids": [
+        "customer_acme",
+        "customer_brightpath",
+        "customer_corvid",
+        "customer_helix",
+        "customer_tamarind"
+      ]
+    },
+    {
+      "id": "cap_s3_export_destination",
+      "name": "S3 bucket destination for exports",
+      "aliases": [
+        "s3 export",
+        "bucket delivery",
+        "export to s3",
+        "object storage delivery"
+      ],
+      "status": "beta",
+      "product_version": "4.3",
+      "owner_id": "person_leo",
+      "customer_ids": [
+        "customer_tamarind",
+        "customer_acme"
+      ]
+    },
+    {
+      "id": "cap_sftp_export_destination",
+      "name": "SFTP delivery for exports",
+      "aliases": [
+        "sftp export",
+        "sftp delivery",
+        "file transfer delivery",
+        "secure ftp"
+      ],
+      "status": "planned",
+      "product_version": null,
+      "owner_id": null,
+      "customer_ids": []
+    },
+    {
+      "id": "cap_sso_saml",
+      "name": "SAML single sign-on",
+      "aliases": [
+        "sso",
+        "saml",
+        "single sign-on",
+        "idp login",
+        "jit provisioning"
+      ],
+      "status": "active",
+      "product_version": "4.2",
+      "owner_id": "person_priya",
+      "customer_ids": [
+        "customer_acme",
+        "customer_brightpath",
+        "customer_corvid",
+        "customer_helix",
+        "customer_tamarind"
+      ]
+    },
+    {
+      "id": "cap_scim_user_provisioning",
+      "name": "SCIM user provisioning (account creation and deprovisioning)",
+      "aliases": [
+        "provisioning",
+        "user provisioning",
+        "account creation",
+        "auto-create accounts",
+        "deprovisioning",
+        "scim users"
+      ],
+      "status": "active",
+      "product_version": "4.2",
+      "owner_id": "person_jonas",
+      "customer_ids": [
+        "customer_acme",
+        "customer_brightpath",
+        "customer_corvid",
+        "customer_helix",
+        "customer_tamarind"
+      ]
+    },
+    {
+      "id": "cap_scim_group_sync",
+      "name": "SCIM group sync and role mapping",
+      "aliases": [
+        "provisioning",
+        "group sync",
+        "group push",
+        "role mapping",
+        "scim groups"
+      ],
+      "status": "active",
+      "product_version": "4.2",
+      "owner_id": "person_jonas",
+      "customer_ids": [
+        "customer_acme",
+        "customer_brightpath",
+        "customer_corvid",
+        "customer_helix",
+        "customer_tamarind"
+      ]
+    },
+    {
+      "id": "cap_api_rate_limits",
+      "name": "Public API rate limits",
+      "aliases": [
+        "rate limit",
+        "429",
+        "throttling",
+        "api quota",
+        "too many requests"
+      ],
+      "status": "active",
+      "product_version": "4.2",
+      "owner_id": "person_leo",
+      "customer_ids": [
+        "customer_acme",
+        "customer_brightpath",
+        "customer_corvid",
+        "customer_helix",
+        "customer_tamarind"
+      ]
+    },
+    {
+      "id": "cap_webhooks",
+      "name": "Webhooks",
+      "aliases": [
+        "webhook",
+        "event callbacks",
+        "webhook retries",
+        "webhook signature"
+      ],
+      "status": "active",
+      "product_version": "4.2",
+      "owner_id": "person_ines",
+      "customer_ids": [
+        "customer_acme",
+        "customer_brightpath",
+        "customer_corvid",
+        "customer_helix",
+        "customer_tamarind"
+      ]
+    },
+    {
+      "id": "cap_data_retention",
+      "name": "Data retention policies",
+      "aliases": [
+        "retention",
+        "data deletion",
+        "purge",
+        "legal hold",
+        "data lifecycle"
+      ],
+      "status": "active",
+      "product_version": "4.2",
+      "owner_id": "person_maya",
+      "customer_ids": [
+        "customer_acme",
+        "customer_brightpath",
+        "customer_corvid",
+        "customer_helix",
+        "customer_tamarind"
+      ]
+    },
+    {
+      "id": "cap_dashboard_sharing",
+      "name": "Dashboard sharing and embedding",
+      "aliases": [
+        "share dashboard",
+        "public link",
+        "embed dashboard",
+        "share link"
+      ],
+      "status": "active",
+      "product_version": "4.2",
+      "owner_id": "person_ines",
+      "customer_ids": [
+        "customer_acme",
+        "customer_brightpath",
+        "customer_corvid",
+        "customer_helix",
+        "customer_tamarind"
+      ]
+    },
+    {
+      "id": "cap_audit_log",
+      "name": "Audit log",
+      "aliases": [
+        "activity log",
+        "audit trail",
+        "admin events",
+        "siem"
+      ],
+      "status": "active",
+      "product_version": "4.2",
+      "owner_id": "person_jonas",
+      "customer_ids": [
+        "customer_acme",
+        "customer_brightpath",
+        "customer_corvid",
+        "customer_helix",
+        "customer_tamarind"
+      ]
+    },
+    {
+      "id": "cap_metric_alerts",
+      "name": "Metric alerts",
+      "aliases": [
+        "threshold alerts",
+        "anomaly alerts",
+        "alert notifications",
+        "alert digest"
+      ],
+      "status": "active",
+      "product_version": "4.2",
+      "owner_id": "person_leo",
+      "customer_ids": [
+        "customer_acme",
+        "customer_brightpath",
+        "customer_corvid",
+        "customer_helix",
+        "customer_tamarind"
+      ]
+    },
+    {
+      "id": "cap_warehouse_sync",
+      "name": "Warehouse sync",
+      "aliases": [
+        "warehouse connector",
+        "data warehouse sync",
+        "reverse etl",
+        "sync lag"
+      ],
+      "status": "beta",
+      "product_version": "4.3",
+      "owner_id": "person_maya",
+      "customer_ids": [
+        "customer_acme",
+        "customer_brightpath"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,154 @@
+{
+  "id": "t18-failed-verification-reopens",
+  "acceptance_ids": [
+    "T18"
+  ],
+  "workspace_id": "ws_demo",
+  "description": "J6: Tamarind asks how to verify webhook signatures; an answer is drafted. The customer reports it still fails. Failed verification moves the request back to investigating, records a failed attempt, and queues a follow-up run whose context retrieves that failed attempt.",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "create_request",
+      "input": {
+        "customer_id": "customer_tamarind",
+        "subject": "Webhook signature check failing",
+        "body": "Our Node service rejects every webhook because the signature never matches. How exactly should we compute it?",
+        "channel": "manual",
+        "capability_ids": [],
+        "external_ref": null,
+        "auto_start": true,
+        "planner_mode": "scripted"
+      }
+    },
+    {
+      "id": "s2",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s3",
+      "action": "get_request",
+      "input": {
+        "request_id": "${s1.request.id}"
+      }
+    },
+    {
+      "id": "s4",
+      "action": "record_observation",
+      "input": {
+        "request_id": "${s1.request.id}",
+        "body": {
+          "action_id": "${s2.latest_action.id}",
+          "kind": "customer_confirmation",
+          "verification": "failed",
+          "body": "Customer followed the steps; signatures still do not match because their framework re-serialises the JSON body.",
+          "evidence_ids": [],
+          "expected_request_version": "${s3.request.version}"
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "action": "get_request",
+      "input": {
+        "request_id": "${s1.request.id}"
+      }
+    },
+    {
+      "id": "s6",
+      "action": "list_runs",
+      "input": {
+        "request_id": "${s1.request.id}"
+      }
+    },
+    {
+      "id": "s7",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s6.latest_run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s8",
+      "action": "get_request_context",
+      "input": {
+        "request_id": "${s1.request.id}"
+      }
+    }
+  ],
+  "expectations": [
+    {
+      "assert": "proposal_kind",
+      "step": "s2",
+      "values": [
+        "answer"
+      ]
+    },
+    {
+      "assert": "evidence_sources_include_any",
+      "step": "s2",
+      "source_ids": [
+        "20-docs-webhooks"
+      ]
+    },
+    {
+      "assert": "request_status",
+      "step": "s3",
+      "values": [
+        "awaiting_verification"
+      ]
+    },
+    {
+      "assert": "request_status",
+      "step": "s5",
+      "values": [
+        "investigating"
+      ]
+    },
+    {
+      "assert": "count_runs",
+      "step": "s6",
+      "min": 2
+    },
+    {
+      "assert": "context_attempt_recorded",
+      "step": "s8",
+      "request_id": "${s1.request.id}",
+      "outcome_in": [
+        "failed",
+        "succeeded",
+        "unknown"
+      ],
+      "verification": "failed"
+    },
+    {
+      "assert": "text_matches",
+      "step": "s7",
+      "fields": [
+        "explanation",
+        "payload.draft_text",
+        "payload.question"
+      ],
+      "regex": "(?i)(raw body|re-?serial|previous|earlier|failed)",
+      "optional": true
+    }
+  ]
+}

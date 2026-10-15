@@ -1,0 +1,95 @@
+{
+  "id": "t11-conflicting-active-decisions",
+  "acceptance_ids": [
+    "T11"
+  ],
+  "workspace_id": "ws_demo",
+  "description": "Corvid asks to delay a purge. decision_corvid_retention_extension (customer scope, true) and decision_retention_no_extension (capability scope, false) are both active and overlap. The model must not quietly pick one: clarification or escalation, citing both.",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "create_request",
+      "input": {
+        "customer_id": "customer_corvid",
+        "subject": "Delay purge of Q1 2025 raw events",
+        "body": "Our auditors need the Q1 2025 raw events kept 30 days beyond the scheduled purge date. Please push that purge back.",
+        "channel": "manual",
+        "capability_ids": [],
+        "external_ref": null,
+        "auto_start": true,
+        "planner_mode": "scripted"
+      }
+    },
+    {
+      "id": "s2",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s3",
+      "action": "get_request",
+      "input": {
+        "request_id": "${s1.request.id}"
+      }
+    }
+  ],
+  "expectations": [
+    {
+      "assert": "context_includes",
+      "step": "s2",
+      "field": "decisions",
+      "ids": [
+        "decision_corvid_retention_extension",
+        "decision_retention_no_extension"
+      ]
+    },
+    {
+      "assert": "proposal_kind",
+      "step": "s2",
+      "values": [
+        "escalate",
+        "clarify"
+      ]
+    },
+    {
+      "assert": "text_matches",
+      "step": "s2",
+      "fields": [
+        "explanation"
+      ],
+      "regex": "(?i)(conflict|contradict|incompatible)"
+    },
+    {
+      "assert": "proposal_cites_ids",
+      "step": "s2",
+      "ids": [
+        "decision_corvid_retention_extension",
+        "decision_retention_no_extension"
+      ]
+    },
+    {
+      "assert": "request_status",
+      "step": "s3",
+      "values": [
+        "awaiting_review",
+        "awaiting_input",
+        "escalated"
+      ]
+    },
+    {
+      "assert": "work_item_count_delta",
+      "step": "s2",
+      "value": 0
+    }
+  ]
+}

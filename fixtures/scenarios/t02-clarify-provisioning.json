@@ -1,0 +1,108 @@
+{
+  "id": "t02-clarify-provisioning",
+  "acceptance_ids": [
+    "T02"
+  ],
+  "workspace_id": "ws_demo",
+  "description": "J2: 'provisioning' is ambiguous between SCIM account creation and SCIM group sync (both aliases). The agent asks one targeted question, persists a waiting state and does not create underspecified work.",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "create_request",
+      "input": {
+        "customer_id": "customer_tamarind",
+        "subject": "Provisioning for store managers",
+        "body": "We need provisioning for our identity provider before 200 store managers join next month. Can you turn it on?",
+        "channel": "manual",
+        "capability_ids": [],
+        "external_ref": null,
+        "auto_start": true,
+        "planner_mode": "scripted"
+      }
+    },
+    {
+      "id": "s2",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s3",
+      "action": "get_request",
+      "input": {
+        "request_id": "${s1.request.id}"
+      }
+    }
+  ],
+  "expectations": [
+    {
+      "assert": "proposal_kind",
+      "step": "s2",
+      "values": [
+        "clarify"
+      ]
+    },
+    {
+      "assert": "proposal_payload_matches",
+      "step": "s2",
+      "path": "question",
+      "regex": "(?is)(account|user).*(group|role)|(group|role).*(account|user)"
+    },
+    {
+      "assert": "proposal_payload_nonempty",
+      "step": "s2",
+      "path": "missing_fields"
+    },
+    {
+      "assert": "run_status",
+      "step": "s2",
+      "values": [
+        "waiting_for_input"
+      ]
+    },
+    {
+      "assert": "action_status",
+      "step": "s2",
+      "values": [
+        "succeeded"
+      ]
+    },
+    {
+      "assert": "request_status",
+      "step": "s3",
+      "values": [
+        "awaiting_input"
+      ]
+    },
+    {
+      "assert": "work_item_count_delta",
+      "step": "s2",
+      "value": 0
+    },
+    {
+      "assert": "no_action_kinds",
+      "step": "s2",
+      "kinds": [
+        "create_work",
+        "link_work"
+      ]
+    },
+    {
+      "assert": "candidate_capabilities_include",
+      "step": "s2",
+      "ids": [
+        "cap_scim_user_provisioning",
+        "cap_scim_group_sync"
+      ]
+    }
+  ]
+}

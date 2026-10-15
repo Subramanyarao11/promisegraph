@@ -1,0 +1,147 @@
+{
+  "id": "t15-unknown-create-reconciles",
+  "acceptance_ids": [
+    "T15"
+  ],
+  "workspace_id": "ws_demo",
+  "description": "J5: create_work for chat-tool alert delivery; the local connector times out after the effect (FAULTS=local_create_timeout_after_effect). The action becomes unknown, reconciliation finds the created task by its action marker, and no duplicate task is created.",
+  "preconditions": [
+    "fresh_seed",
+    "server env FAULTS=local_create_timeout_after_effect (test profile)"
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "action": "create_request",
+      "input": {
+        "customer_id": "customer_tamarind",
+        "subject": "Send alerts to our chat tool",
+        "body": "Store managers live in our team chat tool. We want metric alerts posted to a chat channel through its incoming-webhook URL instead of email.",
+        "channel": "manual",
+        "capability_ids": [],
+        "external_ref": null,
+        "auto_start": true,
+        "planner_mode": "scripted"
+      }
+    },
+    {
+      "id": "s2",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s3",
+      "action": "commit_proposal",
+      "input": {
+        "proposal_id": "${s2.proposal.id}",
+        "idempotency_key": "scenario-s3",
+        "body": {
+          "expected_revision": "${s2.proposal.based_on_revision}",
+          "authorization_id": null
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "failed"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s5",
+      "action": "get_action",
+      "input": {
+        "action_id": "${s3.action.id}"
+      }
+    },
+    {
+      "id": "s6",
+      "action": "get_run_events",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "after_seq": 0
+      }
+    },
+    {
+      "id": "s7",
+      "action": "list_actions",
+      "input": {
+        "request_id": "${s1.request.id}"
+      }
+    }
+  ],
+  "expectations": [
+    {
+      "assert": "proposal_kind",
+      "step": "s2",
+      "values": [
+        "create_work"
+      ]
+    },
+    {
+      "assert": "rejected_alternative",
+      "step": "s2",
+      "kind": "link_work",
+      "mentions_any": [
+        "work_alert_digest"
+      ],
+      "evidence_required": false,
+      "optional": true
+    },
+    {
+      "assert": "event_payload_seen",
+      "step": "s6",
+      "type": "action_updated",
+      "payload": {
+        "status": "unknown"
+      }
+    },
+    {
+      "assert": "action_status",
+      "step": "s5",
+      "values": [
+        "succeeded"
+      ]
+    },
+    {
+      "assert": "receipt_present",
+      "step": "s5",
+      "connector": "local"
+    },
+    {
+      "assert": "count_actions",
+      "step": "s7",
+      "kind": "create_work",
+      "value": 1
+    },
+    {
+      "assert": "work_item_count_delta",
+      "step": "s7",
+      "value": 1
+    },
+    {
+      "assert": "run_status",
+      "step": "s4",
+      "values": [
+        "succeeded"
+      ]
+    }
+  ]
+}

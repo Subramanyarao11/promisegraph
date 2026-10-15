@@ -1,0 +1,179 @@
+{
+  "id": "t06-create-work-with-receipt",
+  "acceptance_ids": [
+    "T06"
+  ],
+  "workspace_id": "ws_demo",
+  "description": "J4: Corvid needs audit events streamed to a SIEM. Existing audit work (CSV download, done) does not cover it. The agent prepares a task with acceptance criteria; operator commit creates a real local task with a persisted receipt that survives re-read.",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "create_request",
+      "input": {
+        "customer_id": "customer_corvid",
+        "subject": "Stream audit events to our SIEM",
+        "body": "Our security operations team needs admin and sign-in audit events streamed to our SIEM over syslog with TLS in near real time. A CSV download is not enough for continuous monitoring.",
+        "channel": "manual",
+        "capability_ids": [],
+        "external_ref": null,
+        "auto_start": true,
+        "planner_mode": "scripted"
+      }
+    },
+    {
+      "id": "s2",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s3",
+      "action": "commit_proposal",
+      "input": {
+        "proposal_id": "${s2.proposal.id}",
+        "idempotency_key": "scenario-s3",
+        "body": {
+          "expected_revision": "${s2.proposal.based_on_revision}",
+          "authorization_id": null
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "failed",
+          "awaiting_review"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s5",
+      "action": "get_action",
+      "input": {
+        "action_id": "${s3.action.id}"
+      }
+    },
+    {
+      "id": "s6",
+      "action": "get_work_item",
+      "input": {
+        "work_item_id": "${s5.action.receipt.target_id}"
+      }
+    },
+    {
+      "id": "s7",
+      "action": "get_request",
+      "input": {
+        "request_id": "${s1.request.id}"
+      }
+    }
+  ],
+  "expectations": [
+    {
+      "assert": "proposal_kind",
+      "step": "s2",
+      "values": [
+        "create_work"
+      ]
+    },
+    {
+      "assert": "rejected_alternative",
+      "step": "s2",
+      "kind": "link_work",
+      "mentions_any": [
+        "work_audit_log_csv_download"
+      ],
+      "evidence_required": true
+    },
+    {
+      "assert": "proposal_payload_equals",
+      "step": "s2",
+      "path": "connector",
+      "value": "local"
+    },
+    {
+      "assert": "proposal_payload_in",
+      "step": "s2",
+      "path": "capability_id",
+      "values": [
+        "cap_audit_log"
+      ]
+    },
+    {
+      "assert": "proposal_payload_in",
+      "step": "s2",
+      "path": "owner_id",
+      "values": [
+        "person_jonas",
+        "person_priya",
+        null
+      ]
+    },
+    {
+      "assert": "proposal_payload_min_items",
+      "step": "s2",
+      "path": "acceptance_criteria",
+      "min": 1
+    },
+    {
+      "assert": "action_status",
+      "step": "s5",
+      "values": [
+        "succeeded"
+      ]
+    },
+    {
+      "assert": "receipt_present",
+      "step": "s5",
+      "connector": "local"
+    },
+    {
+      "assert": "work_item_field_nonempty",
+      "step": "s6",
+      "field": "title"
+    },
+    {
+      "assert": "work_item_count_delta",
+      "step": "s7",
+      "value": 1
+    },
+    {
+      "assert": "request_status",
+      "step": "s7",
+      "values": [
+        "awaiting_work"
+      ]
+    },
+    {
+      "assert": "request_linked_work_includes",
+      "step": "s7",
+      "ids": [
+        "${s5.action.receipt.target_id}"
+      ]
+    },
+    {
+      "assert": "stable_after_restart",
+      "resource": "action",
+      "id": "${s3.action.id}",
+      "fields": [
+        "status",
+        "receipt.target_id",
+        "receipt.result_hash"
+      ]
+    }
+  ]
+}

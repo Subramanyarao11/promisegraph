@@ -1,0 +1,177 @@
+{
+  "id": "t20-workspace-isolation",
+  "acceptance_ids": [
+    "T20"
+  ],
+  "workspace_id": "ws_demo",
+  "description": "ws_other shares names/keywords ('Scheduled exports', 'SFTP', 'provisioning', 'before Friday') with ws_demo. Retrieval and mutation must stay inside the route workspace; cross-workspace IDs are NOT_FOUND.",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "context_search",
+      "workspace_id": "ws_demo",
+      "input": {
+        "query": "scheduled exports SFTP before Friday",
+        "entity_types": [
+          "request",
+          "capability",
+          "work_item",
+          "source"
+        ],
+        "customer_id": null,
+        "limit": 20
+      }
+    },
+    {
+      "id": "s2",
+      "action": "context_search",
+      "workspace_id": "ws_other",
+      "input": {
+        "query": "scheduled exports stopped working",
+        "entity_types": [
+          "request",
+          "capability",
+          "work_item",
+          "source"
+        ],
+        "customer_id": null,
+        "limit": 20
+      }
+    },
+    {
+      "id": "s3",
+      "action": "get_request",
+      "workspace_id": "ws_demo",
+      "input": {
+        "request_id": "request_ox_quill_exports"
+      }
+    },
+    {
+      "id": "s4",
+      "action": "get_work_item",
+      "workspace_id": "ws_other",
+      "input": {
+        "work_item_id": "work_export_issue"
+      }
+    },
+    {
+      "id": "s5",
+      "action": "create_request",
+      "input": {
+        "customer_id": "customer_ox_quill",
+        "subject": "Exports missing",
+        "body": "Exports are missing again.",
+        "channel": "manual",
+        "capability_ids": [],
+        "external_ref": null,
+        "auto_start": true,
+        "planner_mode": "scripted"
+      },
+      "workspace_id": "ws_demo"
+    },
+    {
+      "id": "s6",
+      "action": "create_request",
+      "input": {
+        "customer_id": "customer_ox_quill",
+        "subject": "Scheduled exports stopped before our Friday deadline",
+        "body": "Our scheduled exports stopped working yesterday and we need them before Friday.",
+        "channel": "manual",
+        "capability_ids": [],
+        "external_ref": null,
+        "auto_start": true,
+        "planner_mode": "scripted"
+      },
+      "workspace_id": "ws_other"
+    },
+    {
+      "id": "s7",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s6.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      },
+      "workspace_id": "ws_other"
+    }
+  ],
+  "expectations": [
+    {
+      "assert": "result_ids_exclude_pattern",
+      "step": "s1",
+      "regex": "_ox_"
+    },
+    {
+      "assert": "result_ids_exclude",
+      "step": "s2",
+      "ids": [
+        "cap_scheduled_exports",
+        "work_export_issue",
+        "work_s3_destination",
+        "request_exports_prior",
+        "20-docs-scheduled-exports@ws_demo"
+      ]
+    },
+    {
+      "assert": "result_ids_include_any",
+      "step": "s2",
+      "ids": [
+        "work_ox_export_outage",
+        "cap_ox_scheduled_exports",
+        "request_ox_quill_exports"
+      ]
+    },
+    {
+      "assert": "http_error",
+      "step": "s3",
+      "status": [
+        404
+      ],
+      "codes": [
+        "NOT_FOUND"
+      ]
+    },
+    {
+      "assert": "http_error",
+      "step": "s4",
+      "status": [
+        404
+      ],
+      "codes": [
+        "NOT_FOUND"
+      ]
+    },
+    {
+      "assert": "http_error",
+      "step": "s5",
+      "status": [
+        404,
+        422
+      ],
+      "codes": [
+        "NOT_FOUND",
+        "INVALID_INPUT"
+      ]
+    },
+    {
+      "assert": "proposal_payload_in",
+      "step": "s7",
+      "path": "work_item_id",
+      "values": [
+        "work_ox_export_outage"
+      ],
+      "when_kind": "link_work"
+    },
+    {
+      "assert": "context_ids_exclude_pattern",
+      "step": "s7",
+      "regex": "^(cap|work|request|decision|attempt|customer|person)_(?!ox_)"
+    }
+  ]
+}

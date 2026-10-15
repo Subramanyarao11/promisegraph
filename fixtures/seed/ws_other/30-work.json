@@ -1,0 +1,84 @@
+{
+  "workspace_id": "ws_other",
+  "observed_at": "2026-10-15T10:00:00Z",
+  "work_items": [
+    {
+      "id": "work_ox_export_outage",
+      "title": "Scheduled exports failing after storage migration",
+      "description": "Scheduled exports fail with a permissions error after the storage migration. Fix forecast for Friday.",
+      "kind": "ticket",
+      "status": "in_progress",
+      "owner_id": "person_ox_rhea",
+      "connector": "local",
+      "external_id": null,
+      "external_url": null,
+      "forecast_at": "2026-10-17T00:00:00Z",
+      "observed_at": "2026-10-15T10:00:00Z",
+      "capability_ids": [
+        "cap_ox_scheduled_exports"
+      ],
+      "depends_on": [],
+      "acceptance_criteria": [
+        "Nightly exports deliver for all customers."
+      ]
+    },
+    {
+      "id": "work_ox_sftp_delivery",
+      "title": "SFTP delivery for scheduled exports",
+      "description": "Push scheduled export files to customer SFTP servers.",
+      "kind": "feature",
+      "status": "in_progress",
+      "owner_id": "person_ox_rhea",
+      "connector": "local",
+      "external_id": null,
+      "external_url": null,
+      "forecast_at": "2026-11-01T00:00:00Z",
+      "observed_at": "2026-10-14T10:00:00Z",
+      "capability_ids": [
+        "cap_ox_scheduled_exports"
+      ],
+      "depends_on": [],
+      "acceptance_criteria": [
+        "Customer can configure an SFTP host and key."
+      ]
+    },
+    {
+      "id": "work_ox_sso_okta",
+      "title": "SSO setup guide for IdP group provisioning",
+      "description": "Documentation for group provisioning.",
+      "kind": "ticket",
+      "status": "done",
+      "owner_id": "person_ox_tomas",
+      "connector": "local",
+      "external_id": null,
+      "external_url": null,
+      "forecast_at": null,
+      "observed_at": "2026-10-10T10:00:00Z",
+      "capability_ids": [
+        "cap_ox_sso"
+      ],
+      "depends_on": [],
+      "acceptance_criteria": []
+    },
+    {
+      "id": "work_ox_webhook_signing",
+      "title": "Webhook signing secrets",
+      "description": "Sign webhook payloads with per-endpoint secrets.",
+      "kind": "feature",
+      "status": "open",
+      "owner_id": null,
+      "connector": "local",
+      "external_id": null,
+      "external_url": null,
+      "forecast_at": null,
+      "observed_at": "2026-10-01T10:00:00Z",
+      "capability_ids": [
+        "cap_ox_webhooks"
+      ],
+      "depends_on": [
+        "work_ox_export_outage"
+      ],
+      "acceptance_criteria": []
+    }
+  ]
+}

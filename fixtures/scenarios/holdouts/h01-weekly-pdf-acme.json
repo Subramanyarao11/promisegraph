@@ -1,0 +1,24 @@
+{
+  "id": "h01-weekly-pdf-acme",
+  "workspace_id": "ws_demo",
+  "request": {
+    "customer_id": "customer_acme",
+    "subject": "Friday PDF of the pipeline dashboard",
+    "body": "Can the sales pipeline dashboard be emailed as a PDF every Friday at 16:00 Chicago time to our leadership list?",
+    "channel": "manual",
+    "capability_ids": [],
+    "external_ref": null,
+    "auto_start": true,
+    "planner_mode": "scripted"
+  },
+  "acceptable_dispositions": [
+    {
+      "kind": "answer"
+    }
+  ],
+  "must_not": [
+    "create_work",
+    "link_work:work_export_issue"
+  ],
+  "notes": "Supported export; schedule docs apply. Acme's outage work is unrelated to configuring a new schedule (an answer may mention current delivery issues)."
+}

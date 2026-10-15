@@ -1,0 +1,115 @@
+{
+  "id": "t08-stale-truncated-uncertainty",
+  "acceptance_ids": [
+    "T08"
+  ],
+  "workspace_id": "ws_demo",
+  "description": "Acme asks when legal-hold exemption ships. work_retention_legal_hold was last observed 2026-09-25 (stale vs reference 2026-10-16), is blocked, has no forecast and an inactive owner. The plan must flag staleness/unknowns rather than state a date or claim complete coverage. A deliberately truncated expansion must report truncated=true.",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "create_request",
+      "input": {
+        "customer_id": "customer_acme",
+        "subject": "When will legal hold for retention be available?",
+        "body": "Our compliance team needs 2025 event data excluded from the purge under a legal hold. When will that be available and who is working on it?",
+        "channel": "manual",
+        "capability_ids": [],
+        "external_ref": null,
+        "auto_start": true,
+        "planner_mode": "scripted"
+      }
+    },
+    {
+      "id": "s2",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s3",
+      "action": "get_request_context",
+      "input": {
+        "request_id": "${s1.request.id}"
+      }
+    },
+    {
+      "id": "s4",
+      "action": "context_expand",
+      "input": {
+        "entity_ids": [
+          "cap_scheduled_exports"
+        ],
+        "relation_types": [
+          "IMPLEMENTED_BY",
+          "DEPENDS_ON",
+          "OWNED_BY"
+        ],
+        "depth": 1,
+        "limit": 1
+      }
+    }
+  ],
+  "expectations": [
+    {
+      "assert": "proposal_kind",
+      "step": "s2",
+      "values": [
+        "link_work",
+        "escalate",
+        "clarify",
+        "answer"
+      ]
+    },
+    {
+      "assert": "proposal_payload_in",
+      "step": "s2",
+      "path": "work_item_id",
+      "values": [
+        "work_retention_legal_hold"
+      ],
+      "when_kind": "link_work"
+    },
+    {
+      "assert": "evidence_marked_stale",
+      "step": "s3",
+      "entity_ids": [
+        "work_retention_legal_hold"
+      ]
+    },
+    {
+      "assert": "context_missing_information_or_explanation",
+      "step": "s2",
+      "regex": "(?i)(stale|not current|last (observed|updated)|unconfirmed|no forecast|unknown|inactive)"
+    },
+    {
+      "assert": "text_not_matches",
+      "step": "s2",
+      "fields": [
+        "payload.draft_text",
+        "payload.comment_text",
+        "explanation"
+      ],
+      "regex": "(?i)(will|should) (be available|ship|land) (by|on|in) "
+    },
+    {
+      "assert": "expand_truncated",
+      "step": "s4",
+      "value": true
+    },
+    {
+      "assert": "work_item_count_delta",
+      "step": "s2",
+      "value": 0
+    }
+  ]
+}

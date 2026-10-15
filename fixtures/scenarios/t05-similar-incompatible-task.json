@@ -1,0 +1,109 @@
+{
+  "id": "t05-similar-incompatible-task",
+  "acceptance_ids": [
+    "T05"
+  ],
+  "workspace_id": "ws_demo",
+  "description": "Tamarind needs SFTP delivery. work_s3_destination looks similar (scheduled export destination) but explicitly excludes SFTP; work_sftp_spike is cancelled. Both are rejected with evidence before new work is proposed.",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "create_request",
+      "input": {
+        "customer_id": "customer_tamarind",
+        "subject": "Push daily sales export to our SFTP server",
+        "body": "Every morning we need the daily sales export pushed to our SFTP server at sftp.tamarind.example. Our firewall cannot pull files from cloud storage buckets.",
+        "channel": "manual",
+        "capability_ids": [],
+        "external_ref": null,
+        "auto_start": true,
+        "planner_mode": "scripted"
+      }
+    },
+    {
+      "id": "s2",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    }
+  ],
+  "expectations": [
+    {
+      "assert": "run_status",
+      "step": "s2",
+      "values": [
+        "awaiting_review"
+      ]
+    },
+    {
+      "assert": "proposal_kind",
+      "step": "s2",
+      "values": [
+        "create_work"
+      ]
+    },
+    {
+      "assert": "rejected_alternative",
+      "step": "s2",
+      "kind": "link_work",
+      "mentions_any": [
+        "work_s3_destination"
+      ],
+      "evidence_required": true
+    },
+    {
+      "assert": "proposal_payload_not_in",
+      "step": "s2",
+      "path": "dependency_ids",
+      "values": [
+        "work_sftp_spike"
+      ]
+    },
+    {
+      "assert": "proposal_payload_in",
+      "step": "s2",
+      "path": "capability_id",
+      "values": [
+        "cap_sftp_export_destination",
+        "cap_scheduled_exports"
+      ]
+    },
+    {
+      "assert": "proposal_payload_in",
+      "step": "s2",
+      "path": "owner_id",
+      "values": [
+        null,
+        "person_maya",
+        "person_leo"
+      ]
+    },
+    {
+      "assert": "proposal_payload_nonempty",
+      "step": "s2",
+      "path": "acceptance_criteria"
+    },
+    {
+      "assert": "no_link_to",
+      "step": "s2",
+      "work_item_ids": [
+        "work_s3_destination",
+        "work_sftp_spike"
+      ]
+    },
+    {
+      "assert": "work_item_count_delta",
+      "step": "s2",
+      "value": 0
+    }
+  ]
+}

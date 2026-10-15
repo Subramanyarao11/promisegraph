@@ -1,0 +1,68 @@
+{
+  "id": "t26-reimport-noop-and-revision",
+  "acceptance_ids": [
+    "T26"
+  ],
+  "workspace_id": "ws_demo",
+  "description": "Re-importing an unchanged seed file is a no-op; changing its content creates revision 2 without rewriting revision 1.",
+  "preconditions": [
+    "seeded once with scripts/seed.sh"
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "action": "import_file",
+      "input": {
+        "path": "fixtures/seed/ws_demo/20-docs-api-rate-limits.md",
+        "format": "markdown",
+        "origin": "synthetic",
+        "source_key": "20-docs-api-rate-limits"
+      }
+    },
+    {
+      "id": "s2",
+      "action": "import_content",
+      "input": {
+        "format": "markdown",
+        "origin": "synthetic",
+        "source_key": "20-docs-api-rate-limits",
+        "content_from": "fixtures/seed/ws_demo/20-docs-api-rate-limits.md",
+        "append": "\nEnterprise burst allowance increases to 300 from 2026-11-01 (synthetic change).\n"
+      }
+    },
+    {
+      "id": "s3",
+      "action": "get_source",
+      "input": {
+        "source_id": "20-docs-api-rate-limits",
+        "revision": 1
+      }
+    }
+  ],
+  "expectations": [
+    {
+      "assert": "import_counts",
+      "step": "s1",
+      "imported": 0,
+      "noop_min": 1,
+      "rejected": 0
+    },
+    {
+      "assert": "import_counts",
+      "step": "s2",
+      "imported": 1,
+      "rejected": 0
+    },
+    {
+      "assert": "source_revision",
+      "step": "s2",
+      "source_id": "20-docs-api-rate-limits",
+      "revision": 2
+    },
+    {
+      "assert": "source_body_unchanged",
+      "step": "s3",
+      "content_from": "fixtures/seed/ws_demo/20-docs-api-rate-limits.md"
+    }
+  ]
+}

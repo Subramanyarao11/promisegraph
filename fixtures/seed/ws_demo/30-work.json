@@ -1,0 +1,300 @@
+{
+  "workspace_id": "ws_demo",
+  "observed_at": "2026-10-15T18:00:00Z",
+  "work_items": [
+    {
+      "id": "work_queue_v2_cutover",
+      "title": "Queue v2 cutover for eu-west export workers",
+      "description": "Cut eu-west export and webhook workers over to queue v2. Blocked on KMS key re-provisioning in eu-west. Owner left the company on 2026-09-30; no replacement assigned in the tracker. Forecast date has passed and was not re-confirmed.",
+      "kind": "milestone",
+      "status": "blocked",
+      "owner_id": "person_dana",
+      "connector": "local",
+      "external_id": null,
+      "external_url": null,
+      "forecast_at": "2026-10-09T00:00:00Z",
+      "observed_at": "2026-10-02T10:00:00Z",
+      "capability_ids": [],
+      "depends_on": [],
+      "acceptance_criteria": [
+        "All eu-west export workers consume from queue v2.",
+        "Queue v1 drained and decommissioned in eu-west."
+      ]
+    },
+    {
+      "id": "work_export_migration",
+      "title": "Migrate export worker to queue v2",
+      "description": "Move the scheduled-export worker from queue v1 to queue v2. Code complete for us-east; eu-west waits on the queue v2 cutover milestone.",
+      "kind": "feature",
+      "status": "in_progress",
+      "owner_id": "person_maya",
+      "connector": "local",
+      "external_id": null,
+      "external_url": null,
+      "forecast_at": "2026-10-30T00:00:00Z",
+      "observed_at": "2026-10-15T16:00:00Z",
+      "capability_ids": [],
+      "depends_on": [
+        "work_queue_v2_cutover"
+      ],
+      "acceptance_criteria": [
+        "Export worker processes schedules from queue v2 in all regions.",
+        "No duplicate deliveries during migration."
+      ]
+    },
+    {
+      "id": "work_export_issue",
+      "title": "Restore scheduled exports",
+      "description": "Scheduled exports stopped delivering for several customers since 2026-10-11 after the partial worker migration. Scheduled exports are blocked by the export worker migration. Retrying schedules and manual reruns did not restore delivery. No delivery date committed.",
+      "kind": "ticket",
+      "status": "blocked",
+      "owner_id": "person_maya",
+      "connector": "local",
+      "external_id": null,
+      "external_url": null,
+      "forecast_at": null,
+      "observed_at": "2026-10-15T18:00:00Z",
+      "capability_ids": [
+        "cap_scheduled_exports"
+      ],
+      "depends_on": [
+        "work_export_migration"
+      ],
+      "acceptance_criteria": [
+        "Scheduled exports deliver on time for all affected customers for 3 consecutive days.",
+        "Affected customers confirm delivery."
+      ]
+    },
+    {
+      "id": "work_export_dst_skip",
+      "title": "Scheduled exports skip a run after DST transition",
+      "description": "Schedules defined in a local timezone skip one run on the day of a daylight-saving transition in product version 4.2. Recreating the schedule in UTC avoids the skip for most customers but did not work for Acme's custom fiscal calendar.",
+      "kind": "ticket",
+      "status": "open",
+      "owner_id": "person_leo",
+      "connector": "local",
+      "external_id": null,
+      "external_url": null,
+      "forecast_at": "2026-11-12T00:00:00Z",
+      "observed_at": "2026-10-14T12:00:00Z",
+      "capability_ids": [
+        "cap_scheduled_exports"
+      ],
+      "depends_on": [],
+      "acceptance_criteria": [
+        "Schedules in local timezones fire exactly once on DST transition days.",
+        "Regression test covers America/Chicago and Europe/Berlin transitions."
+      ]
+    },
+    {
+      "id": "work_s3_destination",
+      "title": "Add S3 bucket destination for scheduled exports",
+      "description": "Deliver scheduled export files to a customer-owned S3 bucket using a cross-account IAM role. Out of scope: SFTP, FTPS, Azure Blob and any push into the customer's network.",
+      "kind": "feature",
+      "status": "in_progress",
+      "owner_id": "person_leo",
+      "connector": "local",
+      "external_id": null,
+      "external_url": null,
+      "forecast_at": "2026-11-20T00:00:00Z",
+      "observed_at": "2026-10-13T09:00:00Z",
+      "capability_ids": [
+        "cap_s3_export_destination",
+        "cap_scheduled_exports"
+      ],
+      "depends_on": [],
+      "acceptance_criteria": [
+        "Customer can configure an S3 bucket and IAM role ARN as an export destination.",
+        "Delivery uses the customer's role; no static keys are stored.",
+        "SFTP and other push protocols are explicitly not supported by this item."
+      ]
+    },
+    {
+      "id": "work_sftp_spike",
+      "title": "Spike: SFTP delivery for exports",
+      "description": "Two-day investigation into SFTP push delivery. Cancelled on 2026-06-01 when the S3 destination was prioritised. No SFTP work is scheduled.",
+      "kind": "ticket",
+      "status": "cancelled",
+      "owner_id": "person_leo",
+      "connector": "local",
+      "external_id": null,
+      "external_url": null,
+      "forecast_at": null,
+      "observed_at": "2026-06-01T09:00:00Z",
+      "capability_ids": [
+        "cap_sftp_export_destination"
+      ],
+      "depends_on": [],
+      "acceptance_criteria": []
+    },
+    {
+      "id": "work_scim_user_provisioning_ga",
+      "title": "SCIM user provisioning GA",
+      "description": "General availability of SCIM 2.0 /Users endpoint: create, update and deactivate accounts from the IdP.",
+      "kind": "feature",
+      "status": "done",
+      "owner_id": "person_jonas",
+      "connector": "local",
+      "external_id": null,
+      "external_url": null,
+      "forecast_at": null,
+      "observed_at": "2026-10-10T08:00:00Z",
+      "capability_ids": [
+        "cap_scim_user_provisioning"
+      ],
+      "depends_on": [],
+      "acceptance_criteria": [
+        "IdP can create, update and deactivate users via SCIM.",
+        "Deactivated users lose access within 5 minutes."
+      ]
+    },
+    {
+      "id": "work_scim_nested_groups",
+      "title": "SCIM group sync: support nested IdP groups",
+      "description": "Flat group push and role mapping are supported today. Nested groups are flattened incorrectly; this item adds nested group expansion.",
+      "kind": "feature",
+      "status": "in_progress",
+      "owner_id": "person_jonas",
+      "connector": "local",
+      "external_id": null,
+      "external_url": null,
+      "forecast_at": "2026-11-05T00:00:00Z",
+      "observed_at": "2026-10-13T08:00:00Z",
+      "capability_ids": [
+        "cap_scim_group_sync"
+      ],
+      "depends_on": [],
+      "acceptance_criteria": [
+        "Members of nested IdP groups receive the role mapped to the parent group.",
+        "Group sync log shows expansion depth."
+      ]
+    },
+    {
+      "id": "work_scim_deprovision_fix",
+      "title": "Deprovisioned SCIM users keep active sessions",
+      "description": "Sessions were not revoked when the IdP deactivated a user through SCIM connector v1. Fixed in SCIM connector v2.",
+      "kind": "ticket",
+      "status": "done",
+      "owner_id": "person_jonas",
+      "connector": "local",
+      "external_id": null,
+      "external_url": null,
+      "forecast_at": null,
+      "observed_at": "2026-10-09T08:00:00Z",
+      "capability_ids": [
+        "cap_scim_user_provisioning"
+      ],
+      "depends_on": [],
+      "acceptance_criteria": [
+        "Deactivation revokes all sessions and API tokens."
+      ]
+    },
+    {
+      "id": "work_webhook_retry_queue",
+      "title": "Durable webhook retry queue (24h)",
+      "description": "Today webhooks retry with backoff for at most 30 minutes. This item persists undelivered events for 24 hours on queue v2.",
+      "kind": "feature",
+      "status": "in_progress",
+      "owner_id": "person_ines",
+      "connector": "local",
+      "external_id": null,
+      "external_url": null,
+      "forecast_at": "2026-11-15T00:00:00Z",
+      "observed_at": "2026-10-12T08:00:00Z",
+      "capability_ids": [
+        "cap_webhooks"
+      ],
+      "depends_on": [
+        "work_queue_v2_cutover"
+      ],
+      "acceptance_criteria": [
+        "Events undelivered for up to 24 hours are retried and delivered in order.",
+        "Operators can replay a time window."
+      ]
+    },
+    {
+      "id": "work_retry_after_header",
+      "title": "Return Retry-After header on 429 responses",
+      "description": "Public API now returns Retry-After and X-RateLimit-Remaining headers on throttled responses.",
+      "kind": "ticket",
+      "status": "done",
+      "owner_id": "person_leo",
+      "connector": "local",
+      "external_id": null,
+      "external_url": null,
+      "forecast_at": null,
+      "observed_at": "2026-10-11T08:00:00Z",
+      "capability_ids": [
+        "cap_api_rate_limits"
+      ],
+      "depends_on": [],
+      "acceptance_criteria": [
+        "429 responses include Retry-After in seconds.",
+        "Documentation updated."
+      ]
+    },
+    {
+      "id": "work_dashboard_embed_sdk",
+      "title": "Signed embed SDK for dashboards",
+      "description": "Embed dashboards in customer portals using signed, expiring tokens. Not started; no forecast.",
+      "kind": "feature",
+      "status": "open",
+      "owner_id": "person_ines",
+      "connector": "local",
+      "external_id": null,
+      "external_url": null,
+      "forecast_at": null,
+      "observed_at": "2026-09-20T08:00:00Z",
+      "capability_ids": [
+        "cap_dashboard_sharing"
+      ],
+      "depends_on": [],
+      "acceptance_criteria": [
+        "Embeds require a signed token that expires within 24 hours.",
+        "Row-level filters can be bound into the token."
+      ]
+    },
+    {
+      "id": "work_alert_sensitivity",
+      "title": "Configurable anomaly alert sensitivity",
+      "description": "Adds a per-alert sensitivity setting (low/medium/high) for anomaly alerts.",
+      "kind": "ticket",
+      "status": "done",
+      "owner_id": "person_leo",
+      "connector": "local",
+      "external_id": null,
+      "external_url": null,
+      "forecast_at": null,
+      "observed_at": "2026-10-08T08:00:00Z",
+      "capability_ids": [
+        "cap_metric_alerts"
+      ],
+      "depends_on": [],
+      "acceptance_criteria": [
+        "Each anomaly alert has a sensitivity setting.",
+        "Default remains medium."
+      ]
+    },
+    {
+      "id": "work_warehouse_sync_backfill",
+      "title": "Warehouse sync lag after schema change",
+      "description": "Large schema changes trigger a full backfill which delays incremental syncs by several hours.",
+      "kind": "ticket",
+      "status": "in_progress",
+      "owner_id": "person_maya",
+      "connector": "local",
+      "external_id": null,
+      "external_url": null,
+      "forecast_at": "2026-10-21T00:00:00Z",
+      "observed_at": "2026-10-14T08:00:00Z",
+      "capability_ids": [
+        "cap_warehouse_sync"
+      ],
+      "depends_on": [],
+      "acceptance_criteria": [
+        "Schema changes trigger column-level backfill only.",
+        "Incremental lag stays under 30 minutes during backfill."
+      ]
+    }
+  ]
+}

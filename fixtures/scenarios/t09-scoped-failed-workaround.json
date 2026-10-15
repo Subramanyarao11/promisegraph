@@ -1,0 +1,146 @@
+{
+  "id": "t09-scoped-failed-workaround",
+  "acceptance_ids": [
+    "T09"
+  ],
+  "workspace_id": "ws_demo",
+  "description": "Acme's earlier 'recreate schedule in UTC' workaround failed on product version 4.2 (attempt_acme_utc_recreate, scoped to customer_acme). A new Acme DST request must not repeat it blindly. Brightpath's similar request is unaffected: the documented UTC workaround remains eligible and Acme-scoped attempts/decisions are not in its context.",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "create_request",
+      "input": {
+        "customer_id": "customer_acme",
+        "subject": "Fiscal close export skipped when clocks changed",
+        "body": "The scheduled export for our fiscal close did not run on the night the clocks changed. We need it to run reliably before the November change.",
+        "channel": "manual",
+        "capability_ids": [],
+        "external_ref": null,
+        "auto_start": true,
+        "planner_mode": "scripted"
+      }
+    },
+    {
+      "id": "s2",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s3",
+      "action": "create_request",
+      "input": {
+        "customer_id": "customer_brightpath",
+        "subject": "Nightly export skipped on DST night",
+        "body": "Our nightly shipments export skipped one run on the day daylight saving time ended. How do we stop that from happening?",
+        "channel": "manual",
+        "capability_ids": [],
+        "external_ref": null,
+        "auto_start": true,
+        "planner_mode": "scripted"
+      }
+    },
+    {
+      "id": "s4",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s3.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    }
+  ],
+  "expectations": [
+    {
+      "assert": "context_includes",
+      "step": "s2",
+      "field": "attempts",
+      "ids": [
+        "attempt_acme_utc_recreate"
+      ]
+    },
+    {
+      "assert": "proposal_kind",
+      "step": "s2",
+      "values": [
+        "link_work",
+        "escalate"
+      ]
+    },
+    {
+      "assert": "proposal_payload_in",
+      "step": "s2",
+      "path": "work_item_id",
+      "values": [
+        "work_export_dst_skip"
+      ],
+      "when_kind": "link_work"
+    },
+    {
+      "assert": "text_not_matches",
+      "step": "s2",
+      "fields": [
+        "payload.draft_text",
+        "payload.comment_text"
+      ],
+      "regex": "(?i)recreate[^.]*\\bUTC\\b"
+    },
+    {
+      "assert": "proposal_kind",
+      "step": "s4",
+      "values": [
+        "answer",
+        "link_work"
+      ]
+    },
+    {
+      "assert": "proposal_payload_in",
+      "step": "s4",
+      "path": "work_item_id",
+      "values": [
+        "work_export_dst_skip"
+      ],
+      "when_kind": "link_work"
+    },
+    {
+      "assert": "context_excludes",
+      "step": "s4",
+      "field": "attempts",
+      "ids": [
+        "attempt_acme_utc_recreate",
+        "attempt_exports_acme_rerun",
+        "attempt_acme_sso_jit"
+      ]
+    },
+    {
+      "assert": "context_excludes",
+      "step": "s4",
+      "field": "decisions",
+      "ids": [
+        "decision_exports_001"
+      ]
+    },
+    {
+      "assert": "evidence_sources_include_any",
+      "step": "s4",
+      "source_ids": [
+        "20-docs-export-troubleshooting"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+id,title,kind,status,owner_id,capability_ids,depends_on,forecast_at,observed_at
+work_csv_utf8_bom,CSV export garbles non-ASCII characters in Excel,ticket,done,person_leo,cap_csv_export,,,2026-10-06T08:00:00Z
+work_csv_async_large,Async manual export for result sets over 1M rows,feature,open,person_leo,cap_csv_export,work_export_migration,2026-11-30T00:00:00Z,2026-10-14T08:00:00Z
+work_rate_limit_burst,Burst allowance for paginated API reads,ticket,in_progress,person_leo,cap_api_rate_limits,,2026-10-28T00:00:00Z,2026-10-13T08:00:00Z
+work_retention_purge_job,Rewrite retention purge job for per-dataset policies,feature,in_progress,person_maya,cap_data_retention,,2026-11-15T00:00:00Z,2026-10-12T08:00:00Z
+work_retention_legal_hold,Legal hold exemption for retention purge,feature,blocked,person_dana,cap_data_retention,work_retention_purge_job,,2026-09-25T08:00:00Z
+work_audit_log_csv_download,Audit log CSV download (365 days),feature,done,person_jonas,cap_audit_log,,,2026-10-07T08:00:00Z
+work_alert_digest,Daily email digest for metric alerts,feature,open,person_leo,cap_metric_alerts,,2026-12-01T00:00:00Z,2026-10-03T08:00:00Z
+work_sso_cert_rotation,SAML signing certificate rotation without downtime,ticket,done,person_priya,cap_sso_saml,,,2026-10-05T08:00:00Z

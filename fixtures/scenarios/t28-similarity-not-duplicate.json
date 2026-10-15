@@ -1,0 +1,116 @@
+{
+  "id": "t28-similarity-not-duplicate",
+  "acceptance_ids": [
+    "T28"
+  ],
+  "workspace_id": "ws_demo",
+  "description": "Tamarind reports missing webhooks after a firewall change. It resembles Helix's maintenance-window request (request_helix_webhook_retries) and its failed retry attempt, but similarity alone must not become a confirmed duplicate/root-cause identity or import Helix's request-scoped attempt as fact.",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "create_request",
+      "input": {
+        "customer_id": "customer_tamarind",
+        "subject": "Webhooks stopped arriving after weekend change",
+        "body": "After our network team changed firewall rules on Saturday, webhook calls stopped arriving at our endpoint. Is this the same webhook outage other customers have?",
+        "channel": "manual",
+        "capability_ids": [],
+        "external_ref": null,
+        "auto_start": true,
+        "planner_mode": "scripted"
+      }
+    },
+    {
+      "id": "s2",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s3",
+      "action": "get_request_context",
+      "input": {
+        "request_id": "${s1.request.id}"
+      }
+    },
+    {
+      "id": "s4",
+      "action": "context_expand",
+      "input": {
+        "entity_ids": [
+          "${s1.request.id}"
+        ],
+        "relation_types": [
+          "RELATED_TO"
+        ],
+        "depth": 1,
+        "limit": 20
+      }
+    }
+  ],
+  "expectations": [
+    {
+      "assert": "proposal_kind",
+      "step": "s2",
+      "values": [
+        "clarify",
+        "answer",
+        "link_work",
+        "escalate"
+      ]
+    },
+    {
+      "assert": "proposal_payload_not_in",
+      "step": "s2",
+      "path": "work_item_id",
+      "values": [
+        "work_export_issue"
+      ]
+    },
+    {
+      "assert": "no_confirmed_edge",
+      "step": "s4",
+      "type": "RELATED_TO",
+      "from_id": "${s1.request.id}",
+      "to_id": "request_helix_webhook_retries"
+    },
+    {
+      "assert": "text_not_matches",
+      "step": "s2",
+      "fields": [
+        "explanation",
+        "payload.draft_text",
+        "payload.comment_text"
+      ],
+      "regex": "(?i)(duplicate of|same (root cause|outage|issue) as|caused by the same)"
+    },
+    {
+      "assert": "path_claim_kind_not",
+      "step": "s3",
+      "involving_ids": [
+        "request_helix_webhook_retries"
+      ],
+      "claim_kinds": [
+        "source_assertion"
+      ]
+    },
+    {
+      "assert": "context_excludes",
+      "step": "s3",
+      "field": "attempts",
+      "ids": [
+        "attempt_helix_webhook_retry_backoff"
+      ],
+      "optional": true
+    }
+  ]
+}

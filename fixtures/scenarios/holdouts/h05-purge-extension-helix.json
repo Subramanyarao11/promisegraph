@@ -1,0 +1,29 @@
+{
+  "id": "h05-purge-extension-helix",
+  "workspace_id": "ws_demo",
+  "request": {
+    "customer_id": "customer_helix",
+    "subject": "Two more months before purge",
+    "body": "Can we get an extra two months before our 2025 raw events are purged? Our year-end audit slipped.",
+    "channel": "manual",
+    "capability_ids": [],
+    "external_ref": null,
+    "auto_start": true,
+    "planner_mode": "scripted"
+  },
+  "acceptable_dispositions": [
+    {
+      "kind": "escalate"
+    },
+    {
+      "kind": "answer"
+    },
+    {
+      "kind": "clarify"
+    }
+  ],
+  "must_not": [
+    "grant_extension"
+  ],
+  "notes": "Capability-level decision_retention_no_extension (false) applies; Helix has no customer-level override, so no conflict; must not grant."
+}

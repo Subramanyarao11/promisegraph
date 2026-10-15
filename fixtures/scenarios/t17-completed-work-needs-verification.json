@@ -1,0 +1,151 @@
+{
+  "id": "t17-completed-work-needs-verification",
+  "acceptance_ids": [
+    "T17"
+  ],
+  "workspace_id": "ws_demo",
+  "description": "Tamarind reports garbled accents in manual CSV downloads; work_csv_utf8_bom is already done. Linking (or answering) leaves the request awaiting_verification; a connector_status observation does not resolve it; only an operator/customer confirmation does.",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "create_request",
+      "input": {
+        "customer_id": "customer_tamarind",
+        "subject": "Accented store names garbled in CSV",
+        "body": "Store names with accents, like 'Café Norte', show up as garbled characters when we open the manual CSV download in our spreadsheet tool.",
+        "channel": "manual",
+        "capability_ids": [],
+        "external_ref": null,
+        "auto_start": true,
+        "planner_mode": "scripted"
+      }
+    },
+    {
+      "id": "s2",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s3",
+      "action": "commit_proposal_if_awaiting_review",
+      "input": {
+        "proposal_id": "${s2.proposal.id}",
+        "body": {
+          "expected_revision": "${s2.proposal.based_on_revision}",
+          "authorization_id": null
+        }
+      }
+    },
+    {
+      "id": "s4",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "failed"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s5",
+      "action": "get_request",
+      "input": {
+        "request_id": "${s1.request.id}"
+      }
+    },
+    {
+      "id": "s6",
+      "action": "record_observation",
+      "input": {
+        "request_id": "${s1.request.id}",
+        "body": {
+          "action_id": "${s4.latest_action.id}",
+          "kind": "connector_status",
+          "verification": "passed",
+          "body": "Linked work item status is done.",
+          "evidence_ids": [],
+          "expected_request_version": "${s5.request.version}"
+        }
+      }
+    },
+    {
+      "id": "s7",
+      "action": "get_request",
+      "input": {
+        "request_id": "${s1.request.id}"
+      }
+    },
+    {
+      "id": "s8",
+      "action": "record_observation",
+      "input": {
+        "request_id": "${s1.request.id}",
+        "body": {
+          "action_id": "${s4.latest_action.id}",
+          "kind": "operator_confirmation",
+          "verification": "passed",
+          "body": "Operator re-tested the CSV download with the customer's file; accents render correctly.",
+          "evidence_ids": [],
+          "expected_request_version": "${s7.request.version}"
+        }
+      }
+    }
+  ],
+  "expectations": [
+    {
+      "assert": "proposal_kind",
+      "step": "s2",
+      "values": [
+        "link_work",
+        "answer"
+      ]
+    },
+    {
+      "assert": "proposal_payload_in",
+      "step": "s2",
+      "path": "work_item_id",
+      "values": [
+        "work_csv_utf8_bom"
+      ],
+      "when_kind": "link_work"
+    },
+    {
+      "assert": "request_status",
+      "step": "s5",
+      "values": [
+        "awaiting_verification"
+      ]
+    },
+    {
+      "assert": "request_status",
+      "step": "s7",
+      "values": [
+        "awaiting_verification"
+      ]
+    },
+    {
+      "assert": "request_status",
+      "step": "s8",
+      "values": [
+        "resolved"
+      ]
+    },
+    {
+      "assert": "work_item_count_delta",
+      "step": "s5",
+      "value": 0
+    }
+  ]
+}

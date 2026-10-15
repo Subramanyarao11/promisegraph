@@ -1,0 +1,26 @@
+{
+  "_note": "Test-only scenario conventions. Production code must never read fixtures/scenarios.",
+  "references": {
+    "${sN.<path>}": "Value from step sN's captured result (request, run, proposal = latest proposal for the run, action, latest_action, work_item, decision, events, latest_run).",
+    "${knowledge_revision}": "Current workspace knowledge revision (e.g. from the latest Run/Proposal based_on_revision or an ImportPreviewResult)."
+  },
+  "step_actions": {
+    "create_request": "POST /requests with RequestCreate; captures {request, run}",
+    "await_run": "Poll GET /runs/{run_id} until status in until_status_in; captures run, latest proposal, latest action",
+    "commit_proposal": "POST /proposals/{id}/commit with ProposalCommit and the given Idempotency-Key; captures action or error",
+    "commit_proposal_if_awaiting_review": "As commit_proposal, skipped when the proposal was auto-committed",
+    "reply": "POST /requests/{id}/replies (ReplyCreate); captures {run}",
+    "record_observation": "POST /requests/{id}/observations (ObservationCreate); captures {observation, request}",
+    "patch_work_item": "PATCH /work-items/{id} (WorkItemUpdate)",
+    "decision_command": "POST /decisions (DecisionCommand); captures decision",
+    "start_run": "POST /requests/{id}/runs (RunCreate); captures run",
+    "get_request | get_run_events | get_action | get_work_item | get_proposal | get_source | get_request_context": "Plain reads",
+    "list_actions | list_runs | list_decisions": "Plain list reads",
+    "context_search | context_expand": "POST /context/search | /context/expand",
+    "import_file | import_content": "POST /imports/preview then /imports/{id}/commit"
+  },
+  "step_fields": {
+    "workspace_id": "Optional override of the scenario workspace for this step"
+  },
+  "assertions": "Each expectation is {assert, step, ...}. Text assertions (text_matches/text_not_matches) inspect only the named fields that exist; when_kind limits a payload assertion to proposals of that kind; optional=true records but does not fail. work_item_count_delta compares GET /work-items count against the post-seed baseline."
+}

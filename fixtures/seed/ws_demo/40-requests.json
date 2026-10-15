@@ -1,0 +1,505 @@
+{
+  "workspace_id": "ws_demo",
+  "observed_at": "2026-10-15T18:00:00Z",
+  "requests": [
+    {
+      "id": "request_corvid_schedule_howto",
+      "customer_id": "customer_corvid",
+      "subject": "How do I schedule a weekly XLSX export to email?",
+      "body": "We want the Clinical Ops dashboard emailed as XLSX every Monday at 07:00 Berlin time to three recipients. How do we set that up?",
+      "status": "resolved",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_scheduled_exports"
+      ],
+      "linked_work_ids": [],
+      "related_request_ids": [],
+      "created_at": "2026-08-20T08:10:00Z"
+    },
+    {
+      "id": "request_tamarind_sftp_old",
+      "customer_id": "customer_tamarind",
+      "subject": "SFTP delivery for exports",
+      "body": "Can scheduled exports be pushed to our SFTP server? Our firewall does not allow pulling from cloud storage.",
+      "status": "closed",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_sftp_export_destination"
+      ],
+      "linked_work_ids": [
+        "work_sftp_spike"
+      ],
+      "related_request_ids": [],
+      "created_at": "2026-05-14T13:00:00Z"
+    },
+    {
+      "id": "request_tamarind_schedule_s3",
+      "customer_id": "customer_tamarind",
+      "subject": "Can scheduled exports land in an S3 bucket?",
+      "body": "Our analytics team would like the daily sales export delivered into an S3 bucket owned by our data lake account.",
+      "status": "awaiting_work",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_s3_export_destination"
+      ],
+      "linked_work_ids": [
+        "work_s3_destination"
+      ],
+      "related_request_ids": [],
+      "created_at": "2026-09-10T10:00:00Z"
+    },
+    {
+      "id": "request_acme_dst_skip",
+      "customer_id": "customer_acme",
+      "subject": "Exports skipped the 02:00 run after the clock change",
+      "body": "Our 02:00 fiscal-calendar export did not run on the DST transition day. We are on product version 4.2.",
+      "status": "awaiting_work",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_scheduled_exports"
+      ],
+      "linked_work_ids": [
+        "work_export_dst_skip"
+      ],
+      "related_request_ids": [],
+      "created_at": "2026-03-09T15:00:00Z"
+    },
+    {
+      "id": "request_exports_prior",
+      "customer_id": "customer_brightpath",
+      "subject": "Nightly scheduled export not delivered",
+      "body": "The nightly shipments export has not arrived since Saturday. Nothing in the export history after 2026-10-11.",
+      "status": "awaiting_work",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_scheduled_exports"
+      ],
+      "linked_work_ids": [
+        "work_export_issue"
+      ],
+      "related_request_ids": [],
+      "created_at": "2026-10-12T09:15:00Z"
+    },
+    {
+      "id": "request_exports_acme_retry",
+      "customer_id": "customer_acme",
+      "subject": "Weekly revenue export missing since Monday",
+      "body": "The weekly revenue export to finance did not arrive Monday. We clicked 'run now' but nothing was delivered.",
+      "status": "awaiting_work",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_scheduled_exports"
+      ],
+      "linked_work_ids": [
+        "work_export_issue"
+      ],
+      "related_request_ids": [
+        "request_exports_prior"
+      ],
+      "created_at": "2026-10-13T07:40:00Z"
+    },
+    {
+      "id": "request_corvid_eu_exports",
+      "customer_id": "customer_corvid",
+      "subject": "EU region exports delayed",
+      "body": "Scheduled exports for our EU workspace are hours late or missing since the weekend.",
+      "status": "awaiting_work",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_scheduled_exports"
+      ],
+      "linked_work_ids": [
+        "work_export_issue"
+      ],
+      "related_request_ids": [
+        "request_exports_prior"
+      ],
+      "created_at": "2026-10-14T06:20:00Z"
+    },
+    {
+      "id": "request_helix_scope_reduction",
+      "customer_id": "customer_helix",
+      "subject": "Phase 1: export only daily summaries",
+      "body": "For the pilot we only need daily summary exports; hourly detail can wait until phase 2.",
+      "status": "closed",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_scheduled_exports"
+      ],
+      "linked_work_ids": [],
+      "related_request_ids": [],
+      "created_at": "2026-08-15T09:00:00Z"
+    },
+    {
+      "id": "request_helix_sso_setup",
+      "customer_id": "customer_helix",
+      "subject": "Configure SAML SSO with our IdP",
+      "body": "Please help us configure SAML single sign-on. Our IdP metadata URL is ready.",
+      "status": "resolved",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_sso_saml"
+      ],
+      "linked_work_ids": [],
+      "related_request_ids": [],
+      "created_at": "2026-07-01T11:00:00Z"
+    },
+    {
+      "id": "request_helix_scim_accounts",
+      "customer_id": "customer_helix",
+      "subject": "Auto-create accounts for new hires",
+      "body": "We want new hires to get an account automatically when HR adds them in the IdP, and leavers to be deactivated.",
+      "status": "resolved",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_scim_user_provisioning"
+      ],
+      "linked_work_ids": [
+        "work_scim_user_provisioning_ga"
+      ],
+      "related_request_ids": [],
+      "created_at": "2026-07-15T10:30:00Z"
+    },
+    {
+      "id": "request_acme_sso_jit",
+      "customer_id": "customer_acme",
+      "subject": "Users get 'no account' after SSO login",
+      "body": "Some users authenticate through SSO and then see 'no account found'.",
+      "status": "resolved",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_sso_saml",
+        "cap_scim_user_provisioning"
+      ],
+      "linked_work_ids": [],
+      "related_request_ids": [],
+      "created_at": "2026-08-28T14:00:00Z"
+    },
+    {
+      "id": "request_brightpath_group_sync",
+      "customer_id": "customer_brightpath",
+      "subject": "IdP groups not mapping to roles",
+      "body": "Members of our nested 'Regional Managers' group are not getting the Editor role.",
+      "status": "awaiting_work",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_scim_group_sync"
+      ],
+      "linked_work_ids": [
+        "work_scim_nested_groups"
+      ],
+      "related_request_ids": [],
+      "created_at": "2026-09-28T09:00:00Z"
+    },
+    {
+      "id": "request_corvid_scim_deprovision",
+      "customer_id": "customer_corvid",
+      "subject": "Deprovisioned users still have access",
+      "body": "A user deactivated in our IdP yesterday could still open dashboards this morning.",
+      "status": "resolved",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_scim_user_provisioning"
+      ],
+      "linked_work_ids": [
+        "work_scim_deprovision_fix"
+      ],
+      "related_request_ids": [],
+      "created_at": "2026-09-09T08:00:00Z"
+    },
+    {
+      "id": "request_corvid_rate_limit_429",
+      "customer_id": "customer_corvid",
+      "subject": "Getting 429s from the metrics API during backfill",
+      "body": "Our backfill script gets HTTP 429 after a few minutes. What are the limits and how should we back off?",
+      "status": "resolved",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_api_rate_limits"
+      ],
+      "linked_work_ids": [],
+      "related_request_ids": [],
+      "created_at": "2026-08-05T12:00:00Z"
+    },
+    {
+      "id": "request_acme_rate_limit_increase",
+      "customer_id": "customer_acme",
+      "subject": "Raise API quota for nightly sync",
+      "body": "We need the API quota tripled for our nightly sync to finish before business hours.",
+      "status": "escalated",
+      "owner_id": "person_ops",
+      "capability_ids": [
+        "cap_api_rate_limits"
+      ],
+      "linked_work_ids": [],
+      "related_request_ids": [],
+      "created_at": "2026-09-15T16:00:00Z"
+    },
+    {
+      "id": "request_tamarind_api_pagination",
+      "customer_id": "customer_tamarind",
+      "subject": "429 errors while paginating events",
+      "body": "Paginating the events endpoint hits 429 halfway through, even though we wait between pages.",
+      "status": "awaiting_work",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_api_rate_limits"
+      ],
+      "linked_work_ids": [
+        "work_rate_limit_burst"
+      ],
+      "related_request_ids": [
+        "request_corvid_rate_limit_429"
+      ],
+      "created_at": "2026-10-02T09:00:00Z"
+    },
+    {
+      "id": "request_brightpath_webhook_signature",
+      "customer_id": "customer_brightpath",
+      "subject": "How do we verify webhook signatures?",
+      "body": "Our security team wants to verify that webhook calls really come from you.",
+      "status": "resolved",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_webhooks"
+      ],
+      "linked_work_ids": [],
+      "related_request_ids": [],
+      "created_at": "2026-06-11T10:00:00Z"
+    },
+    {
+      "id": "request_corvid_webhook_new_event",
+      "customer_id": "customer_corvid",
+      "subject": "Webhook for dashboard-shared events",
+      "body": "Could you emit a webhook whenever someone shares a dashboard externally?",
+      "status": "closed",
+      "owner_id": "person_ines",
+      "capability_ids": [
+        "cap_webhooks",
+        "cap_dashboard_sharing"
+      ],
+      "linked_work_ids": [],
+      "related_request_ids": [],
+      "created_at": "2026-04-18T10:00:00Z"
+    },
+    {
+      "id": "request_helix_webhook_retries",
+      "customer_id": "customer_helix",
+      "subject": "Webhooks dropped during our maintenance window",
+      "body": "Events sent during our Sunday maintenance window never arrived. We need them redelivered.",
+      "status": "investigating",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_webhooks"
+      ],
+      "linked_work_ids": [
+        "work_webhook_retry_queue"
+      ],
+      "related_request_ids": [],
+      "created_at": "2026-09-22T08:00:00Z"
+    },
+    {
+      "id": "request_tamarind_retention_policy",
+      "customer_id": "customer_tamarind",
+      "subject": "What is the default retention for raw events?",
+      "body": "How long do you keep raw event data before it is purged?",
+      "status": "resolved",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_data_retention"
+      ],
+      "linked_work_ids": [],
+      "related_request_ids": [],
+      "created_at": "2026-05-02T09:00:00Z"
+    },
+    {
+      "id": "request_brightpath_retention_purge",
+      "customer_id": "customer_brightpath",
+      "subject": "Confirm deletion of churned workspace data",
+      "body": "Please confirm the data from our closed sandbox workspace has been purged.",
+      "status": "resolved",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_data_retention"
+      ],
+      "linked_work_ids": [],
+      "related_request_ids": [],
+      "created_at": "2026-09-05T09:00:00Z"
+    },
+    {
+      "id": "request_corvid_retention_extension",
+      "customer_id": "customer_corvid",
+      "subject": "Extend purge deadline for 2024 event data",
+      "body": "Our auditors need the 2024 raw events for six more weeks. Can you delay the scheduled purge?",
+      "status": "awaiting_review",
+      "owner_id": "person_ops",
+      "capability_ids": [
+        "cap_data_retention"
+      ],
+      "linked_work_ids": [
+        "work_retention_purge_job"
+      ],
+      "related_request_ids": [],
+      "created_at": "2026-10-09T09:00:00Z"
+    },
+    {
+      "id": "request_acme_public_dashboard_link",
+      "customer_id": "customer_acme",
+      "subject": "Share dashboard with external auditors without login",
+      "body": "Can we create a link our auditors can open without an account?",
+      "status": "closed",
+      "owner_id": "person_ops",
+      "capability_ids": [
+        "cap_dashboard_sharing"
+      ],
+      "linked_work_ids": [],
+      "related_request_ids": [],
+      "created_at": "2026-08-12T10:00:00Z"
+    },
+    {
+      "id": "request_brightpath_dashboard_embed",
+      "customer_id": "customer_brightpath",
+      "subject": "Embed dashboard in our customer portal",
+      "body": "We want to embed the delivery-performance dashboard in our customer portal with per-customer filters.",
+      "status": "awaiting_work",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_dashboard_sharing"
+      ],
+      "linked_work_ids": [
+        "work_dashboard_embed_sdk"
+      ],
+      "related_request_ids": [],
+      "created_at": "2026-09-01T10:00:00Z"
+    },
+    {
+      "id": "request_corvid_audit_log_export",
+      "customer_id": "customer_corvid",
+      "subject": "Need audit log for SOC 2 evidence",
+      "body": "Our auditor needs the last 12 months of admin activity.",
+      "status": "resolved",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_audit_log"
+      ],
+      "linked_work_ids": [
+        "work_audit_log_csv_download"
+      ],
+      "related_request_ids": [],
+      "created_at": "2026-06-20T10:00:00Z"
+    },
+    {
+      "id": "request_acme_audit_log_retention",
+      "customer_id": "customer_acme",
+      "subject": "Audit log only shows 90 days",
+      "body": "The audit log UI only goes back 90 days. Is older data gone?",
+      "status": "resolved",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_audit_log",
+        "cap_data_retention"
+      ],
+      "linked_work_ids": [
+        "work_audit_log_csv_download"
+      ],
+      "related_request_ids": [
+        "request_corvid_audit_log_export"
+      ],
+      "created_at": "2026-07-08T10:00:00Z"
+    },
+    {
+      "id": "request_helix_alert_noise",
+      "customer_id": "customer_helix",
+      "subject": "Anomaly alerts too noisy",
+      "body": "We get 30+ anomaly alerts a day on the ledger volume metric; most are not actionable.",
+      "status": "awaiting_verification",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_metric_alerts"
+      ],
+      "linked_work_ids": [
+        "work_alert_sensitivity"
+      ],
+      "related_request_ids": [],
+      "created_at": "2026-10-01T10:00:00Z"
+    },
+    {
+      "id": "request_tamarind_alert_digest",
+      "customer_id": "customer_tamarind",
+      "subject": "One summary email for alerts",
+      "body": "Store managers want one summary email per day instead of an email per alert.",
+      "status": "awaiting_work",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_metric_alerts"
+      ],
+      "linked_work_ids": [
+        "work_alert_digest"
+      ],
+      "related_request_ids": [],
+      "created_at": "2026-10-03T10:00:00Z"
+    },
+    {
+      "id": "request_acme_warehouse_sync_lag",
+      "customer_id": "customer_acme",
+      "subject": "Warehouse sync lagging 6 hours",
+      "body": "Since we added columns to the orders model the warehouse sync is about 6 hours behind.",
+      "status": "awaiting_work",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_warehouse_sync"
+      ],
+      "linked_work_ids": [
+        "work_warehouse_sync_backfill"
+      ],
+      "related_request_ids": [],
+      "created_at": "2026-10-10T10:00:00Z"
+    },
+    {
+      "id": "request_brightpath_warehouse_schema",
+      "customer_id": "customer_brightpath",
+      "subject": "New columns not appearing in warehouse",
+      "body": "We added two columns to a model and they are not in the warehouse tables.",
+      "status": "resolved",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_warehouse_sync"
+      ],
+      "linked_work_ids": [],
+      "related_request_ids": [],
+      "created_at": "2026-07-30T10:00:00Z"
+    },
+    {
+      "id": "request_helix_csv_encoding",
+      "customer_id": "customer_helix",
+      "subject": "CSV export garbles non-ASCII names",
+      "body": "Names with accents look broken when we open the CSV export in a spreadsheet tool.",
+      "status": "resolved",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_csv_export"
+      ],
+      "linked_work_ids": [
+        "work_csv_utf8_bom"
+      ],
+      "related_request_ids": [],
+      "created_at": "2026-06-03T10:00:00Z"
+    },
+    {
+      "id": "request_tamarind_csv_large",
+      "customer_id": "customer_tamarind",
+      "subject": "Manual CSV export times out over 1M rows",
+      "body": "Exporting the full transactions table times out after a few minutes.",
+      "status": "awaiting_work",
+      "owner_id": "person_sam",
+      "capability_ids": [
+        "cap_csv_export"
+      ],
+      "linked_work_ids": [
+        "work_csv_async_large"
+      ],
+      "related_request_ids": [],
+      "created_at": "2026-09-19T10:00:00Z"
+    }
+  ]
+}

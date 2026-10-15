@@ -1,0 +1,28 @@
+{
+  "id": "h03-finance-export-corvid",
+  "workspace_id": "ws_demo",
+  "request": {
+    "customer_id": "customer_corvid",
+    "subject": "Finance export not arriving",
+    "body": "The nightly export to our finance team has not arrived since Sunday night.",
+    "channel": "manual",
+    "capability_ids": [],
+    "external_ref": null,
+    "auto_start": true,
+    "planner_mode": "scripted"
+  },
+  "acceptable_dispositions": [
+    {
+      "kind": "link_work",
+      "work_item_id": "work_export_issue"
+    },
+    {
+      "kind": "escalate"
+    }
+  ],
+  "must_not": [
+    "create_work",
+    "promise_date"
+  ],
+  "notes": "Existing blocked export issue; escalate acceptable via routing owner person_maya."
+}

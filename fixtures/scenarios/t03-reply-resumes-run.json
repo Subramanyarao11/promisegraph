@@ -1,0 +1,202 @@
+{
+  "id": "t03-reply-resumes-run",
+  "acceptance_ids": [
+    "T02",
+    "T03"
+  ],
+  "workspace_id": "ws_demo",
+  "description": "J2 continued: a clarification reply resumes the same logical run (same run id, prior events retained), with refreshed context, and reaches a group-sync disposition.",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "create_request",
+      "input": {
+        "customer_id": "customer_tamarind",
+        "subject": "Provisioning for store managers",
+        "body": "We need provisioning for our identity provider before 200 store managers join next month. Can you turn it on?",
+        "channel": "manual",
+        "capability_ids": [],
+        "external_ref": null,
+        "auto_start": true,
+        "planner_mode": "scripted"
+      }
+    },
+    {
+      "id": "s2",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s3",
+      "action": "get_request",
+      "input": {
+        "request_id": "${s1.request.id}"
+      }
+    },
+    {
+      "id": "s4",
+      "action": "reply",
+      "input": {
+        "request_id": "${s1.request.id}",
+        "body": {
+          "body": "We mean group sync: our IdP groups 'Store Managers' and 'Regional Leads' should map to the Viewer and Editor roles. Accounts are already created at first login.",
+          "external_ref": null,
+          "expected_request_version": "${s3.request.version}"
+        }
+      }
+    },
+    {
+      "id": "s5",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "failed"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s6",
+      "action": "get_run_events",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "after_seq": 0
+      }
+    }
+  ],
+  "expectations": [
+    {
+      "assert": "proposal_kind",
+      "step": "s2",
+      "values": [
+        "clarify"
+      ]
+    },
+    {
+      "assert": "proposal_payload_matches",
+      "step": "s2",
+      "path": "question",
+      "regex": "(?is)(account|user).*(group|role)|(group|role).*(account|user)"
+    },
+    {
+      "assert": "proposal_payload_nonempty",
+      "step": "s2",
+      "path": "missing_fields"
+    },
+    {
+      "assert": "run_status",
+      "step": "s2",
+      "values": [
+        "waiting_for_input"
+      ]
+    },
+    {
+      "assert": "action_status",
+      "step": "s2",
+      "values": [
+        "succeeded"
+      ]
+    },
+    {
+      "assert": "request_status",
+      "step": "s3",
+      "values": [
+        "awaiting_input"
+      ]
+    },
+    {
+      "assert": "work_item_count_delta",
+      "step": "s2",
+      "value": 0
+    },
+    {
+      "assert": "no_action_kinds",
+      "step": "s2",
+      "kinds": [
+        "create_work",
+        "link_work"
+      ]
+    },
+    {
+      "assert": "candidate_capabilities_include",
+      "step": "s2",
+      "ids": [
+        "cap_scim_user_provisioning",
+        "cap_scim_group_sync"
+      ]
+    },
+    {
+      "assert": "same_id",
+      "a": "${s4.run.id}",
+      "b": "${s1.run.id}"
+    },
+    {
+      "assert": "run_status",
+      "step": "s5",
+      "values": [
+        "succeeded",
+        "awaiting_review"
+      ]
+    },
+    {
+      "assert": "proposal_kind",
+      "step": "s5",
+      "values": [
+        "answer",
+        "link_work"
+      ]
+    },
+    {
+      "assert": "proposal_payload_in",
+      "step": "s5",
+      "path": "work_item_id",
+      "values": [
+        "work_scim_nested_groups"
+      ],
+      "when_kind": "link_work"
+    },
+    {
+      "assert": "evidence_sources_include_any",
+      "step": "s5",
+      "source_ids": [
+        "20-docs-sso-scim"
+      ]
+    },
+    {
+      "assert": "revision_gte",
+      "a": "${s5.proposal.based_on_revision}",
+      "b": "${s2.proposal.based_on_revision}"
+    },
+    {
+      "assert": "events_include_types_in_order",
+      "step": "s6",
+      "types": [
+        "run_started",
+        "waiting_for_input",
+        "run_started"
+      ]
+    },
+    {
+      "assert": "events_seq_contiguous",
+      "step": "s6"
+    },
+    {
+      "assert": "work_item_count_delta",
+      "step": "s5",
+      "value": 0
+    }
+  ]
+}

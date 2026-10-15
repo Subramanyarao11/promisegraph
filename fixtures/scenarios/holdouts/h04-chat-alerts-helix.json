@@ -1,0 +1,28 @@
+{
+  "id": "h04-chat-alerts-helix",
+  "workspace_id": "ws_demo",
+  "request": {
+    "customer_id": "customer_helix",
+    "subject": "Alerts in our chat channels",
+    "body": "Could ledger anomaly alerts be posted to our chat tool's channels instead of email?",
+    "channel": "manual",
+    "capability_ids": [],
+    "external_ref": null,
+    "auto_start": true,
+    "planner_mode": "scripted"
+  },
+  "acceptable_dispositions": [
+    {
+      "kind": "create_work",
+      "capability_id": "cap_metric_alerts"
+    },
+    {
+      "kind": "escalate"
+    }
+  ],
+  "must_not": [
+    "link_work:work_alert_digest",
+    "link_work:work_alert_sensitivity"
+  ],
+  "notes": "Not covered by digest or sensitivity work; webhook-to-chat answer is borderline but docs say chat integrations unavailable."
+}

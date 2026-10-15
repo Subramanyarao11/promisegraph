@@ -1,0 +1,163 @@
+{
+  "id": "t07-four-hop-owner-path",
+  "acceptance_ids": [
+    "T07"
+  ],
+  "workspace_id": "ws_demo",
+  "description": "Corvid asks who owns the EU export fix and when. Path: request -> cap_scheduled_exports -> work_export_issue -> work_export_migration -> work_queue_v2_cutover -> person_dana (inactive). After linking, request -TRACKED_BY-> work_export_issue -DEPENDS_ON-> work_export_migration -DEPENDS_ON-> work_queue_v2_cutover -OWNED_BY-> person_dana is exactly 4 hops. The inactive root owner and the active routing decision (decision_exports_routing_v2 -> person_maya) must shape the action: no date promise, routed to an active owner, never to person_dana.",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "create_request",
+      "input": {
+        "customer_id": "customer_corvid",
+        "subject": "Who owns the EU export fix and when will it land?",
+        "body": "Our EU scheduled exports are still failing. Which team owns the underlying fix, and can you give us a date we can share with our hospital clients?",
+        "channel": "manual",
+        "capability_ids": [],
+        "external_ref": null,
+        "auto_start": true,
+        "planner_mode": "scripted"
+      }
+    },
+    {
+      "id": "s2",
+      "action": "await_run",
+      "input": {
+        "run_id": "${s1.run.id}",
+        "until_status_in": [
+          "succeeded",
+          "awaiting_review",
+          "waiting_for_input",
+          "failed",
+          "cancelled"
+        ],
+        "timeout_seconds": 90
+      }
+    },
+    {
+      "id": "s3",
+      "action": "get_request_context",
+      "input": {
+        "request_id": "${s1.request.id}",
+        "depth": 4
+      }
+    },
+    {
+      "id": "s4",
+      "action": "context_expand",
+      "input": {
+        "entity_ids": [
+          "work_export_issue"
+        ],
+        "relation_types": [
+          "DEPENDS_ON",
+          "OWNED_BY"
+        ],
+        "depth": 4,
+        "limit": 50
+      }
+    }
+  ],
+  "expectations": [
+    {
+      "assert": "proposal_kind",
+      "step": "s2",
+      "values": [
+        "escalate",
+        "link_work"
+      ]
+    },
+    {
+      "assert": "proposal_payload_in",
+      "step": "s2",
+      "path": "work_item_id",
+      "values": [
+        "work_export_issue"
+      ],
+      "when_kind": "link_work"
+    },
+    {
+      "assert": "proposal_payload_in",
+      "step": "s2",
+      "path": "owner_id",
+      "values": [
+        "person_maya",
+        null
+      ],
+      "when_kind": "escalate"
+    },
+    {
+      "assert": "proposal_payload_in",
+      "step": "s2",
+      "path": "team_id",
+      "values": [
+        "team_data_platform",
+        null
+      ],
+      "when_kind": "escalate"
+    },
+    {
+      "assert": "proposal_payload_not_in",
+      "step": "s2",
+      "path": "owner_id",
+      "values": [
+        "person_dana"
+      ]
+    },
+    {
+      "assert": "context_includes",
+      "step": "s2",
+      "field": "decisions",
+      "ids": [
+        "decision_exports_routing_v2"
+      ]
+    },
+    {
+      "assert": "text_matches",
+      "step": "s2",
+      "fields": [
+        "explanation"
+      ],
+      "regex": "(?i)(inactive|no active owner|left|work_queue_v2_cutover|queue v2)"
+    },
+    {
+      "assert": "text_not_matches",
+      "step": "s2",
+      "fields": [
+        "explanation",
+        "payload.comment_text",
+        "payload.reason"
+      ],
+      "regex": "(?i)(fixed|ready|delivered|restored) (by|on) (2026-10-(09|30)|oct(ober)? (9|30))"
+    },
+    {
+      "assert": "path_contains_ordered",
+      "step": "s4",
+      "ids": [
+        "work_export_issue",
+        "work_export_migration",
+        "work_queue_v2_cutover",
+        "person_dana"
+      ],
+      "max_hops": 4
+    },
+    {
+      "assert": "path_contains_ordered",
+      "step": "s3",
+      "ids": [
+        "cap_scheduled_exports",
+        "work_export_issue",
+        "work_export_migration",
+        "work_queue_v2_cutover"
+      ],
+      "max_hops": 4,
+      "optional": true
+    },
+    {
+      "assert": "work_item_count_delta",
+      "step": "s2",
+      "value": 0
+    }
+  ]
+}
