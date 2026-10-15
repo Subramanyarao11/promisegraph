@@ -1,0 +1,632 @@
+{
+  "contract_version": "1.0.0",
+  "status": "Illustrative specification fixtures, not executed results.",
+  "scenario": "Link an export request to existing blocked work; run succeeds while request and verification remain pending.",
+  "resource_examples": [
+    {
+      "schema": "Customer",
+      "data": {
+        "id": "customer_acme",
+        "workspace_id": "ws_demo",
+        "name": "Acme (synthetic)",
+        "version": 1
+      }
+    },
+    {
+      "schema": "Request",
+      "data": {
+        "id": "request_exports_001",
+        "workspace_id": "ws_demo",
+        "customer_id": "customer_acme",
+        "subject": "Scheduled exports stopped",
+        "body": "Our scheduled exports stopped working. We need them before Friday.",
+        "channel": "manual",
+        "status": "awaiting_work",
+        "owner_id": "person_maya",
+        "source_id": "src_request_001",
+        "capability_ids": [
+          "cap_scheduled_exports"
+        ],
+        "linked_work_ids": [
+          "work_export_issue"
+        ],
+        "created_at": "2026-10-16T04:30:00Z",
+        "updated_at": "2026-10-16T04:30:00Z",
+        "version": 3
+      }
+    },
+    {
+      "schema": "WorkItem",
+      "data": {
+        "id": "work_export_issue",
+        "workspace_id": "ws_demo",
+        "title": "Restore scheduled exports",
+        "kind": "ticket",
+        "status": "blocked",
+        "owner_id": "person_maya",
+        "connector": "local",
+        "external_id": null,
+        "external_url": null,
+        "forecast_at": null,
+        "observed_at": "2026-10-16T04:30:00Z",
+        "evidence_ids": [
+          "ev_export_issue_1",
+          "ev_migration_owner_1"
+        ],
+        "version": 2
+      }
+    },
+    {
+      "schema": "SourceRecord",
+      "data": {
+        "id": "src_export_issue",
+        "workspace_id": "ws_demo",
+        "revision": 1,
+        "title": "Synthetic export issue observation",
+        "kind": "work",
+        "origin": "synthetic",
+        "body": "Scheduled exports are blocked by the export worker migration.",
+        "sha256": "34f07ac4c0578b1fdc8654635d82d002e46d935fd5dff613c963330eec1bfc24",
+        "observed_at": "2026-10-16T04:30:00Z",
+        "ingested_at": "2026-10-16T04:30:00Z",
+        "supersedes_revision": null
+      }
+    },
+    {
+      "schema": "ContextBundle",
+      "data": {
+        "request_id": "request_exports_001",
+        "based_on_revision": 7,
+        "sources": [
+          {
+            "id": "ev_export_issue_1",
+            "source_id": "src_export_issue",
+            "source_revision": 1,
+            "origin": "synthetic",
+            "excerpt": "Scheduled exports are blocked by the export worker migration.",
+            "location": "body",
+            "observed_at": "2026-10-16T04:30:00Z",
+            "ingested_at": "2026-10-16T04:30:00Z",
+            "stale": false
+          },
+          {
+            "id": "ev_request_topic_1",
+            "source_id": "src_request_001",
+            "source_revision": 1,
+            "origin": "synthetic",
+            "excerpt": "Our scheduled exports stopped working. We need them before Friday.",
+            "location": "body",
+            "observed_at": "2026-10-16T04:30:00Z",
+            "ingested_at": "2026-10-16T04:30:00Z",
+            "stale": false
+          },
+          {
+            "id": "ev_capability_work_1",
+            "source_id": "src_capability_work",
+            "source_revision": 1,
+            "origin": "synthetic",
+            "excerpt": "The scheduled exports capability has tracked work work_export_issue.",
+            "location": "body",
+            "observed_at": "2026-10-16T04:30:00Z",
+            "ingested_at": "2026-10-16T04:30:00Z",
+            "stale": false
+          },
+          {
+            "id": "ev_migration_owner_1",
+            "source_id": "src_migration_owner",
+            "source_revision": 1,
+            "origin": "synthetic",
+            "excerpt": "Maya owns the export worker migration and the scheduled exports issue.",
+            "location": "body",
+            "observed_at": "2026-10-16T04:30:00Z",
+            "ingested_at": "2026-10-16T04:30:00Z",
+            "stale": false
+          },
+          {
+            "id": "ev_export_policy_1",
+            "source_id": "src_export_policy",
+            "source_revision": 1,
+            "origin": "synthetic",
+            "excerpt": "Synthetic policy: export links must remain authenticated.",
+            "location": "body",
+            "observed_at": "2026-10-16T04:30:00Z",
+            "ingested_at": "2026-10-16T04:30:00Z",
+            "stale": false
+          },
+          {
+            "id": "ev_export_retry_1",
+            "source_id": "src_export_retry",
+            "source_revision": 1,
+            "origin": "synthetic",
+            "excerpt": "Retrying did not restore exports in the recorded configuration.",
+            "location": "body",
+            "observed_at": "2026-10-16T04:30:00Z",
+            "ingested_at": "2026-10-16T04:30:00Z",
+            "stale": false
+          }
+        ],
+        "paths": [
+          {
+            "id": "path_export_owner",
+            "nodes": [
+              {
+                "id": "request_exports_001",
+                "label": "Request",
+                "title": "Scheduled exports stopped"
+              },
+              {
+                "id": "cap_scheduled_exports",
+                "label": "Capability",
+                "title": "Scheduled exports"
+              },
+              {
+                "id": "work_export_issue",
+                "label": "WorkItem",
+                "title": "Restore scheduled exports"
+              },
+              {
+                "id": "work_export_migration",
+                "label": "WorkItem",
+                "title": "Export worker migration"
+              },
+              {
+                "id": "person_maya",
+                "label": "Person",
+                "title": "Maya (synthetic)"
+              }
+            ],
+            "edges": [
+              {
+                "id": "edge_export_1",
+                "type": "ABOUT",
+                "from_id": "request_exports_001",
+                "to_id": "cap_scheduled_exports",
+                "evidence_ids": [
+                  "ev_request_topic_1"
+                ],
+                "confirmed": true
+              },
+              {
+                "id": "edge_export_2",
+                "type": "IMPLEMENTED_BY",
+                "from_id": "cap_scheduled_exports",
+                "to_id": "work_export_issue",
+                "evidence_ids": [
+                  "ev_capability_work_1"
+                ],
+                "confirmed": true
+              },
+              {
+                "id": "edge_export_3",
+                "type": "DEPENDS_ON",
+                "from_id": "work_export_issue",
+                "to_id": "work_export_migration",
+                "evidence_ids": [
+                  "ev_export_issue_1"
+                ],
+                "confirmed": true
+              },
+              {
+                "id": "edge_export_4",
+                "type": "OWNED_BY",
+                "from_id": "work_export_migration",
+                "to_id": "person_maya",
+                "evidence_ids": [
+                  "ev_migration_owner_1"
+                ],
+                "confirmed": true
+              }
+            ],
+            "claim_kind": "source_assertion",
+            "evidence_ids": [
+              "ev_request_topic_1",
+              "ev_capability_work_1",
+              "ev_export_issue_1",
+              "ev_migration_owner_1"
+            ]
+          }
+        ],
+        "related_work": [
+          {
+            "id": "work_export_issue",
+            "workspace_id": "ws_demo",
+            "title": "Restore scheduled exports",
+            "kind": "ticket",
+            "status": "blocked",
+            "owner_id": "person_maya",
+            "connector": "local",
+            "external_id": null,
+            "external_url": null,
+            "forecast_at": null,
+            "observed_at": "2026-10-16T04:30:00Z",
+            "evidence_ids": [
+              "ev_export_issue_1",
+              "ev_migration_owner_1"
+            ],
+            "version": 2
+          }
+        ],
+        "decisions": [
+          {
+            "id": "decision_exports_001",
+            "workspace_id": "ws_demo",
+            "rule_type": "forbidden_workaround",
+            "value": "manual_public_export_link",
+            "scope": {
+              "entity_type": "customer",
+              "entity_id": "customer_acme"
+            },
+            "status": "active",
+            "rationale": "Synthetic policy: export links must remain authenticated.",
+            "author_id": "person_ops",
+            "effective_at": "2026-10-16T04:30:00Z",
+            "expires_at": null,
+            "supersedes_id": null,
+            "evidence_ids": [
+              "ev_export_policy_1"
+            ],
+            "version": 1
+          }
+        ],
+        "attempts": [
+          {
+            "id": "attempt_exports_001",
+            "workspace_id": "ws_demo",
+            "request_id": "request_exports_prior",
+            "procedure_key": "retry_schedule",
+            "context_signature": "cap_scheduled_exports:worker-v1",
+            "scope": {
+              "entity_type": "capability",
+              "entity_id": "cap_scheduled_exports"
+            },
+            "outcome": "failed",
+            "verification": "failed",
+            "summary": "Retrying did not restore exports in the recorded configuration.",
+            "evidence_ids": [
+              "ev_export_retry_1"
+            ],
+            "observed_at": "2026-10-16T04:30:00Z"
+          }
+        ],
+        "missing_information": [
+          "No reliable delivery forecast is recorded."
+        ],
+        "truncated": false
+      }
+    },
+    {
+      "schema": "Decision",
+      "data": {
+        "id": "decision_exports_001",
+        "workspace_id": "ws_demo",
+        "rule_type": "forbidden_workaround",
+        "value": "manual_public_export_link",
+        "scope": {
+          "entity_type": "customer",
+          "entity_id": "customer_acme"
+        },
+        "status": "active",
+        "rationale": "Synthetic policy: export links must remain authenticated.",
+        "author_id": "person_ops",
+        "effective_at": "2026-10-16T04:30:00Z",
+        "expires_at": null,
+        "supersedes_id": null,
+        "evidence_ids": [
+          "ev_export_policy_1"
+        ],
+        "version": 1
+      }
+    },
+    {
+      "schema": "Attempt",
+      "data": {
+        "id": "attempt_exports_001",
+        "workspace_id": "ws_demo",
+        "request_id": "request_exports_prior",
+        "procedure_key": "retry_schedule",
+        "context_signature": "cap_scheduled_exports:worker-v1",
+        "scope": {
+          "entity_type": "capability",
+          "entity_id": "cap_scheduled_exports"
+        },
+        "outcome": "failed",
+        "verification": "failed",
+        "summary": "Retrying did not restore exports in the recorded configuration.",
+        "evidence_ids": [
+          "ev_export_retry_1"
+        ],
+        "observed_at": "2026-10-16T04:30:00Z"
+      }
+    },
+    {
+      "schema": "Proposal",
+      "data": {
+        "id": "proposal_exports_001",
+        "workspace_id": "ws_demo",
+        "request_id": "request_exports_001",
+        "run_id": "run_exports_001",
+        "kind": "link_work",
+        "payload": {
+          "work_item_id": "work_export_issue",
+          "comment_text": null
+        },
+        "evidence_ids": [
+          "ev_export_issue_1"
+        ],
+        "explanation": "Existing tracked work covers the request. Do not create a duplicate or invent a delivery date.",
+        "rejected_alternatives": [
+          {
+            "kind": "create_work",
+            "reason": "Existing work covers this capability.",
+            "evidence_ids": [
+              "ev_capability_work_1"
+            ]
+          }
+        ],
+        "based_on_revision": 7,
+        "validity": "valid",
+        "validation_reasons": [],
+        "authorization_id": "authorization_operator_001",
+        "created_at": "2026-10-16T04:30:00Z",
+        "version": 1
+      }
+    },
+    {
+      "schema": "Action",
+      "data": {
+        "id": "action_exports_001",
+        "workspace_id": "ws_demo",
+        "request_id": "request_exports_001",
+        "run_id": "run_exports_001",
+        "proposal_id": "proposal_exports_001",
+        "kind": "link_work",
+        "status": "succeeded",
+        "verification": "pending",
+        "idempotency_key": "idem_export_link_001",
+        "connector": "local",
+        "receipt": {
+          "id": "receipt_exports_001",
+          "connector": "local",
+          "target_id": "link_request_exports_work_export",
+          "target_url": null,
+          "observed_at": "2026-10-16T04:30:00Z",
+          "result_hash": "72c54eaa810e2a3b566ddd10e3fd80b2d57892f428c6aba41452c409479bfb8b"
+        },
+        "error": null,
+        "created_at": "2026-10-16T04:30:00Z",
+        "updated_at": "2026-10-16T04:30:00Z",
+        "version": 3
+      }
+    },
+    {
+      "schema": "Observation",
+      "data": {
+        "id": "observation_exports_001",
+        "workspace_id": "ws_demo",
+        "request_id": "request_exports_001",
+        "action_id": "action_exports_001",
+        "kind": "connector_status",
+        "verification": "pending",
+        "body": "Linked work remains blocked; customer resolution is not verified.",
+        "evidence_ids": [
+          "ev_export_issue_1"
+        ],
+        "actor_id": "worker_demo",
+        "observed_at": "2026-10-16T04:30:00Z"
+      }
+    },
+    {
+      "schema": "Run",
+      "data": {
+        "id": "run_exports_001",
+        "workspace_id": "ws_demo",
+        "request_id": "request_exports_001",
+        "mode": "scripted",
+        "status": "succeeded",
+        "stage": "remember",
+        "based_on_revision": 7,
+        "event_seq": 8,
+        "budget": {
+          "max_tool_calls": 12,
+          "max_replans": 2,
+          "max_active_seconds": 90,
+          "extensions_used": 0
+        },
+        "usage": {
+          "tool_calls": 5,
+          "replans": 0,
+          "active_ms": 2100
+        },
+        "error": null,
+        "created_at": "2026-10-16T04:30:00Z",
+        "updated_at": "2026-10-16T04:30:00Z",
+        "version": 5
+      }
+    },
+    {
+      "schema": "RunEvent",
+      "data": {
+        "id": "event_exports_008",
+        "run_id": "run_exports_001",
+        "seq": 8,
+        "type": "run_finished",
+        "occurred_at": "2026-10-16T04:30:00Z",
+        "step_id": "step_008",
+        "tool_name": null,
+        "payload": {
+          "run_status": "succeeded",
+          "request_status": "awaiting_work",
+          "action_id": "action_exports_001"
+        }
+      }
+    },
+    {
+      "schema": "JobLease",
+      "data": {
+        "job_id": "job_exports_001",
+        "kind": "investigate",
+        "run_id": "run_exports_001",
+        "action_id": null,
+        "attempt": 1,
+        "lease_token": "EXAMPLE_ONLY_NOT_A_SECRET",
+        "fencing_token": 1,
+        "expires_at": "2026-10-16T04:31:00Z",
+        "checkpoint": null
+      }
+    },
+    {
+      "schema": "SourceRecord",
+      "data": {
+        "id": "src_request_001",
+        "workspace_id": "ws_demo",
+        "revision": 1,
+        "title": "Synthetic source for ev_request_topic_1",
+        "kind": "request",
+        "origin": "synthetic",
+        "body": "Our scheduled exports stopped working. We need them before Friday.",
+        "sha256": "d9f5ed25e1cf84e8659edb3e5700f80d25f829d1f5e228998a151caab7f4acbb",
+        "observed_at": "2026-10-16T04:30:00Z",
+        "ingested_at": "2026-10-16T04:30:00Z",
+        "supersedes_revision": null
+      }
+    },
+    {
+      "schema": "SourceRecord",
+      "data": {
+        "id": "src_capability_work",
+        "workspace_id": "ws_demo",
+        "revision": 1,
+        "title": "Synthetic source for ev_capability_work_1",
+        "kind": "work",
+        "origin": "synthetic",
+        "body": "The scheduled exports capability has tracked work work_export_issue.",
+        "sha256": "7f2f6c327f0aaaff365b941e79a525ee09624a628078d1d53eeb0dd00bf9823e",
+        "observed_at": "2026-10-16T04:30:00Z",
+        "ingested_at": "2026-10-16T04:30:00Z",
+        "supersedes_revision": null
+      }
+    },
+    {
+      "schema": "SourceRecord",
+      "data": {
+        "id": "src_migration_owner",
+        "workspace_id": "ws_demo",
+        "revision": 1,
+        "title": "Synthetic source for ev_migration_owner_1",
+        "kind": "work",
+        "origin": "synthetic",
+        "body": "Maya owns the export worker migration and the scheduled exports issue.",
+        "sha256": "2d98ed6186b7682ed625832a5ebb19e6a80cdc0feea1306ca53367ffa73cf896",
+        "observed_at": "2026-10-16T04:30:00Z",
+        "ingested_at": "2026-10-16T04:30:00Z",
+        "supersedes_revision": null
+      }
+    },
+    {
+      "schema": "SourceRecord",
+      "data": {
+        "id": "src_export_policy",
+        "workspace_id": "ws_demo",
+        "revision": 1,
+        "title": "Synthetic source for ev_export_policy_1",
+        "kind": "decision",
+        "origin": "synthetic",
+        "body": "Synthetic policy: export links must remain authenticated.",
+        "sha256": "9b189440be6f9f7de6aa28d8cd3b0d46299e155c74a42760d674fec7de52c885",
+        "observed_at": "2026-10-16T04:30:00Z",
+        "ingested_at": "2026-10-16T04:30:00Z",
+        "supersedes_revision": null
+      }
+    },
+    {
+      "schema": "SourceRecord",
+      "data": {
+        "id": "src_export_retry",
+        "workspace_id": "ws_demo",
+        "revision": 1,
+        "title": "Synthetic source for ev_export_retry_1",
+        "kind": "observation",
+        "origin": "synthetic",
+        "body": "Retrying did not restore exports in the recorded configuration.",
+        "sha256": "c76332e1c756efdd2b230d7cfd4be1ead7e20b2a1aa00a3b4b8e0c4783817780",
+        "observed_at": "2026-10-16T04:30:00Z",
+        "ingested_at": "2026-10-16T04:30:00Z",
+        "supersedes_revision": null
+      }
+    }
+  ],
+  "endpoint_examples": [
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/ws_demo/requests/request_exports_001",
+      "status": 200,
+      "body": {
+        "data": {
+          "id": "request_exports_001",
+          "workspace_id": "ws_demo",
+          "customer_id": "customer_acme",
+          "subject": "Scheduled exports stopped",
+          "body": "Our scheduled exports stopped working. We need them before Friday.",
+          "channel": "manual",
+          "status": "awaiting_work",
+          "owner_id": "person_maya",
+          "source_id": "src_request_001",
+          "capability_ids": [
+            "cap_scheduled_exports"
+          ],
+          "linked_work_ids": [
+            "work_export_issue"
+          ],
+          "created_at": "2026-10-16T04:30:00Z",
+          "updated_at": "2026-10-16T04:30:00Z",
+          "version": 3
+        },
+        "meta": {
+          "contract_version": "1.0.0",
+          "knowledge_revision": 8,
+          "correlation_id": "corr_demo_001"
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/ws_demo/runs/run_exports_001/events?after_seq=7",
+      "status": 200,
+      "body": {
+        "data": [
+          {
+            "id": "event_exports_008",
+            "run_id": "run_exports_001",
+            "seq": 8,
+            "type": "run_finished",
+            "occurred_at": "2026-10-16T04:30:00Z",
+            "step_id": "step_008",
+            "tool_name": null,
+            "payload": {
+              "run_status": "succeeded",
+              "request_status": "awaiting_work",
+              "action_id": "action_exports_001"
+            }
+          }
+        ],
+        "next_after_seq": 8,
+        "has_more": false,
+        "meta": {
+          "contract_version": "1.0.0",
+          "knowledge_revision": 8,
+          "correlation_id": "corr_demo_002"
+        }
+      }
+    }
+  ],
+  "scenario_assertions": [
+    "request.status == awaiting_work",
+    "run.status == succeeded",
+    "action.status == succeeded",
+    "action.verification == pending",
+    "action.connector == local",
+    "no new work item was created",
+    "same idempotency key returns the same action",
+    "external issue closure alone cannot resolve this request"
+  ]
+}

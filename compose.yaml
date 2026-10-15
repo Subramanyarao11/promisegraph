@@ -1,0 +1,13 @@
+# Coordinator-owned. FalkorDB only for G0/G1; api/worker/web services are added at integration.
+services:
+  falkordb:
+    image: falkordb/falkordb:v4.20.7
+    ports:
+      - "6380:6379"
+    # AOF + RDB so state survives restart (T19); verified by scripts/check_persistence.sh
+    environment:
+      REDIS_ARGS: "--appendonly yes --appendfsync everysec --save 60 1"
+    volumes:
+      - falkordb-data:/var/lib/falkordb/data
+volumes:
+  falkordb-data:
