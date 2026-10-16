@@ -1,7 +1,7 @@
 # PromiseGraph protocol mock (contract 1.0.0)
 
 An in-memory HTTP mock of Agent A's API, built to the contract. It lets the worker (B) and the web app (C) develop
-without the real API. It covers every public route in Contracts §4, the two list routes added by PROTOCOL.md "G0 clarifications (rev 2)" (`GET /requests/{id}/runs` and `GET /proposals?request_id=&run_id=`, both newest first) and every private route in §7, using the
+without the real API. It covers every public route in Contracts §4, the two list routes added by PROTOCOL.md "G0 clarifications (rev 2)" (`GET /requests/{id}/runs` and `GET /proposals?request_id=&run_id=`, both newest first), the Rev 3 routes (items 19–21) and every private route in §7, using the
 contract's envelopes, error codes, auth rules, idempotency, leases and fencing, cursors and state transitions.
 Each response carries the header `X-PromiseGraph-Mock: true`.
 
@@ -32,7 +32,7 @@ cd contracts/mock && uv run pytest -q
 
 The harness checks every HTTP response against `contracts/tools/validate.py`. That covers the `{data, meta}` and list
 envelopes, `EventsPage`, `ErrorEnvelope` and the DTO for each route. It also reports how many of the 36 contract
-routes the run exercised (38, counting the rev 2 list routes). `tests/test_rev2.py` covers the rev 2 clarifications, including #17.
+routes the run exercised (44 in total). `tests/test_rev2.py` covers the rev 2 clarifications (including #17), and `tests/test_rev3.py` covers Rev 3 (items 19–24).
 
 ## Seed
 
@@ -59,7 +59,7 @@ On startup and on each reset:
 
 | Fault | Behaviour |
 | --- | --- |
-| `database_unavailable` (sticky bool) | Every route except `/__mock/*` and `/health/live` returns 503 `DEPENDENCY_UNAVAILABLE` (retryable). `/health/ready` returns 503 too. |
+| `database_unavailable` (sticky bool) | Every route except `/__mock/*` and `/health/live` returns 503 `DEPENDENCY_UNAVAILABLE` (retryable), with `meta.knowledge_revision: 0` meaning "unknown" (Rev 3 #24). `/health/ready` returns 503 too. |
 | `stale_next_proposal` (count) | The next `POST /proposals` bumps knowledge_revision first, to simulate a concurrent change, so that proposal comes back `stale`. |
 | `lease_expire_now` (action) | Every current lease expires immediately. Holders get 409 `LEASE_LOST`, and the next claim gets the same job with `attempt+1` and a higher fencing token. |
 | `local_create_timeout_after_effect` (count) | The next `execute-local` applies the local effect, then returns 503 (retryable) without recording a receipt. The action stays `dispatching`. The worker can either retry `execute-local`, which dedupes by action marker and reads the receipt back, or complete the dispatch job `unknown`, which queues a reconcile job. |
@@ -116,6 +116,21 @@ On startup and on each reset:
   entities invalidate the proposals that consulted them.
 - **Other API-created jobs (rev 2 #18).** Reply-resume, replan-after-failed-dispatch and operator-resume jobs carry
   the run's last worker checkpoint plus `resume_stage` and one of `reply_source_id` or `resume_reason`.
+- **Rev 3 reads (#19).** `GET /evidence/{id}` returns an EvidenceRef, `GET /work-items/{id}` a WorkItem, and
+  `GET /observations?request_id=` and `GET /attempts?request_id=` return lists, newest first.
+- **Operator reconciliation (#20).** `POST /actions/{id}/reconcile` is operator only, and its body is validated
+  against `ActionReconcile`. It works only on `unknown` actions; anything else returns 409 `INVALID_TRANSITION`, and
+  so does a reconcile job leased by a worker. A version mismatch returns 409 `REVISION_CONFLICT`.
+  - `succeeded` needs a receipt whose connector matches the action. For local actions the receipt's `target_id`
+    must match the effect the mock recorded; the mock keeps its own receipt. After that, the normal continuation is
+    queued.
+  - `failed` marks the action failed and queues a replan.
+  - Any queued reconcile job is cancelled, and the operator's `evidence_ids` are kept on the action.
+- **Closure (#21).** `POST /requests/{id}/close` is operator only and is validated against `RequestClose`. It
+  returns the Request with status `closed` and cancels the request's active runs cooperatively. Closing an
+  already-closed request returns 409 `INVALID_TRANSITION`.
+- **Refresh target (#22).** Refresh jobs keep `run_id: null`; their checkpoint is
+  `{request_id, reason, work_item_ids}`, where `work_item_ids` are the request's linked work.
 - **Investigate completion.** Only `proposal_ids` is required in `result`. A `waiting` outcome also needs
   `awaiting: "review"`.
 - **Run control.** Cancel is cooperative: queued jobs are cancelled, and leased jobs may still record receipts. If a

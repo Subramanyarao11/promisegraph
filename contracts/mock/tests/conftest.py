@@ -54,6 +54,13 @@ ROUTES = [
     ("POST", r"/decisions", "Decision", "single"),
     ("POST", r"/imports/preview", "ImportPreviewResult", "single"),
     ("POST", rf"/imports/{ID}/commit", "ImportCommitResult", "single"),
+    # rev 3
+    ("GET", rf"/evidence/{ID}", "EvidenceRef", "single"),
+    ("GET", rf"/work-items/{ID}", "WorkItem", "single"),
+    ("GET", r"/observations", "Observation", "list"),
+    ("GET", r"/attempts", "Attempt", "list"),
+    ("POST", rf"/actions/{ID}/reconcile", "Action", "single"),
+    ("POST", rf"/requests/{ID}/close", "Request", "single"),
     # private
     ("POST", r"/jobs/claim", "JobLease", "single"),
     ("POST", rf"/jobs/{ID}/heartbeat", "JobLease", "single"),

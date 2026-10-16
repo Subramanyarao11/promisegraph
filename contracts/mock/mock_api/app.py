@@ -19,7 +19,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from . import context as ctxmod
 from . import engine, importer, seed
 from .common import (
-    ACTION_KINDS, CONTRACT_VERSION, REFERENCE_TIME, ApiError, contract_errors, assert_contract, bounded_id, canonical, check_input, invalid, iso,
+    ACTION_KINDS, CONTRACT_VERSION, REFERENCE_TIME, ApiError, assert_contract, bounded_id, canonical, check_input, invalid, iso,
     new_id, not_found, now, now_dt, plus, pub, sha256,
 )
 from .state import Workspace, touch
@@ -895,29 +895,9 @@ async def list_attempts(request: Request, wid: str):
     return ok_list(ctx, page, "Attempt", nxt)
 
 
-def _check_fields(b: Any, spec: dict[str, Callable[[Any], bool]], name: str) -> None:
-    """Hand validation for rev 3 bodies that have no commands.schema.json definition yet."""
-    if not isinstance(b, dict):
-        raise invalid(f"{name} must be an object", {"<root>": "expected object"})
-    fields = {k: "invalid or missing" for k, ok_ in spec.items() if k not in b or not ok_(b[k])}
-    fields.update({k: "additional property not allowed" for k in b if k not in spec})
-    if fields:
-        raise invalid(f"Request body does not match {name}", fields)
-
-
-def _is_id(v) -> bool:
-    return isinstance(v, str) and 1 <= len(v) <= 128
-
-
 @app.post(PUBLIC + "/actions/{aid}/reconcile")
 async def reconcile_action(request: Request, wid: str, aid: str):
     def h(ctx: Ctx, b: dict):
-        _check_fields(b, {
-            "outcome": lambda v: v in ("succeeded", "failed"),
-            "receipt": lambda v: v is None or (isinstance(v, dict) and not contract_errors("Receipt", v)),
-            "evidence_ids": lambda v: isinstance(v, list) and len(v) <= 100 and all(_is_id(x) for x in v),
-            "expected_action_version": lambda v: isinstance(v, int) and not isinstance(v, bool) and v >= 1,
-        }, "ActionReconcile")
         if b["outcome"] == "succeeded" and b["receipt"] is None:
             raise invalid("outcome succeeded requires a receipt", {"receipt": "required when outcome=succeeded"})
         ws = ctx.ws
@@ -928,16 +908,12 @@ async def reconcile_action(request: Request, wid: str, aid: str):
         if b["receipt"] is not None and b["receipt"]["connector"] != action["connector"]:
             raise invalid("receipt connector does not match the action", {"receipt/connector": f"expected {action['connector']}"})
         return 200, pub(engine.operator_reconcile(ws, action, b)), "Action"
-    return await command(request, wid, "POST /actions/{action_id}/reconcile", None, h, operator_only=True)
+    return await command(request, wid, "POST /actions/{action_id}/reconcile", "ActionReconcile", h, operator_only=True)
 
 
 @app.post(PUBLIC + "/requests/{rid}/close")
 async def close_request(request: Request, wid: str, rid: str):
     def h(ctx: Ctx, b: dict):
-        _check_fields(b, {
-            "reason": lambda v: isinstance(v, str) and 1 <= len(v) <= 2000,
-            "expected_request_version": lambda v: isinstance(v, int) and not isinstance(v, bool) and v >= 1,
-        }, "RequestClose")
         ws = ctx.ws
         req = ws.get("requests", rid, "request")
         if req["status"] == "closed":
@@ -950,7 +926,7 @@ async def close_request(request: Request, wid: str, rid: str):
         req["_close_reason"] = b["reason"]
         engine.set_request(req, "closed")
         return 200, pub(req), "Request"
-    return await command(request, wid, "POST /requests/{request_id}/close", None, h, operator_only=True)
+    return await command(request, wid, "POST /requests/{request_id}/close", "RequestClose", h, operator_only=True)
 
 
 @app.post(PRIVATE + "/jobs/claim")
