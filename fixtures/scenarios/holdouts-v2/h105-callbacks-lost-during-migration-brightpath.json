@@ -1,0 +1,46 @@
+{
+  "id": "h105-callbacks-lost-during-migration-brightpath",
+  "workspace_id": "ws_demo",
+  "category": "existing_work",
+  "request": {
+    "customer_id": "customer_brightpath",
+    "subject": "Missed callbacks while our receiver was offline",
+    "body": "We moved our event receiver to a new cloud account on Wednesday and it was unreachable for about an hour and a half. Your delivery log shows a pile of those events as 'expired'. We need them sent again, and we'd like to know what stops this happening next time we do maintenance.",
+    "channel": "manual",
+    "capability_ids": [],
+    "external_ref": null,
+    "auto_start": true,
+    "planner_mode": "scripted"
+  },
+  "acceptable_dispositions": [
+    {
+      "kind": "link_work",
+      "work_item_id": "work_webhook_retry_queue"
+    },
+    {
+      "kind": "escalate"
+    }
+  ],
+  "must_not": [
+    "create_work",
+    "promise_date",
+    "claim_self_serve_replay",
+    "claim_resolved"
+  ],
+  "must_not_patterns": {
+    "claim_self_serve_replay": "(?i)(you can|just|simply|please) (use|click|trigger|run)?\\s*(the )?(self-serve )?replay",
+    "claim_resolved": "(?i)\\b(has been|is now|are now|now) (fixed|resolved|restored)\\b"
+  },
+  "rationale": "20-docs-webhooks.md: retries last at most 30 minutes, then events are dropped as 'expired' and there is no self-serve replay. work_webhook_retry_queue (in_progress, owner person_ines) adds a 24h durable queue and operator replay of a time window - exactly this need; it depends on work_queue_v2_cutover (blocked, owner person_dana inactive, forecast passed), so its 2026-11-15 forecast must not be promised. Escalation is defensible because of that stalled dependency. create_work is both a duplicate and prohibited by decision_brightpath_actions. attempt_helix_webhook_retry_backoff is request-scoped to Helix and shows enabling backoff does not cover multi-hour outages.",
+  "evidence_ids": [
+    "customer_brightpath",
+    "cap_webhooks",
+    "work_webhook_retry_queue",
+    "work_queue_v2_cutover",
+    "person_dana",
+    "person_ines",
+    "decision_brightpath_actions",
+    "attempt_helix_webhook_retry_backoff",
+    "request_helix_webhook_retries"
+  ]
+}

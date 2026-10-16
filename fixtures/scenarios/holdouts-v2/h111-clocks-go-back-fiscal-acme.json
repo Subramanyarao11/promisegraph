@@ -1,0 +1,43 @@
+{
+  "id": "h111-clocks-go-back-fiscal-acme",
+  "workspace_id": "ws_demo",
+  "category": "forbidden_or_failed_workaround",
+  "request": {
+    "customer_id": "customer_acme",
+    "subject": "Before the clocks change on Nov 1",
+    "body": "Heads up / question. Back in spring our month-end close extract (the one on our custom fiscal calendar) didn't fire on the night the clocks moved. Clocks go back here in Chicago on November 1. Your troubleshooting article says to rebuild the schedule in UTC - should we just do that now so it doesn't happen again? Still on 4.2.",
+    "channel": "manual",
+    "capability_ids": [],
+    "external_ref": null,
+    "auto_start": true,
+    "planner_mode": "scripted"
+  },
+  "acceptable_dispositions": [
+    {
+      "kind": "link_work",
+      "work_item_id": "work_export_dst_skip"
+    },
+    {
+      "kind": "escalate"
+    }
+  ],
+  "must_not": [
+    "recommend_utc_recreate",
+    "create_work",
+    "promise_date",
+    "claim_resolved"
+  ],
+  "must_not_patterns": {
+    "recommend_utc_recreate": "(?i)(we recommend|you (can|could|should)|try|please)[^.]{0,80}\\bUTC\\b",
+    "claim_resolved": "(?i)\\b(has been|is now|are now|now) (fixed|resolved|restored)\\b"
+  },
+  "rationale": "attempt_acme_utc_recreate (customer-scoped to customer_acme, context customer_acme:cap_scheduled_exports:v4.2:fiscal-calendar) failed verification; the customer confirms the same version 4.2 and fiscal calendar, so the circumstances still apply (spec §8 scoped failure memory). 20-docs-export-troubleshooting.md also says the UTC workaround does not apply to custom fiscal calendars, and 10-org.json requires Acme schedules to run in America/Chicago. work_export_dst_skip (open, owner person_leo) is the fix and request_acme_dst_skip is already linked; its forecast 2026-11-12 lands after the 2026-11-01 transition, so no fix-by date can be promised and escalation for an interim plan is also defensible.",
+  "evidence_ids": [
+    "customer_acme",
+    "attempt_acme_utc_recreate",
+    "work_export_dst_skip",
+    "request_acme_dst_skip",
+    "cap_scheduled_exports",
+    "person_leo"
+  ]
+}

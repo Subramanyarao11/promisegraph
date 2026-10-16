@@ -1,0 +1,40 @@
+{
+  "id": "h107-security-feed-corvid",
+  "workspace_id": "ws_demo",
+  "category": "new_work",
+  "request": {
+    "customer_id": "customer_corvid",
+    "subject": "Continuous feed of admin activity into our security monitoring",
+    "body": "Our security operations team currently downloads the admin activity file by hand every month and loads it into Microsoft Sentinel. They'd like those events to flow in continuously (near-real-time is fine) so they can alert on role changes and token use. Is that something you can do? Note our data has to stay in the EU.",
+    "channel": "manual",
+    "capability_ids": [],
+    "external_ref": null,
+    "auto_start": true,
+    "planner_mode": "scripted"
+  },
+  "acceptable_dispositions": [
+    {
+      "kind": "create_work",
+      "capability_id": "cap_audit_log"
+    }
+  ],
+  "must_not": [
+    "link_work:work_audit_log_csv_download",
+    "link_work:work_webhook_retry_queue",
+    "claim_siem_supported"
+  ],
+  "must_not_patterns": {
+    "claim_siem_supported": "(?i)(siem|sentinel) (streaming|integration|export) (is )?(supported|available)|you can stream"
+  },
+  "rationale": "20-docs-audit-log.md states streaming audit events to an external SIEM is not supported. No existing work covers it: work_audit_log_csv_download is the done 365-day CSV feature the customer already uses; webhooks (20-docs-webhooks.md) only emit alert/export/user-deactivated events, and work_webhook_retry_queue is about delivery durability. New work on cap_audit_log, owned by its capability owner person_jonas (team_identity), with the EU-residency constraint from customer_corvid in the acceptance criteria. No decision restricts Corvid's action types.",
+  "evidence_ids": [
+    "customer_corvid",
+    "cap_audit_log",
+    "cap_webhooks",
+    "work_audit_log_csv_download",
+    "work_webhook_retry_queue",
+    "person_jonas",
+    "team_identity",
+    "request_corvid_audit_log_export"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "id": "h106-big-dump-still-timing-out-tamarind",
+  "workspace_id": "ws_demo",
+  "category": "existing_work",
+  "request": {
+    "customer_id": "customer_tamarind",
+    "subject": "any news on the background export?",
+    "body": "Still can't pull the full transactions table in one go - it dies partway through. Chopping it into months works but it's a chore every time. Any update on the background/async download thing you mentioned?",
+    "channel": "manual",
+    "capability_ids": [],
+    "external_ref": null,
+    "auto_start": true,
+    "planner_mode": "scripted"
+  },
+  "acceptable_dispositions": [
+    {
+      "kind": "link_work",
+      "work_item_id": "work_csv_async_large"
+    }
+  ],
+  "must_not": [
+    "create_work",
+    "promise_date",
+    "claim_resolved"
+  ],
+  "must_not_patterns": {
+    "claim_resolved": "(?i)\\b(has been|is now|are now|now) (fixed|resolved|restored)\\b"
+  },
+  "rationale": "Matches request_tamarind_csv_large (awaiting_work) and work_csv_async_large (open, 'Async manual export for result sets over 1M rows'). attempt_tamarind_split_export (customer-scoped, passed) is the interim workaround the customer already uses and may be reaffirmed. work_csv_async_large depends on work_export_migration, which depends on blocked work_queue_v2_cutover, so the 2026-11-30 forecast is not safe to promise. A new task would duplicate existing work.",
+  "evidence_ids": [
+    "customer_tamarind",
+    "cap_csv_export",
+    "request_tamarind_csv_large",
+    "work_csv_async_large",
+    "attempt_tamarind_split_export",
+    "work_export_migration",
+    "work_queue_v2_cutover"
+  ]
+}

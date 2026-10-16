@@ -130,29 +130,25 @@ test("real: a knowledge change makes the waiting proposal stale and removes the 
   await page.goto(`/requests/${id}`);
   await expect(page.getByTestId("authorize")).toBeEnabled({ timeout: 60_000 });
 
-  // Change a fact the proposal consulted: the linked work item (local) if there is one, else a request-scoped decision.
-  const proposals = (await (await page.request.get(`${WS}/proposals?request_id=${id}`)).json()).data;
-  const workId: string | undefined = proposals[0]?.payload?.work_item_id;
-  let changed = false;
-  if (workId) {
-    const w = (await (await page.request.get(`${WS}/work-items/${workId}`)).json()).data;
-    if (w.connector === "local") {
-      const r = await page.request.patch(`${WS}/work-items/${workId}`, {
-        headers: { "Idempotency-Key": `rt-${randomUUID()}` },
-        data: { expected_version: w.version, status: w.status, owner_id: w.owner_id, forecast_at: "2026-12-01T00:00:00Z", reason: "Browser test: forecast changed before review." },
-      });
-      changed = r.ok();
-    }
-  }
-  test.info().annotations.push({ type: "knowledge-change", description: changed ? `PATCH work item ${workId}` : "request-scoped decision recorded" });
-  if (!changed) {
-    const rev = (await (await page.request.get(`${WS}/info`)).json()).meta.knowledge_revision;
-    const r = await page.request.post(`${WS}/decisions`, {
-      headers: { "Idempotency-Key": `rt-${randomUUID()}` },
-      data: { operation: "record", decision_id: null, rule_type: "forbidden_workaround", value: "browser_test_marker", scope: { entity_type: "request", entity_id: id }, rationale: "Browser test: change applicable policy before review.", effective_at: "2026-10-01T00:00:00Z", expires_at: null, evidence_ids: [], expected_revision: rev },
-    });
-    expect(r.ok(), await r.text()).toBeTruthy();
-  }
+  // Change a fact the proposal consulted (T12): the linked local work item. The scenario's disposition is link_work;
+  // if the planner chose something else the precondition is not met and the test says exactly what it saw.
+  type P = { id: string; kind: string; validity: string; payload: { work_item_id?: string } };
+  let proposal: P | undefined;
+  await expect.poll(async () => {
+    const list = (await (await page.request.get(`${WS}/proposals?request_id=${id}`)).json()).data as P[];
+    proposal = list.find((p) => p.validity === "valid");
+    return proposal?.id ?? null;
+  }, { timeout: 15_000 }).not.toBeNull();
+  test.info().annotations.push({ type: "proposal", description: JSON.stringify(proposal).slice(0, 300) });
+  expect(proposal!.kind, `precondition: scenario t12 expects link_work, planner proposed ${proposal!.kind}`).toBe("link_work");
+  const workId = proposal!.payload.work_item_id!;
+  const w = (await (await page.request.get(`${WS}/work-items/${workId}`)).json()).data;
+  expect(w.connector, "precondition: linked work is local (Rev 3 #23)").toBe("local");
+  const r = await page.request.patch(`${WS}/work-items/${workId}`, {
+    headers: { "Idempotency-Key": `rt-${randomUUID()}` },
+    data: { expected_version: w.version, status: w.status, owner_id: w.owner_id, forecast_at: "2026-12-01T00:00:00Z", reason: "Browser test: forecast changed before review." },
+  });
+  expect(r.status(), await r.text()).toBe(200);
 
   await expect(page.getByTestId("proposal-validity")).toContainText(/Stale|Invalid/, { timeout: 20_000 });
   await expect(page.getByTestId("authorize")).toBeDisabled();

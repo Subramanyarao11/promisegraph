@@ -1,0 +1,43 @@
+{
+  "id": "h108-columnar-extract-helix",
+  "workspace_id": "ws_demo",
+  "category": "new_work",
+  "request": {
+    "customer_id": "customer_helix",
+    "subject": "Parquet for the weekly ledger extract?",
+    "body": "Our data science people keep complaining that the weekly ledger extract comes as CSV and they lose all the column types when loading it. Could the automated extract be produced as Parquet instead?",
+    "channel": "manual",
+    "capability_ids": [],
+    "external_ref": null,
+    "auto_start": true,
+    "planner_mode": "scripted"
+  },
+  "acceptable_dispositions": [
+    {
+      "kind": "create_work",
+      "capability_id": "cap_scheduled_exports"
+    }
+  ],
+  "must_not": [
+    "link_work:work_csv_utf8_bom",
+    "link_work:work_s3_destination",
+    "link_work:work_export_issue",
+    "claim_parquet_supported"
+  ],
+  "must_not_patterns": {
+    "claim_parquet_supported": "(?i)parquet (is|are) (supported|available)|(choose|select|pick) parquet"
+  },
+  "rationale": "20-docs-scheduled-exports.md lists CSV, XLSX and PDF only. Plausible-but-wrong matches: work_csv_utf8_bom (done, encoding; Helix's own request_helix_csv_encoding), work_s3_destination (destination, not format; Helix is not in the S3 beta customer list), work_export_issue (delivery outage). None covers a new file format, so create work on cap_scheduled_exports (owner person_maya). decision_helix_scope_reduction is expired and irrelevant.",
+  "evidence_ids": [
+    "customer_helix",
+    "cap_scheduled_exports",
+    "cap_s3_export_destination",
+    "work_csv_utf8_bom",
+    "request_helix_csv_encoding",
+    "work_s3_destination",
+    "work_export_issue",
+    "person_maya",
+    "decision_helix_scope_reduction"
+  ],
+  "notes": "Similarity-not-duplicate: three CSV/export-flavoured items must be rejected with reasons."
+}

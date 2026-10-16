@@ -4,7 +4,7 @@ import type { WorkItem, WorkItemUpdate, WorkItemUpdateResult } from "@contracts"
 import { useCommand, useWorkItems } from "../api/hooks";
 import { ApiError } from "../api/client";
 import { Icon } from "../components/Icon";
-import { Dialog, Empty, ErrorPanel, Field, Loading, Mono, StatusBadge, Tag, Ts, useAnnounce } from "../components/ui";
+import { Dialog, Empty, ErrorPanel, Field, Loading, Mono, Owner, StatusBadge, Tag, Ts, useAnnounce } from "../components/ui";
 import { CONNECTOR_LABEL, WORK_STATUS } from "../lib/status";
 
 export function WorkPage() {
@@ -42,7 +42,7 @@ export function WorkPage() {
               </thead>
               <tbody>
                 {items.map((w) => (
-                  <tr key={w.id}>
+                  <tr key={w.id} data-testid={`work-row-${w.id}`}>
                     <td data-label="Work"><span className="cell-title">{w.title}</span><div className="cell-sub"><Mono>{w.id}</Mono> · {w.kind}</div></td>
                     <td data-label="Status"><StatusBadge map={WORK_STATUS} value={w.status} /></td>
                     <td data-label="Target">
@@ -52,7 +52,7 @@ export function WorkPage() {
                         {w.external_url && <a href={w.external_url} target="_blank" rel="noreferrer">Open<span className="sr-only"> {w.title} in Linear (new tab)</span></a>}
                       </span>
                     </td>
-                    <td data-label="Owner">{w.owner_id ? <Mono>{w.owner_id}</Mono> : <Tag tone="warn" icon="alert">Missing owner</Tag>}</td>
+                    <td data-label="Owner"><Owner id={w.owner_id} /></td>
                     <td data-label="Forecast">{w.forecast_at ? <Ts iso={w.forecast_at} /> : <span className="muted">None</span>}</td>
                     <td data-label="Observed"><Ts iso={w.observed_at} /></td>
                     <td>

@@ -1,0 +1,35 @@
+{
+  "id": "h103-stale-finance-numbers-acme",
+  "workspace_id": "ws_demo",
+  "category": "ambiguous",
+  "request": {
+    "customer_id": "customer_acme",
+    "subject": "numbers stale again",
+    "body": "Finance says the numbers they work from have been stale for a few days now. Is this the same thing you're already looking at, or something new? We close the quarter soon so need to know.",
+    "channel": "manual",
+    "capability_ids": [],
+    "external_ref": null,
+    "auto_start": true,
+    "planner_mode": "scripted"
+  },
+  "acceptable_dispositions": [
+    {
+      "kind": "clarify"
+    }
+  ],
+  "must_not": [
+    "create_work",
+    "promise_date"
+  ],
+  "rationale": "Acme has two distinct open data-freshness problems: the scheduled-export outage (work_export_issue, blocked; Acme's request_exports_acme_retry) and warehouse sync lag after schema changes (work_warehouse_sync_backfill, in_progress; request_acme_warehouse_sync_lag). The message does not say whether finance consumes delivered export files or warehouse tables, so either link could be wrong. One targeted question (which delivery path / which dataset) is the correct move (spec J2). No new work: both candidates already exist. 'Quarter close' must not produce a delivery date: work_export_issue has no forecast and depends on a blocked chain.",
+  "evidence_ids": [
+    "customer_acme",
+    "work_export_issue",
+    "request_exports_acme_retry",
+    "work_warehouse_sync_backfill",
+    "request_acme_warehouse_sync_lag",
+    "cap_scheduled_exports",
+    "cap_warehouse_sync"
+  ],
+  "notes": "Terse; linking either item without asking is a guess."
+}

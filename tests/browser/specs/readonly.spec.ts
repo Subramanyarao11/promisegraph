@@ -53,3 +53,30 @@ test("unknown request shows an explicit missing-entity state", async ({ page }) 
   await page.goto("/requests/request_unknown_xyz");
   await expect(page.getByTestId("state-unknown-entity")).toContainText("Unknown request");
 });
+
+test("owner activity from GET /people: an inactive owner is labelled, not presented as accountable", async ({ page }) => {
+  const work = (await (await page.request.get(`${WS}/work-items?limit=100`)).json()).data as { id: string; owner_id: string | null }[];
+  const owners = [...new Set(work.map((w) => w.owner_id).filter((o): o is string => Boolean(o)))];
+  let inactive: { id: string; name: string } | null = null;
+  for (const id of owners) {
+    const r = await page.request.get(`${WS}/people/${encodeURIComponent(id)}`);
+    expect(r.ok(), `GET /people/${id}`).toBeTruthy();
+    const p = (await r.json()).data;
+    if (p.active === false) { inactive = p; break; }
+  }
+  test.skip(!inactive, "no work item owned by an inactive person in this workspace");
+  const item = work.find((w) => w.owner_id === inactive!.id)!;
+  test.info().annotations.push({ type: "inactive-owner", description: `${inactive!.id} owns ${item.id}` });
+
+  await page.goto("/work");
+  const row = page.getByTestId(`work-row-${item.id}`);
+  await expect(row.getByTestId("owner")).toContainText(inactive!.name);
+  await expect(row.getByTestId("owner")).toContainText("Inactive owner");
+
+  // An active owner on another row is not flagged.
+  const active = work.find((w) => w.owner_id && w.owner_id !== inactive!.id);
+  if (active) {
+    const p = (await (await page.request.get(`${WS}/people/${active.owner_id}`)).json()).data;
+    if (p.active) await expect(page.getByTestId(`work-row-${active.id}`).getByTestId("owner")).not.toContainText("Inactive owner");
+  }
+});

@@ -1,0 +1,36 @@
+{
+  "id": "h104-partner-visibility-helix",
+  "workspace_id": "ws_demo",
+  "category": "ambiguous",
+  "request": {
+    "customer_id": "customer_helix",
+    "subject": "Letting outside partners see the reconciliation board",
+    "body": "We'd like our outsourced bookkeeping firm and a handful of franchise partners to be able to look at the ledger reconciliation dashboard. Ideally it'd show up somewhere they already go, like our partner portal, but honestly whatever works. What are our options?",
+    "channel": "manual",
+    "capability_ids": [],
+    "external_ref": null,
+    "auto_start": true,
+    "planner_mode": "scripted"
+  },
+  "acceptable_dispositions": [
+    {
+      "kind": "clarify"
+    },
+    {
+      "kind": "answer"
+    }
+  ],
+  "must_not": [
+    "create_work",
+    "promise_date"
+  ],
+  "rationale": "20-docs-dashboard-sharing.md offers guest invites (account needed), expiring share links (Helix has no forbidden-workaround decision, unlike decision_exports_001 which is Acme-scoped and must not contaminate this), and iframe embedding of authenticated dashboards. Signed per-viewer-filter embedding is not available and is tracked by work_dashboard_embed_sdk (open, no forecast; request_brightpath_dashboard_embed). Whether each franchise must see only its own rows decides between 'works today' and 'needs the embed SDK', so clarify is best; an answer laying out the options with that caveat is also defensible. Creating work duplicates work_dashboard_embed_sdk; no date may be promised.",
+  "evidence_ids": [
+    "customer_helix",
+    "cap_dashboard_sharing",
+    "work_dashboard_embed_sdk",
+    "request_brightpath_dashboard_embed",
+    "decision_exports_001"
+  ],
+  "notes": "Linking work_dashboard_embed_sdk is NOT listed as acceptable: per-viewer filtering is not stated."
+}

@@ -9,11 +9,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  *   pointed at it would claim this suite's jobs — that sharing was the root cause of earlier intermittent failures.
  * PG_TARGET=real: support/real-stack.mjs starts a private API (unique DATABASE_GRAPH_PREFIX, seeded via
  *   scripts/seed.sh), Agent B's real worker and the web dev server (:5176). Requires FalkorDB on DATABASE_PORT.
+ *   This run's graphs are deleted on teardown unless PG_KEEP_GRAPHS=1.
+ * PG_TARGET=real-fault: same, but on a private FalkorDB container (paused by T21) with the API's
+ *   FAULTS=local_create_timeout_after_effect (T15). Only specs/real-faults.spec.ts runs journeys there.
  */
 const target = process.env.PG_TARGET ?? "mock";
+const isReal = target === "real" || target === "real-fault";
+// One id per test run, shared by the runner, its workers (inherited env) and the stack script.
+process.env.PG_RUN_ID ??= Date.now().toString(36);
+process.env.PG_FAULT_DB_CONTAINER ??= `pgtest-falkordb-${process.env.PG_RUN_ID}`;
 const repo = path.resolve(__dirname, "../..");
 const mockPort = Number(process.env.PG_MOCK_PORT ?? 8199);
-const webPort = Number(process.env.PG_WEB_PORT ?? (target === "real" ? 5176 : 5174));
+const webPort = Number(process.env.PG_WEB_PORT ?? (isReal ? 5176 : 5174));
 process.env.PG_MOCK_URL = `http://localhost:${mockPort}`; // read by support/driver.ts in worker processes
 
 const mockServers = [
@@ -35,13 +42,20 @@ const realServers = [
     reuseExistingServer: false,
     timeout: 240_000,
     stdout: "pipe" as const,
-    env: { PG_WEB_PORT: String(webPort) },
+    // SIGTERM (not SIGKILL) so the stack can delete its graphs / private container before exiting.
+    gracefulShutdown: { signal: "SIGTERM" as const, timeout: 20_000 },
+    env: {
+      PG_WEB_PORT: String(webPort),
+      PG_RUN_ID: process.env.PG_RUN_ID!,
+      PG_FAULT_DB_CONTAINER: process.env.PG_FAULT_DB_CONTAINER!,
+      PG_STACK_PROFILE: target === "real-fault" ? "fault" : "normal",
+    },
   },
 ];
 
 export default defineConfig({
   testDir: "./specs",
-  timeout: target === "real" ? 120_000 : 60_000,
+  timeout: isReal ? 120_000 : 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
   workers: 1,
@@ -49,5 +63,5 @@ export default defineConfig({
   reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
   use: { baseURL: `http://localhost:${webPort}`, trace: "retain-on-failure", screenshot: "only-on-failure" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  webServer: target === "real" ? realServers : mockServers,
+  webServer: isReal ? realServers : mockServers,
 });

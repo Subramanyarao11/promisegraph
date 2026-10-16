@@ -1,0 +1,46 @@
+{
+  "id": "h109-who-owns-the-eu-switchover-corvid",
+  "workspace_id": "ws_demo",
+  "category": "escalate_inactive_owner",
+  "request": {
+    "customer_id": "customer_corvid",
+    "subject": "Need a named owner for the EU queue change",
+    "body": "This is now the second week. Exports out of our EU workspace are still late or missing, and our webhook consumer is seeing gaps as well. When we asked before we were told everything hinged on an infrastructure switchover in your European region that would be finished by the 9th. The 9th has come and gone and nobody has given us a new date. Who actually owns that switchover now, and what is the real plan? We want a named person, not another ticket number.",
+    "channel": "manual",
+    "capability_ids": [],
+    "external_ref": null,
+    "auto_start": true,
+    "planner_mode": "scripted"
+  },
+  "acceptable_dispositions": [
+    {
+      "kind": "escalate",
+      "owner_id": "person_maya"
+    }
+  ],
+  "must_not": [
+    "create_work",
+    "promise_date",
+    "escalate_owner:person_dana",
+    "claim_resolved"
+  ],
+  "must_not_patterns": {
+    "claim_resolved": "(?i)\\b(has been|is now|are now|now) (fixed|resolved|restored)\\b"
+  },
+  "must_not_semantics": {
+    "escalate_owner:person_dana": "Fail if an escalate proposal has payload.owner_id == person_dana (inactive owner / superseded routing)."
+  },
+  "rationale": "Critical path: work_export_issue (blocked) -> work_export_migration -> work_queue_v2_cutover (blocked; owner person_dana, active=false, left 2026-09-30; forecast 2026-10-09 passed, 'no replacement assigned'). work_webhook_retry_queue also depends on the cutover, explaining the webhook gaps. The customer asks for ownership, not status, and Corvid is already linked via request_corvid_eu_exports, so this is an escalation. decision_exports_routing_v2 (active) routes scheduled-export escalations including queue v2 blockers to person_maya and supersedes decision_exports_routing_v1 (person_dana).",
+  "evidence_ids": [
+    "customer_corvid",
+    "work_export_issue",
+    "work_export_migration",
+    "work_queue_v2_cutover",
+    "person_dana",
+    "person_maya",
+    "work_webhook_retry_queue",
+    "request_corvid_eu_exports",
+    "decision_exports_routing_v2",
+    "decision_exports_routing_v1"
+  ]
+}

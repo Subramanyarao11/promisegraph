@@ -1,0 +1,42 @@
+{
+  "id": "h101-throttle-and-callback-auth-brightpath",
+  "workspace_id": "ws_demo",
+  "category": "answer_from_docs",
+  "request": {
+    "customer_id": "customer_brightpath",
+    "subject": "new integration dev - couple of questions",
+    "body": "Hi, I've just taken over our integration with you from a colleague who left. Two things I can't find written down on our side: (1) what's the ceiling on API calls for our tier before you start rejecting us, and how am I supposed to know how long to wait when that happens? We're about to backfill ~2 years of shipment metrics. (2) how do we prove the event callbacks hitting our endpoint actually came from you and aren't spoofed? Thanks!",
+    "channel": "manual",
+    "capability_ids": [],
+    "external_ref": null,
+    "auto_start": true,
+    "planner_mode": "scripted"
+  },
+  "acceptable_dispositions": [
+    {
+      "kind": "answer"
+    }
+  ],
+  "must_not": [
+    "create_work",
+    "link_work:work_rate_limit_burst",
+    "escalate",
+    "promise_quota_increase"
+  ],
+  "must_not_patterns": {
+    "promise_quota_increase": "(?i)(we (can|will|have) (raise|raised|increase|increased|bump|bumped))|(quota (increase )?(is |has been )?(granted|approved|raised))"
+  },
+  "rationale": "Both concerns are documented. Brightpath is on the growth plan (10-org.json customer_brightpath) so 20-docs-api-rate-limits.md gives 300 req/min, burst 50, HTTP 429 with Retry-After/X-RateLimit-Remaining, and recommends /v2/metrics:batch for backfills; work_retry_after_header is done and attempt_corvid_429_bulk is a capability-scoped (cap_api_rate_limits:v4.2) verified-passed resolution for exactly a backfill. 20-docs-webhooks.md 'Signatures' covers HMAC-SHA256 X-Lumetric-Signature + X-Lumetric-Timestamp (5 min); request_brightpath_webhook_signature was resolved the same way. Nothing is broken and no quota increase is asked, so no work/escalation; work_rate_limit_burst concerns paginated reads (request_tamarind_api_pagination), not this backfill question. decision_brightpath_actions permits answer.",
+  "evidence_ids": [
+    "customer_brightpath",
+    "cap_api_rate_limits",
+    "cap_webhooks",
+    "work_retry_after_header",
+    "attempt_corvid_429_bulk",
+    "request_brightpath_webhook_signature",
+    "work_rate_limit_burst",
+    "request_tamarind_api_pagination",
+    "decision_brightpath_actions"
+  ],
+  "notes": "Two-concern request; a good answer covers both and cites both docs."
+}

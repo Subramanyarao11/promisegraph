@@ -1,0 +1,39 @@
+{
+  "id": "h102-who-touched-schedules-tamarind",
+  "workspace_id": "ws_demo",
+  "category": "answer_from_docs",
+  "request": {
+    "customer_id": "customer_tamarind",
+    "subject": "Change history for export timetables",
+    "body": "Our loss-prevention lead wants a list of everyone who edited our automated export timetables since roughly February. The admin activity screen only scrolls back to mid-July. Did we lose the older history?",
+    "channel": "manual",
+    "capability_ids": [],
+    "external_ref": null,
+    "auto_start": true,
+    "planner_mode": "scripted"
+  },
+  "acceptable_dispositions": [
+    {
+      "kind": "answer"
+    }
+  ],
+  "must_not": [
+    "create_work",
+    "link_work:work_audit_log_csv_download",
+    "escalate",
+    "claim_audit_data_lost"
+  ],
+  "must_not_patterns": {
+    "claim_audit_data_lost": "(?i)(older|earlier|previous) (entries|records|events|history) (are|were|have been) (gone|deleted|purged|lost)"
+  },
+  "rationale": "20-docs-audit-log.md: the audit log records export schedule changes; UI shows 90 days (today 2026-10-16 -> mid-July), CSV download covers 365 days under Admin > Audit log > Download, so February is still available. 20-docs-data-retention.md confirms audit entries are retained 365 days. work_audit_log_csv_download is done and earlier equivalent requests (request_acme_audit_log_retention, request_corvid_audit_log_export) were resolved by answering, so linking completed work or creating work would be unnecessary.",
+  "evidence_ids": [
+    "customer_tamarind",
+    "cap_audit_log",
+    "cap_data_retention",
+    "work_audit_log_csv_download",
+    "request_acme_audit_log_retention",
+    "request_corvid_audit_log_export"
+  ],
+  "notes": "Uses synonyms (activity screen, export timetables) rather than the doc's wording."
+}
