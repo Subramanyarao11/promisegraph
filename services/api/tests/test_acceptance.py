@@ -600,3 +600,78 @@ def test_cancel_and_resume(seeded: Api):
                                                    "based_on_revision": api.revision()}, expect=409)
     assert e["error"]["code"] in ("INVALID_TRANSITION", "LEASE_LOST")
     time.sleep(0)
+
+
+def test_operator_reconcile_and_close_rev3(seeded: Api):
+    api = seeded
+    req, run, prop = to_review(api, "link_work", LINK)
+    api.post(f"/proposals/{prop['id']}/commit", {"expected_revision": api.revision(), "authorization_id": None},
+             "ProposalCommitResult", 202)
+    dl = api.claim(["dispatch"])
+    w = api.as_worker()
+    w.post(f"/jobs/{dl['job_id']}/complete", lease_body(dl, completion_id="u", outcome="unknown",
+           result={"action_id": dl["action_id"], "execution_state": "unknown", "receipt": None, "error": None}),
+           "CompletionReceipt", private=True)
+    act = api.get(f"/actions/{dl['action_id']}", "Action")["data"]
+    body = {"outcome": "succeeded", "receipt": None, "evidence_ids": [], "expected_action_version": act["version"]}
+    api.post(f"/actions/{act['id']}/reconcile", body, expect=409)  # reconcile job still active
+    rc = api.claim(["reconcile"])
+    w.post(f"/jobs/{rc['job_id']}/complete", lease_body(rc, completion_id="r", outcome="succeeded",
+           result={"action_id": act["id"], "lookup_evidence": "none", "established": False, "receipt": None}),
+           "CompletionReceipt", private=True)
+    assert api.get(f"/runs/{run['id']}", "Run")["data"]["status"] == "awaiting_review"
+    api.post(f"/actions/{act['id']}/reconcile", body, expect=422)  # succeeded needs a receipt
+    api.as_worker().post(f"/actions/{act['id']}/reconcile", body, expect=403)  # operator only
+    bad = {**body, "receipt": {"id": "rcpt_x", "connector": "local", "target_id": "nope", "target_url": None,
+                               "observed_at": "2026-10-16T05:00:00Z", "result_hash": "b" * 64}}
+    api.post(f"/actions/{act['id']}/reconcile", bad, expect=422)  # target does not exist
+    fb = {"outcome": "failed", "receipt": None, "evidence_ids": [], "expected_action_version": act["version"]}
+    out = api.post(f"/actions/{act['id']}/reconcile", fb, "Action", 200, key="rec-1")["data"]
+    assert out["status"] == "failed"
+    assert api.post(f"/actions/{act['id']}/reconcile", fb, "Action", 200, key="rec-1")["data"] == out  # replay
+    r = api.get(f"/runs/{run['id']}", "Run")["data"]
+    assert r["status"] == "queued" and r["usage"]["replans"] == 1
+    lease = api.claim(["investigate"])
+    assert lease["run_id"] == run["id"] and "resume_reason" in lease["checkpoint"]
+    evs = api.get(f"/runs/{run['id']}/events", "EventsPage")["data"]
+    assert evs[-1]["type"] == "action_updated" and evs[-1]["payload"]["status"] == "failed"
+    # closure
+    rq = api.get(f"/requests/{req['id']}", "Request")["data"]
+    api.post(f"/requests/{req['id']}/close", {"reason": "dup", "expected_request_version": rq["version"] - 1}, expect=409)
+    api.post(f"/requests/{req['id']}/close", {"reason": ""}, expect=422)
+    c = api.post(f"/requests/{req['id']}/close", {"reason": "customer withdrew", "expected_request_version":
+                                                   rq["version"]}, "Request", 200)["data"]
+    assert c["status"] == "closed" and c["version"] == rq["version"] + 1
+    api.post(f"/requests/{req['id']}/close", {"reason": "again", "expected_request_version": c["version"]},
+             expect=409)
+
+
+def test_operator_reconcile_succeeded_linear(app_factory):
+    api = Api(TestClient(app_factory(linear_enabled=True, linear_configured=True)))
+    api.import_doc("json", json.dumps(SEED), "seed")
+    payload = {"title": "t", "description": "d", "acceptance_criteria": ["a"], "owner_id": None,
+               "capability_id": "cap_exports", "dependency_ids": [], "connector": "linear"}
+    req, run, prop = to_review(api, "create_work", payload)
+    api.post(f"/proposals/{prop['id']}/commit", {"expected_revision": api.revision(), "authorization_id": None},
+             "ProposalCommitResult", 202)
+    dl = api.claim(["dispatch"])
+    w = api.as_worker()
+    w.post(f"/actions/{dl['action_id']}/begin-dispatch", {"job_id": dl["job_id"], **lease_body(dl),
+           "expected_action_version": 1, "expected_revision": api.revision(), "remote_preconditions": []},
+           "DispatchPermit", private=True)
+    w.post(f"/jobs/{dl['job_id']}/complete", lease_body(dl, completion_id="u", outcome="unknown",
+           result={"action_id": dl["action_id"], "execution_state": "unknown", "receipt": None, "error": None}),
+           "CompletionReceipt", private=True)
+    rc = api.claim(["reconcile"])
+    w.post(f"/jobs/{rc['job_id']}/complete", lease_body(rc, completion_id="r", outcome="succeeded",
+           result={"action_id": dl["action_id"], "lookup_evidence": "none", "established": False, "receipt": None}),
+           "CompletionReceipt", private=True)
+    act = api.get(f"/actions/{dl['action_id']}", "Action")["data"]
+    receipt = {"id": "rcpt_op", "connector": "linear", "target_id": "LIN-7", "target_url": None,
+               "observed_at": "2026-10-16T05:00:00Z", "result_hash": "c" * 64}
+    out = api.post(f"/actions/{act['id']}/reconcile", {"outcome": "succeeded", "receipt": receipt, "evidence_ids": [],
+                                                       "expected_action_version": act["version"]}, "Action")["data"]
+    assert out["status"] == "succeeded" and out["receipt"]["target_id"] == "LIN-7"
+    assert api.get(f"/requests/{req['id']}", "Request")["data"]["status"] == "awaiting_work"
+    cont = api.claim(["investigate"])
+    assert cont["checkpoint"]["resume_stage"] == "observe" and cont["checkpoint"]["action_id"] == act["id"]

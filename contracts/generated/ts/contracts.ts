@@ -2450,6 +2450,27 @@ export interface ImportCommit {
 }
 /**
  * This interface was referenced by `PromiseGraphContracts`'s JSON-Schema
+ * via the `definition` "ActionReconcile".
+ */
+export interface ActionReconcile {
+  outcome: "succeeded" | "failed";
+  receipt: Receipt | null;
+  /**
+   * @maxItems 100
+   */
+  evidence_ids: string[];
+  expected_action_version: number;
+}
+/**
+ * This interface was referenced by `PromiseGraphContracts`'s JSON-Schema
+ * via the `definition` "RequestClose".
+ */
+export interface RequestClose {
+  reason: string;
+  expected_request_version: number;
+}
+/**
+ * This interface was referenced by `PromiseGraphContracts`'s JSON-Schema
  * via the `definition` "WorkspaceInfo".
  */
 export interface WorkspaceInfo {

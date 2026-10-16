@@ -669,3 +669,50 @@ def _complete_reconcile(ctx: Ctx, uow: UnitOfWork, job: dict[str, Any], runp: di
     new_run = _api_event(ctx, uow, new_run, new_action, new_action["status"])
     _save_run(uow, runp, new_run)
     return new_run, next_job, "completed"
+
+
+# ---- operator reconciliation (PROTOCOL rev 3 #20) ---------------------------------------------------
+def operator_reconcile(ctx: Ctx, uow: UnitOfWork, action_id: str, cmd: dict[str, Any]) -> tuple[int, Any]:
+    from .core import missing_evidence
+    ap = load(ctx, "Action", action_id, "action")
+    action = ap["doc"]
+    if cmd["expected_action_version"] != action["version"]:
+        raise conflict("REVISION_CONFLICT", "action version changed", {"current_version": action["version"]})
+    if action["status"] != "unknown":
+        raise conflict("INVALID_TRANSITION", f"action is {action['status']}; only unknown actions are reconciled",
+                       {"action_status": action["status"]})
+    missing = missing_evidence(ctx, cmd["evidence_ids"])
+    if missing:
+        from .errors import evidence_invalid
+        raise evidence_invalid("unknown evidence ids", {"missing": missing[:20]})
+    runp = load(ctx, "Run", action["run_id"], "run")
+    run = runp["doc"]
+    if any(j["kind"] in ("dispatch", "reconcile") and j["status"] in ("queued", "leased")
+           for j in active_jobs(ctx, run["id"])):
+        raise conflict("INVALID_TRANSITION", "a reconcile/dispatch job is still active for this run", {})
+    if cmd["outcome"] == "succeeded":
+        if cmd.get("receipt") is None:
+            raise invalid("succeeded reconciliation requires a receipt", {"receipt": "required"})
+        receipt = _receipt_from({"receipt": cmd["receipt"]}, action)
+        if action["connector"] == "local":
+            if not ctx.store.get(ctx.ws, receipt["target_id"]) and not ctx.store.read(
+                    ctx.ws, "MATCH ()-[r:TRACKED_BY {id: $id}]->() RETURN r.id", {"id": receipt["target_id"]}):
+                raise policy("local receipt target does not exist in the graph", {"target_id": receipt["target_id"]})
+            reqp = load(ctx, "Request", action["request_id"], "request")
+            _finish_effect(ctx, uow, action, reqp, receipt, effect_request_status(action["kind"], None), {})
+        else:
+            _external_success(ctx, uow, action, receipt)
+        new_action = bump(action, ctx.now, status="succeeded", receipt=receipt, error=None)
+        new_run, _jid = _continuation(ctx, uow, run, new_action)
+    else:
+        new_action = bump(action, ctx.now, status="failed",
+                          error=err_obj("DISPATCH_FAILED", "operator reconciliation confirmed no effect was created"))
+        put_action(uow, new_action)
+        new_run, _jid = _replan(ctx, uow, run, new_action, {"code": "DISPATCH_FAILED"})
+    if not any(j["status"] == "leased" for j in active_jobs(ctx, run["id"])):
+        new_run = _api_event(ctx, uow, new_run if new_run is not run else bump(run, ctx.now), new_action,
+                             new_action["status"])
+    if new_run is not run:
+        _save_run(uow, runp, new_run)
+    uow.guard_version(action_id, action["version"])
+    return 200, new_action

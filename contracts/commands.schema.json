@@ -1049,6 +1049,66 @@
       ],
       "additionalProperties": false
     },
+    "ActionReconcile": {
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "enum": [
+            "succeeded",
+            "failed"
+          ]
+        },
+        "receipt": {
+          "anyOf": [
+            {
+              "$ref": "resources.schema.json#/$defs/Receipt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "maxItems": 100
+        },
+        "expected_action_version": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "outcome",
+        "receipt",
+        "evidence_ids",
+        "expected_action_version"
+      ],
+      "additionalProperties": false
+    },
+    "RequestClose": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "expected_request_version": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "reason",
+        "expected_request_version"
+      ],
+      "additionalProperties": false
+    },
     "ConnectorState": {
       "enum": [
         "enabled",

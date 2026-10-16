@@ -740,3 +740,18 @@ def import_commit(ctx: Ctx, uow: UnitOfWork, preview_id: str, cmd: dict[str, Any
                  "noop_count": res["noop_count"], "source_revisions": res["source_revisions"][:1000],
                  "invalidated_proposal_count": res["invalidated_proposal_count"],
                  "knowledge_revision": res["knowledge_revision"]}
+
+
+# ---- closure (PROTOCOL rev 3 #21) ---------------------------------------------------------------------
+def close_request(ctx: Ctx, uow: UnitOfWork, request_id: str, cmd: dict[str, Any]) -> tuple[int, Any]:
+    reqp = load(ctx, "Request", request_id, "request")
+    req = reqp["doc"]
+    if cmd["expected_request_version"] != req["version"]:
+        raise conflict("REVISION_CONFLICT", "request version changed", {"current_version": req["version"]})
+    if req["status"] == "closed":
+        raise conflict("INVALID_TRANSITION", "request is already closed", {"request_status": "closed"})
+    new_req = bump(req, ctx.now, status="closed")
+    uow.guard_version(request_id, req["version"])
+    put_request(uow, new_req, external_ref=reqp.get("external_ref") or "", close_reason=cmd["reason"][:2000],
+                closed_by=ctx.actor_id)
+    return 200, new_req

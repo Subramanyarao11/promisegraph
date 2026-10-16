@@ -19,7 +19,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from . import context as ctxmod
 from . import engine, importer, seed
 from .common import (
-    ACTION_KINDS, CONTRACT_VERSION, REFERENCE_TIME, ApiError, assert_contract, bounded_id, canonical, check_input, invalid, iso,
+    ACTION_KINDS, CONTRACT_VERSION, REFERENCE_TIME, ApiError, contract_errors, assert_contract, bounded_id, canonical, check_input, invalid, iso,
     new_id, not_found, now, now_dt, plus, pub, sha256,
 )
 from .state import Workspace, touch
@@ -104,10 +104,12 @@ def ok_list(ctx: Ctx, items: list, schema: str, next_cursor: str | None) -> JSON
     return JSONResponse({"data": items, "page": {"next_cursor": next_cursor}, "meta": ctx.meta()}, headers=_headers(ctx))
 
 
-def error_response(e: ApiError, request: Request, ws: Workspace | None = None) -> JSONResponse:
+def error_response(e: ApiError, request: Request, ws: Workspace | None = None, *, unknown_revision: bool = False) -> JSONResponse:
     cid = request.headers.get("X-Correlation-Id")
     cid = cid if cid and 1 <= len(cid) <= 128 else new_id("corr")
-    if ws is None:
+    if unknown_revision:
+        ws = None  # rev3 #24: database unreachable -> knowledge_revision 0 means "unknown"
+    elif ws is None:
         ws = store.workspaces.get(request.path_params.get("wid", "")) if hasattr(request, "path_params") else None
     body = {"error": {"code": e.code, "message": e.message, "retryable": e.retryable, "details": e.details},
             "meta": {"contract_version": CONTRACT_VERSION, "knowledge_revision": ws.revision if ws else 0, "correlation_id": cid}}
@@ -137,12 +139,8 @@ async def _unhandled(request: Request, e: Exception):
 async def mock_middleware(request: Request, call_next):
     path = request.url.path
     if store.faults.get("database_unavailable") and not path.startswith("/__mock") and path != "/health/live":
-        ws = None
-        parts = path.split("/")
-        if len(parts) > 4 and parts[3] == "workspaces":
-            ws = store.workspaces.get(parts[4])
         resp = error_response(ApiError(503, "DEPENDENCY_UNAVAILABLE", "database unavailable (injected mock fault)",
-                                       {"dependency": "database"}, retryable=True), request, ws)
+                                       {"dependency": "database"}, retryable=True), request, unknown_revision=True)
     else:
         resp = await call_next(request)
     resp.headers["X-PromiseGraph-Mock"] = "true"
@@ -487,20 +485,7 @@ async def cancel_run(request: Request, wid: str, run_id: str):
         run = ws.get("runs", run_id, "run")
         if run["status"] in ("succeeded", "failed", "cancelled"):
             raise ApiError(409, "INVALID_TRANSITION", f"run is {run['status']}")
-        for j in ws.jobs.values():
-            if j["run_id"] == run_id and j["status"] == "queued" and j["kind"] in ("investigate", "dispatch"):
-                if j["kind"] == "dispatch":
-                    a = ws.actions[j["action_id"]]
-                    if a["status"] != "accepted":
-                        continue
-                    a["status"] = "cancelled"
-                    touch(a)
-                j["status"] = "cancelled"
-        engine.set_run(run, "cancelled")
-        run["_cancel_reason"] = b["reason"]
-        req = ws.requests[run["request_id"]]
-        if not engine.run_leased(ws, run["id"]):  # rev2 #6; otherwise appended when the leased job completes
-            engine.append_event(ws, run, "run_finished", {"run_status": "cancelled", "request_status": req["status"], "action_id": None})
+        engine.cancel_run(ws, run, b["reason"])
         return 200, pub(run), "Run"
     return await command(request, wid, "POST /runs/{run_id}/cancel", "RunCancel", h, operator_only=True)
 
@@ -700,7 +685,9 @@ async def refresh(request: Request, wid: str, rid: str):
         for j in ws.jobs.values():
             if j["kind"] == "refresh" and j["request_id"] == rid and j["status"] == "queued":
                 return 202, {"job_id": j["id"], "coalesced": True}, "RefreshResult"
-        job = engine.enqueue(ws, "refresh", request_id=rid, checkpoint={"request_id": rid, "reason": b["reason"]})
+        req = ws.requests[rid]
+        job = engine.enqueue(ws, "refresh", request_id=rid,  # rev3 #22: run_id stays null; target lives in checkpoint
+                             checkpoint={"request_id": rid, "reason": b["reason"], "work_item_ids": list(req["linked_work_ids"])})
         return 202, {"job_id": job["id"], "coalesced": False}, "RefreshResult"
     return await command(request, wid, "POST /requests/{request_id}/refresh", "RefreshCreate", h, operator_only=True)
 
@@ -872,6 +859,99 @@ async def import_commit(request: Request, wid: str, preview_id: str):
 
 
 # =========================================================================== private job protocol
+
+# =========================================================================== rev 3 additions (PROTOCOL.md items 19-21)
+
+@app.get(PUBLIC + "/evidence/{ev_id}")
+async def get_evidence(request: Request, wid: str, ev_id: str):
+    ctx = authorize(request, wid)
+    ev = ctx.ws.evidence_view(ev_id)
+    if ev is None:
+        raise not_found("evidence", ev_id)
+    return ok(ctx, ev, "EvidenceRef")
+
+
+@app.get(PUBLIC + "/work-items/{work_id}")
+async def get_work_item(request: Request, wid: str, work_id: str):
+    ctx = authorize(request, wid)
+    return ok(ctx, pub(ctx.ws.get("work_items", work_id, "work_item")), "WorkItem")
+
+
+@app.get(PUBLIC + "/observations")
+async def list_observations(request: Request, wid: str):
+    ctx = authorize(request, wid)
+    rq = request.query_params.get("request_id")
+    items = [pub(o) for o in reversed(list(ctx.ws.observations.values())) if not rq or o["request_id"] == rq]
+    page, nxt = paginate(request, items)
+    return ok_list(ctx, page, "Observation", nxt)
+
+
+@app.get(PUBLIC + "/attempts")
+async def list_attempts(request: Request, wid: str):
+    ctx = authorize(request, wid)
+    rq = request.query_params.get("request_id")
+    items = [pub(a) for a in reversed(list(ctx.ws.attempts.values())) if not rq or a["request_id"] == rq]
+    page, nxt = paginate(request, items)
+    return ok_list(ctx, page, "Attempt", nxt)
+
+
+def _check_fields(b: Any, spec: dict[str, Callable[[Any], bool]], name: str) -> None:
+    """Hand validation for rev 3 bodies that have no commands.schema.json definition yet."""
+    if not isinstance(b, dict):
+        raise invalid(f"{name} must be an object", {"<root>": "expected object"})
+    fields = {k: "invalid or missing" for k, ok_ in spec.items() if k not in b or not ok_(b[k])}
+    fields.update({k: "additional property not allowed" for k in b if k not in spec})
+    if fields:
+        raise invalid(f"Request body does not match {name}", fields)
+
+
+def _is_id(v) -> bool:
+    return isinstance(v, str) and 1 <= len(v) <= 128
+
+
+@app.post(PUBLIC + "/actions/{aid}/reconcile")
+async def reconcile_action(request: Request, wid: str, aid: str):
+    def h(ctx: Ctx, b: dict):
+        _check_fields(b, {
+            "outcome": lambda v: v in ("succeeded", "failed"),
+            "receipt": lambda v: v is None or (isinstance(v, dict) and not contract_errors("Receipt", v)),
+            "evidence_ids": lambda v: isinstance(v, list) and len(v) <= 100 and all(_is_id(x) for x in v),
+            "expected_action_version": lambda v: isinstance(v, int) and not isinstance(v, bool) and v >= 1,
+        }, "ActionReconcile")
+        if b["outcome"] == "succeeded" and b["receipt"] is None:
+            raise invalid("outcome succeeded requires a receipt", {"receipt": "required when outcome=succeeded"})
+        ws = ctx.ws
+        for e in b["evidence_ids"]:
+            if e not in ws.evidence:
+                raise invalid(f"evidence {e} does not exist", {"evidence_ids": f"unknown evidence {e}"})
+        action = ws.get("actions", aid, "action")
+        if b["receipt"] is not None and b["receipt"]["connector"] != action["connector"]:
+            raise invalid("receipt connector does not match the action", {"receipt/connector": f"expected {action['connector']}"})
+        return 200, pub(engine.operator_reconcile(ws, action, b)), "Action"
+    return await command(request, wid, "POST /actions/{action_id}/reconcile", None, h, operator_only=True)
+
+
+@app.post(PUBLIC + "/requests/{rid}/close")
+async def close_request(request: Request, wid: str, rid: str):
+    def h(ctx: Ctx, b: dict):
+        _check_fields(b, {
+            "reason": lambda v: isinstance(v, str) and 1 <= len(v) <= 2000,
+            "expected_request_version": lambda v: isinstance(v, int) and not isinstance(v, bool) and v >= 1,
+        }, "RequestClose")
+        ws = ctx.ws
+        req = ws.get("requests", rid, "request")
+        if req["status"] == "closed":
+            raise ApiError(409, "INVALID_TRANSITION", "request is already closed")
+        if b["expected_request_version"] != req["version"]:
+            raise ApiError(409, "REVISION_CONFLICT", "expected_request_version does not match", {"version": req["version"]})
+        for run in ws.runs.values():  # explicit closure stops planning; effects/receipts may still be recorded
+            if run["request_id"] == rid and run["status"] in engine.ACTIVE_RUN:
+                engine.cancel_run(ws, run, f"request closed: {b['reason']}")
+        req["_close_reason"] = b["reason"]
+        engine.set_request(req, "closed")
+        return 200, pub(req), "Request"
+    return await command(request, wid, "POST /requests/{request_id}/close", None, h, operator_only=True)
+
 
 @app.post(PRIVATE + "/jobs/claim")
 async def claim(request: Request, wid: str):

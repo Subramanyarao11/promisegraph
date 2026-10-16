@@ -498,6 +498,48 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return mutate(request, ctx, "/imports/{preview_id}/commit", cmd,
                       lambda u: domain.import_commit(ctx, u, preview_id, cmd))
 
+    @app.post(PUB + "/actions/{action_id}/reconcile")
+    def post_reconcile(request: Request, workspace_id: str, action_id: str, body: Any = Body(None)):
+        """PROTOCOL rev 3 #20 (no schema in commands.schema.json yet; validated here)."""
+        ctx = make_ctx(request, workspace_id, operator_only=True)
+        b = body if isinstance(body, dict) else {}
+        errs: dict[str, str] = {}
+        extra = set(b) - {"outcome", "receipt", "evidence_ids", "expected_action_version"}
+        if extra:
+            errs["<root>"] = f"unexpected fields {sorted(extra)}"
+        if b.get("outcome") not in ("succeeded", "failed"):
+            errs["outcome"] = "succeeded|failed"
+        if "receipt" not in b or not (b["receipt"] is None or isinstance(b["receipt"], dict)):
+            errs["receipt"] = "Receipt|null required"
+        ev = b.get("evidence_ids")
+        if not isinstance(ev, list) or len(ev) > 100 or not all(isinstance(x, str) and 0 < len(x) <= 128 for x in ev):
+            errs["evidence_ids"] = "ID[] required"
+        v = b.get("expected_action_version")
+        if not isinstance(v, int) or isinstance(v, bool) or v < 1:
+            errs["expected_action_version"] = "integer >= 1 required"
+        if errs:
+            raise invalid("reconcile validation failed", errs)
+        return mutate(request, ctx, "/actions/{action_id}/reconcile", b,
+                      lambda u: jobs.operator_reconcile(ctx, u, action_id, b))
+
+    @app.post(PUB + "/requests/{request_id}/close")
+    def post_close(request: Request, workspace_id: str, request_id: str, body: Any = Body(None)):
+        """PROTOCOL rev 3 #21."""
+        ctx = make_ctx(request, workspace_id, operator_only=True)
+        b = body if isinstance(body, dict) else {}
+        errs: dict[str, str] = {}
+        if set(b) - {"reason", "expected_request_version"}:
+            errs["<root>"] = "unexpected fields"
+        if not isinstance(b.get("reason"), str) or not 1 <= len(b["reason"]) <= 2000:
+            errs["reason"] = "string 1..2000 required"
+        v = b.get("expected_request_version")
+        if not isinstance(v, int) or isinstance(v, bool) or v < 1:
+            errs["expected_request_version"] = "integer >= 1 required"
+        if errs:
+            raise invalid("close validation failed", errs)
+        return mutate(request, ctx, "/requests/{request_id}/close", b,
+                      lambda u: domain.close_request(ctx, u, request_id, b))
+
     # ---- private worker protocol ----------------------------------------------------------------------
     @app.post(PRIV + "/jobs/claim")
     def post_claim(request: Request, workspace_id: str, body: Any = Body(None)):

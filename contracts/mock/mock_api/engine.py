@@ -147,6 +147,61 @@ def run_leased(ws: Workspace, run_id: str) -> bool:
     return any(j["run_id"] == run_id and _lease_live(j) for j in ws.jobs.values())
 
 
+def cancel_run(ws: Workspace, run: dict, reason: str) -> None:
+    """Cooperative cancellation: queued investigate/undispatched dispatch jobs are cancelled; leases may still record."""
+    for j in ws.jobs.values():
+        if j["run_id"] == run["id"] and j["status"] == "queued" and j["kind"] in ("investigate", "dispatch"):
+            if j["kind"] == "dispatch":
+                a = ws.actions[j["action_id"]]
+                if a["status"] != "accepted":
+                    continue
+                a["status"] = "cancelled"
+                touch(a)
+            j["status"] = "cancelled"
+    set_run(run, "cancelled")
+    run["_cancel_reason"] = reason
+    if not run_leased(ws, run["id"]):  # rev2 #6; otherwise appended when the leased job completes
+        req = ws.requests[run["request_id"]]
+        append_event(ws, run, "run_finished", {"run_status": "cancelled", "request_status": req["status"], "action_id": None})
+
+
+def operator_reconcile(ws: Workspace, action: dict, body: dict) -> dict:
+    """rev3 #20: operator establishes the outcome of an `unknown` action, then the normal continuation/replan runs."""
+    if action["status"] != "unknown":
+        raise ApiError(409, "INVALID_TRANSITION", f"only unknown actions can be reconciled; action is {action['status']}")
+    if any(j["action_id"] == action["id"] and j["kind"] == "reconcile" and _lease_live(j) for j in ws.jobs.values()):
+        raise ApiError(409, "INVALID_TRANSITION", "a worker reconcile job currently holds a lease on this action")
+    if body["expected_action_version"] != action["version"]:
+        raise ApiError(409, "REVISION_CONFLICT", "expected_action_version does not match", {"version": action["version"]})
+    run = ws.runs[action["run_id"]]
+    for j in ws.jobs.values():
+        if j["action_id"] == action["id"] and j["kind"] == "reconcile" and j["status"] == "queued":
+            j["status"] = "cancelled"
+    prev = max((j for j in ws.jobs.values() if j["action_id"] == action["id"]), key=lambda j: j["seq"])
+    action["_reconciled_by"] = {"actor_id": "person_operator", "evidence_ids": body["evidence_ids"], "at": now()}
+    if body["outcome"] == "succeeded":
+        rc = body["receipt"]
+        if action["connector"] == "local":
+            eff = ws.local_effects.get(action["id"])
+            if not eff:
+                raise ApiError(409, "INVALID_TRANSITION", "no local effect exists for this action; it cannot have succeeded")
+            if rc["target_id"] != eff["target_id"]:
+                raise ApiError(422, "INVALID_INPUT", "receipt target does not match the recorded local effect",
+                               {"fields": {"receipt/target_id": f"expected {eff['target_id']}"}})
+            finalize_local(ws, action, eff)
+        else:
+            apply_effect(ws, action, external_receipt=rc)
+        nxt = _continuation(ws, run, action, prev) if run["status"] not in ("running",) else None
+    else:
+        action["status"] = "failed"
+        action["error"] = err("DISPATCH_FAILED", "operator reconciliation established the effect did not happen")
+        touch(action)
+        nxt = _replan(ws, run) if run["status"] not in ("running",) else None
+    if not run_leased(ws, run["id"]):
+        _action_event(ws, action)
+    return action
+
+
 def get_job(ws: Workspace, job_id: str) -> dict:
     job = ws.jobs.get(job_id)
     if job is None:

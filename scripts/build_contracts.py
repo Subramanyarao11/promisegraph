@@ -160,6 +160,12 @@ defs["ImportPreview"] = obj({
     "source_key": s(1, 200),
 })
 defs["ImportCommit"] = obj({"expected_revision": integer(0)})
+# PROTOCOL.md rev 3 (#20, #21)
+defs["ActionReconcile"] = obj({
+    "outcome": {"enum": ["succeeded", "failed"]}, "receipt": nullable(ref("Receipt")),
+    "evidence_ids": arr(ID), "expected_action_version": integer(1),
+})
+defs["RequestClose"] = obj({"reason": s(1, 2000), "expected_request_version": integer(1)})
 
 # ---------------------------------------------------------------- public results
 defs["ConnectorState"] = CONNECTOR_STATE

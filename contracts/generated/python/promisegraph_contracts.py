@@ -1115,6 +1115,24 @@ class ImportCommit(BaseModel):
     expected_revision: Annotated[int, Field(ge=0)]
 
 
+class ActionReconcile(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outcome: Literal['succeeded', 'failed']
+    receipt: Receipt | None
+    evidence_ids: Annotated[list[EvidenceId], Field(max_length=100)]
+    expected_action_version: Annotated[int, Field(ge=1)]
+
+
+class RequestClose(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    reason: Annotated[str, Field(max_length=2000, min_length=1)]
+    expected_request_version: Annotated[int, Field(ge=1)]
+
+
 class ConnectorState(
     RootModel[
         Literal[
