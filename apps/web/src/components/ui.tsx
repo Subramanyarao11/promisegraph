@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useId, useRef, useSt
 import { Icon, type IconName } from "./Icon";
 import { spec, type StatusSpec } from "../lib/status";
 import { formatTs } from "../lib/format";
-import { ApiError, isUnavailable } from "../api/client";
+import { useQuery } from "@tanstack/react-query";
+import { api, ApiError, isUnavailable } from "../api/client";
 
 export function Badge({ s, title, testId }: { s: StatusSpec; title?: string; testId?: string }) {
   return (
@@ -44,18 +45,17 @@ export function Mono({ children }: { children: ReactNode }) {
 /* ---------- live announcements ---------- */
 const AnnounceCtx = createContext<(msg: string, assertive?: boolean) => void>(() => {});
 export function AnnouncerProvider({ children }: { children: ReactNode }) {
-  const [polite, setPolite] = useState("");
-  const [assertive, setAssertive] = useState("");
+  // Polite messages are appended to a log (not replaced), so a quick follow-up event such as
+  // "run finished" cannot erase a mutation confirmation before assistive tech reads it.
+  const [log, setLog] = useState<{ id: number; msg: string }[]>([]);
+  const [assertive, setAssertive] = useState<{ id: number; msg: string } | null>(null);
   const [toast, setToast] = useState<{ msg: string; key: number; tone: string } | null>(null);
+  const seq = useRef(0);
   const announce = useCallback((msg: string, isAssertive = false) => {
-    if (isAssertive) {
-      setAssertive("");
-      setTimeout(() => setAssertive(msg), 30);
-    } else {
-      setPolite("");
-      setTimeout(() => setPolite(msg), 30);
-    }
-    setToast({ msg, key: Date.now(), tone: isAssertive ? "danger" : "info" });
+    const id = ++seq.current;
+    if (isAssertive) setAssertive({ id, msg });
+    else setLog((l) => [...l, { id, msg }].slice(-8));
+    setToast({ msg, key: id, tone: isAssertive ? "danger" : "info" });
   }, []);
   useEffect(() => {
     if (!toast) return;
@@ -65,8 +65,12 @@ export function AnnouncerProvider({ children }: { children: ReactNode }) {
   return (
     <AnnounceCtx.Provider value={announce}>
       {children}
-      <div className="sr-only" role="status" aria-live="polite" data-testid="live-polite">{polite}</div>
-      <div className="sr-only" role="alert" aria-live="assertive">{assertive}</div>
+      <div className="sr-only" role="log" aria-live="polite" aria-relevant="additions" data-testid="live-polite">
+        {log.map((m) => <p key={m.id}>{m.msg}</p>)}
+      </div>
+      <div className="sr-only" role="alert" aria-live="assertive" data-testid="live-assertive">
+        {assertive && <p key={assertive.id}>{assertive.msg}</p>}
+      </div>
       {toast && (
         <div className={`toast tone-${toast.tone}`} key={toast.key} aria-hidden="true">
           <Icon name={toast.tone === "danger" ? "alert" : "info"} />
@@ -211,5 +215,26 @@ export function Section({ title, id, children, actions, count, testId }: { title
       </header>
       <div className="panel-body">{children}</div>
     </section>
+  );
+}
+
+/* Owner with activity from GET /people/{id} (Rev 5 #33); falls back to the bare ID if the read is unavailable. */
+interface PersonSummary { id: string; name: string; role: string; team_id: string | null; active: boolean; version: number }
+export function Owner({ id }: { id: string | null }) {
+  const q = useQuery({
+    queryKey: ["person", id],
+    enabled: Boolean(id),
+    queryFn: ({ signal }) => api.get<PersonSummary>(`/people/${encodeURIComponent(id!)}`, signal),
+    staleTime: 60_000,
+    retry: false,
+  });
+  if (!id) return <Tag tone="warn" icon="alert">Missing owner</Tag>;
+  const p = q.data?.data;
+  return (
+    <span className="row" style={{ display: "inline-flex" }} data-testid="owner">
+      <Mono>{id}</Mono>
+      {p && <span>{p.name}</span>}
+      {p && !p.active && <Tag tone="warn" icon="alert">Inactive owner</Tag>}
+    </span>
   );
 }

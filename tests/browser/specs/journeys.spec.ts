@@ -215,8 +215,3 @@ test("database unavailable shows an honest unavailable state, no data", async ({
   await expect(page.getByTestId("request-table")).toBeVisible();
   await expect(page.getByTestId("banner-unavailable")).toHaveCount(0, { timeout: 15_000 });
 });
-
-test("unknown request shows an explicit missing-entity state", async ({ page }) => {
-  await page.goto("/requests/request_unknown_xyz");
-  await expect(page.getByTestId("state-unknown-entity")).toContainText("Unknown request");
-});

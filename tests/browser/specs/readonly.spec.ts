@@ -48,3 +48,8 @@ test("inbox filters and an investigation render real evidence paths as ordered t
   await expect(page.getByTestId("drawer-revision")).toContainText("rev ");
   await page.keyboard.press("Escape");
 });
+
+test("unknown request shows an explicit missing-entity state", async ({ page }) => {
+  await page.goto("/requests/request_unknown_xyz");
+  await expect(page.getByTestId("state-unknown-entity")).toContainText("Unknown request");
+});

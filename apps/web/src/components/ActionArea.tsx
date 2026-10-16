@@ -5,7 +5,7 @@ import { ReconcileForm } from "./Forms";
 import { ApiError } from "../api/client";
 import { Icon } from "./Icon";
 import { EvidenceChip } from "./Evidence";
-import { Badge, Callout, Dialog, ErrorPanel, Mono, StatusBadge, Tag, Ts, useAnnounce } from "./ui";
+import { Badge, Callout, Dialog, ErrorPanel, Mono, Owner, StatusBadge, Tag, Ts, useAnnounce } from "./ui";
 import { ACTION_STATUS, CONNECTOR_LABEL, CONNECTOR_STATE, KIND_LABEL, VALIDITY, VERIFICATION, WORK_STATUS, spec } from "../lib/status";
 
 interface Props {
@@ -66,7 +66,7 @@ function Payload({ p, work }: { p: Proposal; work: WorkItem[] }) {
         <div className="stack">
           <dl className="kv">
             <dt>Title</dt><dd><strong>{p.payload.title}</strong></dd>
-            <dt>Owner</dt><dd data-testid="proposal-owner">{p.payload.owner_id ? <Mono>{p.payload.owner_id}</Mono> : <Tag tone="warn" icon="alert">Missing owner — assign before or after creation</Tag>}</dd>
+            <dt>Owner</dt><dd data-testid="proposal-owner">{p.payload.owner_id ? <Owner id={p.payload.owner_id} /> : <Tag tone="warn" icon="alert">Missing owner — assign before or after creation</Tag>}</dd>
             <dt>Capability</dt><dd>{p.payload.capability_id ? <Mono>{p.payload.capability_id}</Mono> : <span className="muted">None linked</span>}</dd>
             <dt>Depends on</dt><dd>{p.payload.dependency_ids.length ? p.payload.dependency_ids.map((d) => <Mono key={d}>{d}</Mono>) : <span className="muted">None</span>}</dd>
           </dl>

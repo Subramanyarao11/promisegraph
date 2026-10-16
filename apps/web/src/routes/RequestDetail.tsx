@@ -5,7 +5,7 @@ import type { Action, Decision, EvidenceRef, Proposal, Run, RunCreate, RunEvent 
 import { api, ApiError, isUnavailable } from "../api/client";
 import { keys, useActions, useCommand, useContextBundle, useCustomerName, useInfo, useKnownRunIds, useRequest, useObservations, useRequestProposals, useRequestRuns, useRunEvents, useSource, rememberRun, type Timeline } from "../api/hooks";
 import { Icon } from "../components/Icon";
-import { Badge, Callout, Empty, ErrorPanel, Loading, Mono, Section, StatusBadge, Tag, Ts, useAnnounce } from "../components/ui";
+import { Badge, Callout, Empty, ErrorPanel, Loading, Mono, Owner, Section, StatusBadge, Tag, Ts, useAnnounce } from "../components/ui";
 import { EvidenceChip, PathText, SourceDrawerProvider, useOpenSource } from "../components/Evidence";
 import { ActionArea } from "../components/ActionArea";
 import { RunTimeline } from "../components/Timeline";
@@ -188,7 +188,7 @@ function Workspace({ id }: { id: string }) {
             </button>
             {reqSource.data && <Tag>{humanize(reqSource.data.data.origin)}</Tag>}
           </span>
-          <span>Owner {request.owner_id ? <Mono>{request.owner_id}</Mono> : <Tag tone="warn" icon="alert">Missing owner</Tag>}</span>
+          <span>Owner <Owner id={request.owner_id} /></span>
           <span>Created <Ts iso={request.created_at} /></span>
           <span>Updated <Ts iso={request.updated_at} /></span>
         </div>
@@ -316,7 +316,7 @@ function Workspace({ id }: { id: string }) {
                       <span className="row small">
                         <Mono>{w.id}</Mono>
                         <Tag icon={w.connector === "linear" ? "external" : "work"}>{CONNECTOR_LABEL[w.connector]}</Tag>
-                        {w.owner_id ? <span>owner <Mono>{w.owner_id}</Mono></span> : <Tag tone="warn" icon="alert">Missing owner</Tag>}
+                        <span>owner <Owner id={w.owner_id} /></span>
                         {request.linked_work_ids.includes(w.id) && <Tag tone="info" icon="link">Linked</Tag>}
                       </span>
                       <span className="small muted">observed <Ts iso={w.observed_at} />{w.forecast_at ? <> · forecast <Ts iso={w.forecast_at} /></> : " · no forecast"}</span>
