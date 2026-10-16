@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Action, EvidenceRef, ObservationCreate, Receipt, ObservationResult, ReplyCreate, ReplyResult, Request, Run, RunCancel, RunCreate, RunResume } from "@contracts";
+import type { Action, ActionReconcile, EvidenceRef, ObservationCreate, ObservationResult, ReplyCreate, ReplyResult, Request, Run, RunCancel, RunCreate, RunResume } from "@contracts";
 import { useCommand, keys, rememberRun, useInfo } from "../api/hooks";
 import { ApiError } from "../api/client";
 import { Icon } from "./Icon";
@@ -217,17 +217,8 @@ export function RunControls({ request, run, onStarted }: { request: Request; run
 }
 
 /* ---------------- operator reconciliation of an unknown dispatch (Rev 3 #20) ---------------- */
-interface ReconcileBody {
-  _id: string;
-  outcome: "succeeded" | "failed";
-  receipt: Receipt | null;
-  evidence_ids: string[];
-  expected_action_version: number;
-}
-async function sha256Hex(text: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
+/** Rev 4 #28: the operator reports only what was found; the API reads the target back and issues the receipt. */
+type ReconcileBody = ActionReconcile & { _id: string };
 export function ReconcileForm({ action }: { action: Action }) {
   const announce = useAnnounce();
   const [outcome, setOutcome] = useState<"succeeded" | "failed">("failed");
@@ -235,18 +226,12 @@ export function ReconcileForm({ action }: { action: Action }) {
   const [targetUrl, setTargetUrl] = useState("");
   const [err, setErr] = useState<string | undefined>();
   const rec = useCommand<ReconcileBody, Action>("post", (b) => `/actions/${encodeURIComponent(b._id)}/reconcile`, () => [["actions"], ["run"], ["request"]]);
-  const submit = async (e: React.FormEvent) => {
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    let receipt: Receipt | null = null;
-    if (outcome === "succeeded") {
-      if (!targetId.trim()) { setErr("Enter the target ID you found (e.g. the task or issue identifier)."); return; }
-      const observed_at = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
-      const record = { connector: action.connector, target_id: targetId.trim(), target_url: targetUrl.trim() || null, observed_at };
-      // The hash covers exactly what the operator observed and entered; nothing else is asserted.
-      receipt = { id: `receipt_operator_${(await sha256Hex(action.id + targetId)).slice(0, 16)}`, ...record, result_hash: await sha256Hex(JSON.stringify(record)) };
-    }
+    if (outcome === "succeeded" && !targetId.trim()) { setErr("Enter the target ID you found (e.g. the task or issue identifier)."); return; }
+    const target = outcome === "succeeded" ? { target_id: targetId.trim(), target_url: targetUrl.trim() || null } : null;
     setErr(undefined);
-    rec.mutate({ _id: action.id, outcome, receipt, evidence_ids: [], expected_action_version: action.version }, {
+    rec.mutate({ _id: action.id, outcome, target, evidence_ids: [], expected_action_version: action.version }, {
       onSuccess: (r) => announce(`Action ${r.data.id} reconciled as ${r.data.status}.`),
       onError: (e2) => announce(`Reconciliation refused: ${(e2 as Error).message}`, true),
     });

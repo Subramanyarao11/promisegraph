@@ -327,8 +327,13 @@ function Workspace({ id }: { id: string }) {
             </Section>
             <Section title="Decisions in scope" count={bundle?.decisions.length} testId="decisions">
               {conflicts.length > 0 && (
-                <Callout tone="warn" icon="alert" title="Conflicting active decisions" testId="conflicting-decisions">
-                  <p>{conflicts.map((c) => `${humanize(c[0].rule_type)} on ${c[0].scope.entity_id}: ${c.map((d) => d.id).join(" vs ")}`).join("; ")}. Expect clarification or escalation rather than a silent choice.</p>
+                <Callout tone="warn" icon="alert" title="Hint: possibly conflicting active decisions" testId="conflicting-decisions">
+                  <p>{conflicts.map((c) => `${humanize(c[0].rule_type)} on ${c[0].scope.entity_id}: ${c.map((d) => d.id).join(" vs ")}`).join("; ")}.</p>
+                  <p className="muted small">This grouping is a display hint (same rule and scope, different values). The authoritative signal is the proposal's validation reasons or an escalation.</p>
+                  {proposal && proposal.validation_reasons.length > 0 && (
+                    <ul className="small" data-testid="conflict-authoritative">{proposal.validation_reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
+                  )}
+                  {proposal?.kind === "escalate" && <p className="small"><strong>Escalated:</strong> {proposal.payload.reason}</p>}
                 </Callout>
               )}
               {!bundle ? null : bundle.decisions.length === 0 ? <p className="muted">No scoped decisions apply.</p> : (
