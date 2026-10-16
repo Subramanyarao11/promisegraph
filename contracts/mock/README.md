@@ -1,7 +1,7 @@
 # PromiseGraph protocol mock (contract 1.0.0)
 
 An in-memory HTTP mock of Agent A's API, built to the contract. It lets the worker (B) and the web app (C) develop
-without the real API. It covers every public route in Contracts §4 and every private route in §7, using the
+without the real API. It covers every public route in Contracts §4, the two list routes added by PROTOCOL.md "G0 clarifications (rev 2)" (`GET /requests/{id}/runs` and `GET /proposals?request_id=&run_id=`, both newest first) and every private route in §7, using the
 contract's envelopes, error codes, auth rules, idempotency, leases and fencing, cursors and state transitions.
 Each response carries the header `X-PromiseGraph-Mock: true`.
 
@@ -32,7 +32,7 @@ cd contracts/mock && uv run pytest -q
 
 The harness checks every HTTP response against `contracts/tools/validate.py`. That covers the `{data, meta}` and list
 envelopes, `EventsPage`, `ErrorEnvelope` and the DTO for each route. It also reports how many of the 36 contract
-routes the run exercised.
+routes the run exercised (38, counting the rev 2 list routes). `tests/test_rev2.py` covers the rev 2 clarifications, including #17.
 
 ## Seed
 
@@ -76,9 +76,13 @@ On startup and on each reset:
   a missing or cancelled or already-linked work target, an inactive owner, a disallowed kind (`allowed_action_types`),
   a forbidden workaround, or an unconfigured linear connector.
 - **Commit.**
-  - A worker can commit only `auto_commit_kinds` (`answer`, `clarify`), unless it passes a stored authorization.
-  - An operator commit is the authorization itself. It creates one, moves the run from `awaiting_review` to
-    `queued`/`act`, and appends `action_updated`.
+  - A worker passes `authorization_id: null` and can commit only `auto_commit_kinds` (`answer`, `clarify`). A
+    non-null value from a worker returns 422 `POLICY_VIOLATION`.
+  - Committing an invalid proposal returns 422 `EVIDENCE_INVALID` if the cause is evidence, otherwise 422
+    `POLICY_VIOLATION`. Unknown evidence ids anywhere else (observations, decisions) return 422 `INVALID_INPUT`.
+  - An operator commit is the authorization itself. It creates one and moves the run from `awaiting_review` to
+    `queued`/`act`. The request stays `awaiting_review` until the effect lands. It appends `action_updated` only if
+    no lease is held on the run.
   - Every commit queues one dispatch job. That job waits until the run's investigate job finishes.
 - **Dispatch.**
   - `execute-local` re-validates (proposal validity, then target), applies the effect atomically and returns the
@@ -93,7 +97,7 @@ On startup and on each reset:
   - If re-validation fails, the action becomes `failed` (REVISION_CONFLICT or POLICY_VIOLATION) and the proposal
     becomes `stale`. Completing the dispatch job `failed` then queues a replan (`usage.replans+1`).
 - **After dispatch.** A successful dispatch completion queues exactly one investigate continuation, with
-  `checkpoint.resume_stage="observe"`. Completing that continuation moves the run to `succeeded`, or to
+  `checkpoint = {resume_stage: "observe", action_id, previous_job_id}`. Completing that continuation moves the run to `succeeded`, or to
   `waiting_for_input` after a clarify. A dispatch completed `unknown` moves the action to `unknown` and queues a
   reconcile job. A reconcile completed with `established: true` leads to the continuation. Still unknown means the
   run goes to `awaiting_review`.
@@ -110,7 +114,12 @@ On startup and on each reset:
 - **Imports.** All three formats are supported, as described in PROTOCOL.md. Unchanged records come back as `noop`.
   Commit requires `expected_revision` to equal both the current revision and the preview's base revision. Changed
   entities invalidate the proposals that consulted them.
-- **Run control.** Cancel is cooperative: queued jobs are cancelled, and leased jobs may still record receipts.
+- **Other API-created jobs (rev 2 #18).** Reply-resume, replan-after-failed-dispatch and operator-resume jobs carry
+  the run's last worker checkpoint plus `resume_stage` and one of `reply_source_id` or `resume_reason`.
+- **Investigate completion.** Only `proposal_ids` is required in `result`. A `waiting` outcome also needs
+  `awaiting: "review"`.
+- **Run control.** Cancel is cooperative: queued jobs are cancelled, and leased jobs may still record receipts. If a
+  lease is live when the run is cancelled, `run_finished` is appended when that job completes, not at cancel time.
   Resume gives one budget extension, capped at 24 tool calls and 180 s.
 
 ## Known deviations from the real API
@@ -119,21 +128,27 @@ On startup and on each reset:
   Expansion is an undirected BFS (each edge keeps its real direction in the returned path) with a visited set, depth
   ≤ 6 and a truncation flag. `GET /requests/{id}/context`:
   - skips `SUBMITTED` edges, to avoid fanning out through the customer.
-  - pages paths 20 at a time; the `cursor` is an offset.
+  - takes `depth` only and returns at most 20 paths, with `truncated` set if more exist. A `cursor` is ignored.
 - **Freshness and leases.** Freshness (stale evidence older than 7 days for `work`/`observation` sources) and decision
   activity use the scenario clock. Lease expiry and timestamps use real UTC.
 - **Budget.** The API does not enforce the budget; the worker must report `BUDGET_EXHAUSTED`. Permit expiry is not
   enforced at completion time. Refresh jobs change no data. The mock never returns 429 and has no SSE.
-- **Idempotency.** Only 2xx results are recorded, so a failed command can be retried with the same key. The payload
-  hash covers the path parameters as well as the body.
+- **Idempotency.** Per rev 2, the scope is (workspace, method, concrete path, caller) and the hash covers the
+  canonical body only. Only 2xx results are recorded, so a failed command can be retried with the same key.
 - **Run version.** `Run.version` changes only on status or stage transitions, not on event or checkpoint appends.
 - **Events the API appends.**
   - operator commit → `action_updated`.
   - dispatch or reconcile completion → `action_updated`.
-  - investigate completion → `run_finished` or `waiting_for_input`, only if the worker didn't just emit it.
+  - investigate completion → `run_finished` or `waiting_for_input`.
   - operator observation on an action, when the run isn't running → `observation_recorded`.
-  - cancel → `run_finished`.
+  - cancel → `run_finished` (deferred to job completion if a lease is live).
 
-  The API appends nothing while a worker job holds a lease (except cancel), so chaining `next_event_seq` within a
+  Workers emit only `run_started`, `tool_started`, `tool_completed`, `proposal_ready` and `error`. A checkpoint
+  that carries an API-owned type (`action_updated`, `waiting_for_input`, `observation_recorded`, `run_finished`)
+  is rejected with 422 `INVALID_INPUT` and nothing is appended (rev 2 #17).
+
+  The API never appends while a worker job holds a lease on that run (rev 2 #6), so chaining `next_event_seq` within a
   job is safe.
+- **Auth.** A missing or invalid bearer token returns 401 `UNAUTHORIZED`. A valid token of the wrong class for the
+  route returns 403 `UNAUTHORIZED`. A workspace the caller isn't permitted in returns 403 `WORKSPACE_FORBIDDEN`.
 - **Health.** `/health/*` returns plain JSON, not contract DTOs.

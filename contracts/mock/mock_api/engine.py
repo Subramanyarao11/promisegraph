@@ -18,6 +18,7 @@ SUFFICIENT_KINDS = {"operator_confirmation", "customer_confirmation", "acceptanc
 ACTIVE_RUN = {"queued", "running", "waiting_for_input", "awaiting_review"}
 KIND_PRIORITY = {"reconcile": 0, "dispatch": 1, "investigate": 2, "refresh": 3}
 CHECKPOINT_MAX_BYTES = 64 * 1024
+API_OWNED_EVENTS = {"action_updated", "waiting_for_input", "observation_recorded", "run_finished"}
 
 
 def linear_enabled() -> bool:
@@ -142,6 +143,10 @@ def claim(ws: Workspace, body: dict) -> dict | None:
     return lease_view(job)
 
 
+def run_leased(ws: Workspace, run_id: str) -> bool:
+    return any(j["run_id"] == run_id and _lease_live(j) for j in ws.jobs.values())
+
+
 def get_job(ws: Workspace, job_id: str) -> dict:
     job = ws.jobs.get(job_id)
     if job is None:
@@ -180,6 +185,9 @@ def checkpoint(ws: Workspace, job: dict, body: dict) -> dict:
     if not job["run_id"]:
         raise ApiError(409, "INVALID_TRANSITION", f"{job['kind']} job has no run to checkpoint")
     run = ws.runs[job["run_id"]]
+    if body["event"]["type"] in API_OWNED_EVENTS:  # rev2 #17
+        raise ApiError(422, "INVALID_INPUT", f"event type {body['event']['type']} is API-owned and cannot be emitted by a worker",
+                       {"fields": {"event/type": f"must not be one of {sorted(API_OWNED_EVENTS)}"}})
     for prior in ws.events[run["id"]]:
         if prior["step_id"] == body["step_id"]:
             return {"event": prior, "next_event_seq": run["event_seq"]}
@@ -222,7 +230,7 @@ def complete(ws: Workspace, job: dict, body: dict) -> dict:
     outcome, result = body["outcome"], body["result"]
     req_fields = RESULT_FIELDS.get(job["kind"], ())
     if job["kind"] == "investigate":
-        req_fields = ("proposal_ids",) + (("action_ids", "summary") if outcome == "succeeded" else ())
+        req_fields = ("proposal_ids",)  # rev2 #12
     missing = [f for f in req_fields if f not in result]
     if missing:
         raise ApiError(422, "INVALID_INPUT", f"{job['kind']} completion result is missing fields",
@@ -234,8 +242,12 @@ def complete(ws: Workspace, job: dict, body: dict) -> dict:
     handler = {"investigate": _complete_investigate, "dispatch": _complete_dispatch,
                "reconcile": _complete_reconcile, "refresh": _complete_refresh}[job["kind"]]
     next_job = handler(ws, job, outcome, result)
-    job["status"] = "completed" if outcome != "retryable_failure" else job["status"]
+    if job["status"] == "leased":
+        job["status"] = "completed"
     run = ws.runs.get(job["run_id"]) if job["run_id"] else None
+    if run and run["status"] == "cancelled" and last_event_type(ws, run["id"]) != "run_finished":
+        append_event(ws, run, "run_finished", {"run_status": "cancelled",
+                                               "request_status": ws.requests[run["request_id"]]["status"], "action_id": None})
     receipt = {"job_id": job["id"], "completion_id": body["completion_id"], "outcome": outcome, "recorded_at": now(),
                "run": pub(run) if run else None, "next_job_id": next_job["id"] if next_job else None}
     job["completion"] = {"completion_id": body["completion_id"], "receipt": receipt}
@@ -310,12 +322,10 @@ def _complete_investigate(ws, job, outcome, result):
     return None
 
 
-def _continuation(ws: Workspace, run: dict, action: dict) -> dict | None:
+def _continuation(ws: Workspace, run: dict, action: dict, previous_job: dict) -> dict | None:
     if run["status"] == "cancelled":
         return None
-    cp = dict(run.get("_checkpoint") or {})
-    cp.update(resume_stage="observe", stage="observe", pending_action_id=action["id"],
-              completed_call_ids=cp.get("completed_call_ids", []), usage=dict(run["usage"]))
+    cp = {"resume_stage": "observe", "action_id": action["id"], "previous_job_id": previous_job["id"]}  # rev2 #13
     set_run(run, "queued", "observe")
     return enqueue(ws, "investigate", run=run, checkpoint=cp)
 
@@ -328,10 +338,9 @@ def _replan(ws: Workspace, run: dict) -> dict | None:
         _fail_run(ws, run, "BUDGET_EXHAUSTED", "replan budget exhausted", True)
         return None
     set_run(run, "queued", "investigate")
-    cp = dict(run.get("_checkpoint") or {})
-    if cp:
-        cp.update(resume_stage="investigate", stage="investigate", pending_action_id=None)
-    return enqueue(ws, "investigate", run=run, checkpoint=cp or None)
+    cp = dict(run.get("_checkpoint") or {})  # rev2 #18: last worker checkpoint + resume_stage + resume_reason
+    cp.update(resume_stage="investigate", resume_reason="replan after failed dispatch revalidation")
+    return enqueue(ws, "investigate", run=run, checkpoint=cp)
 
 
 def _action_event(ws, action):
@@ -353,12 +362,12 @@ def _complete_dispatch(ws, job, outcome, result):
             rc = result.get("receipt")
             from .common import contract_errors
             if not isinstance(rc, dict) or contract_errors("Receipt", rc) or rc["connector"] != "linear":
-                raise ApiError(422, "EVIDENCE_INVALID", "linear dispatch success requires a valid linear Receipt readback")
+                raise ApiError(422, "INVALID_INPUT", "linear dispatch success requires a valid linear Receipt readback", {"fields": {"result/receipt": "valid linear Receipt required"}})
             apply_effect(ws, action, external_receipt=rc)
         if action["status"] != "succeeded" or not action["receipt"]:
             raise ApiError(409, "INVALID_TRANSITION", f"action is {action['status']} without a persisted receipt; cannot complete succeeded")
         _action_event(ws, action)
-        return _continuation(ws, run, action)
+        return _continuation(ws, run, action, job)
     if outcome == "unknown":
         if action["status"] in ("accepted", "dispatching"):
             action["status"] = "unknown"
@@ -389,19 +398,19 @@ def _complete_reconcile(ws, job, outcome, result):
         if action["connector"] == "local":
             eff = ws.local_effects.get(action["id"])
             if not eff:
-                raise ApiError(422, "EVIDENCE_INVALID", "no local effect exists for this action; cannot establish success")
+                raise ApiError(409, "INVALID_TRANSITION", "no local effect exists for this action; cannot establish success")
             rc = result.get("receipt")
             if isinstance(rc, dict) and rc.get("target_id") not in (None, eff["target_id"]):
-                raise ApiError(422, "EVIDENCE_INVALID", "receipt target does not match the recorded local effect")
+                raise ApiError(422, "INVALID_INPUT", "receipt target does not match the recorded local effect", {"fields": {"result/receipt/target_id": "does not match local effect"}})
             finalize_local(ws, action, eff)
         else:
             rc = result.get("receipt")
             from .common import contract_errors
             if not isinstance(rc, dict) or contract_errors("Receipt", rc):
-                raise ApiError(422, "EVIDENCE_INVALID", "established linear result requires a valid Receipt")
+                raise ApiError(422, "INVALID_INPUT", "established linear result requires a valid Receipt", {"fields": {"result/receipt": "valid Receipt required"}})
             apply_effect(ws, action, external_receipt=rc)
         _action_event(ws, action)
-        return _continuation(ws, run, action)
+        return _continuation(ws, run, action, job)
     if result["established"] is True and outcome == "failed":
         action["status"] = "failed"
         action["error"] = err("DISPATCH_FAILED", "reconciliation confirmed the effect did not happen")
@@ -516,7 +525,8 @@ def commit_proposal(ws: Workspace, p: dict, body: dict, *, caller: str, idem_key
         raise ApiError(409, "REVISION_CONFLICT", "proposal is stale; replan against current knowledge",
                        {"proposal_id": p["id"], "validation_reasons": p["validation_reasons"][:10]})
     if p["validity"] == "invalid":
-        raise ApiError(422, "POLICY_VIOLATION", "proposal is invalid and cannot be committed",
+        code = "EVIDENCE_INVALID" if any(r.startswith("EVIDENCE_INVALID") for r in p["validation_reasons"]) else "POLICY_VIOLATION"
+        raise ApiError(422, code, "proposal is invalid and cannot be committed",
                        {"proposal_id": p["id"], "validation_reasons": p["validation_reasons"][:10]})
     auth_id = body["authorization_id"]
     if auth_id is not None:
@@ -524,7 +534,9 @@ def commit_proposal(ws: Workspace, p: dict, body: dict, *, caller: str, idem_key
         if a is None or a["request_id"] not in (None, p["request_id"]):
             raise ApiError(422, "POLICY_VIOLATION", f"authorization {auth_id} does not exist or does not apply")
     if caller == "worker":
-        if auth_id is None and p["kind"] not in ws.auto_commit_kinds:
+        if auth_id is not None:
+            raise ApiError(422, "POLICY_VIOLATION", "workers must pass authorization_id: null; only operator commits authorize")
+        if p["kind"] not in ws.auto_commit_kinds:
             raise ApiError(422, "POLICY_VIOLATION", f"worker may not commit {p['kind']} without an operator authorization",
                            {"auto_commit_kinds": ws.auto_commit_kinds})
     elif auth_id is None:
@@ -700,7 +712,8 @@ def record_observation(ws: Workspace, req: dict, body: dict, actor: str) -> dict
             raise not_found("action", body["action_id"])
     for ev in body["evidence_ids"]:
         if ev not in ws.evidence:
-            raise ApiError(422, "EVIDENCE_INVALID", f"evidence {ev} does not exist in this workspace", {"evidence_id": ev})
+            raise ApiError(422, "INVALID_INPUT", f"evidence {ev} does not exist in this workspace",
+                           {"fields": {"evidence_ids": f"unknown evidence {ev}"}})
     t = now()
     oid = new_id("observation")
     src, _ = ws.add_source(bounded_id("src", oid), title=f"Observation {body['kind']} on {req['id']}", kind="observation",

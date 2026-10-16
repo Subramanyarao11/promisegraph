@@ -1,1 +1,1 @@
-23 passed in 1.91s; contract-validated responses: 439; routes exercised: 36/36 (cd contracts/mock && uv run pytest -q)
+31 passed in 2.48s; contract-validated responses: 570; routes exercised: 38/38; PROTOCOL.md G0 clarifications rev 2 incl. #17-#18 (cd contracts/mock && uv run pytest -q)

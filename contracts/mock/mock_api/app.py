@@ -223,8 +223,8 @@ async def command(request: Request, wid: str, template: str, schema_in: str | No
         if not key or not (1 <= len(key) <= 128):
             raise ApiError(422, "INVALID_INPUT", "Idempotency-Key header (1..128 chars) is required",
                            {"fields": {"header/Idempotency-Key": "required, 1..128 chars"}})
-        scope = (template, ctx.caller, key)
-        digest = sha256(canonical({"path": dict(request.path_params), "body": body}))
+        scope = (request.method, request.url.path, ctx.caller, key)  # rev2 #4: concrete resolved path
+        digest = sha256(canonical(body))
         rec = ws.idem.get(scope)
         if rec is not None:
             if rec["hash"] != digest:
@@ -456,6 +456,16 @@ async def get_run(request: Request, wid: str, run_id: str):
     return ok(ctx, pub(ctx.ws.get("runs", run_id, "run")), "Run")
 
 
+@app.get(PUBLIC + "/requests/{rid}/runs")
+async def list_request_runs(request: Request, wid: str, rid: str):
+    """rev2 #1: Run list for a request, newest first."""
+    ctx = authorize(request, wid)
+    ctx.ws.get("requests", rid, "request")
+    items = [pub(r) for r in reversed(list(ctx.ws.runs.values())) if r["request_id"] == rid]
+    page, nxt = paginate(request, items)
+    return ok_list(ctx, page, "Run", nxt)
+
+
 @app.get(PUBLIC + "/runs/{run_id}/events")
 async def run_events(request: Request, wid: str, run_id: str):
     ctx = authorize(request, wid)
@@ -489,7 +499,8 @@ async def cancel_run(request: Request, wid: str, run_id: str):
         engine.set_run(run, "cancelled")
         run["_cancel_reason"] = b["reason"]
         req = ws.requests[run["request_id"]]
-        engine.append_event(ws, run, "run_finished", {"run_status": "cancelled", "request_status": req["status"], "action_id": None})
+        if not engine.run_leased(ws, run["id"]):  # rev2 #6; otherwise appended when the leased job completes
+            engine.append_event(ws, run, "run_finished", {"run_status": "cancelled", "request_status": req["status"], "action_id": None})
         return 200, pub(run), "Run"
     return await command(request, wid, "POST /runs/{run_id}/cancel", "RunCancel", h, operator_only=True)
 
@@ -512,7 +523,8 @@ async def resume_run(request: Request, wid: str, run_id: str):
         run["error"] = None
         cp = run.get("_checkpoint")
         engine.set_run(run, "queued", (cp or {}).get("stage") or "investigate")
-        engine.enqueue(ws, "investigate", run=run, checkpoint=dict(cp, resume_reason=b["reason"]) if cp else None)
+        engine.enqueue(ws, "investigate", run=run,  # rev2 #18
+                       checkpoint={**(cp or {}), "resume_stage": (cp or {}).get("stage") or "investigate", "resume_reason": b["reason"]})
         return 202, pub(run), "Run"
     return await command(request, wid, "POST /runs/{run_id}/resume", "RunResume", h, operator_only=True)
 
@@ -524,8 +536,7 @@ async def request_context(request: Request, wid: str, rid: str):
     ctx = authorize(request, wid)
     req = ctx.ws.get("requests", rid, "request")
     depth = qint(request, "depth", 4, 1, 6)
-    offset = decode_cursor(request.query_params.get("cursor"))
-    return ok(ctx, ctxmod.bundle(ctx.ws, req, depth, offset), "ContextBundle")
+    return ok(ctx, ctxmod.bundle(ctx.ws, req, depth), "ContextBundle")
 
 
 @app.post(PUBLIC + "/context/search")
@@ -595,8 +606,7 @@ async def reply(request: Request, wid: str, rid: str):
         if waiting:
             run = waiting
             cp = dict(run.get("_checkpoint") or {})
-            cp.update(resume_stage="investigate", stage="investigate", reply_source_id=src["id"], pending_action_id=None,
-                      completed_call_ids=cp.get("completed_call_ids", []), usage=dict(run["usage"]))
+            cp.update(resume_stage="investigate", reply_source_id=src["id"])  # rev2 #18
             engine.set_run(run, "queued", "investigate")
             engine.enqueue(ws, "investigate", run=run, checkpoint=cp)
         elif active:
@@ -618,6 +628,17 @@ async def create_proposal(request: Request, wid: str):
         p = engine.create_proposal(ctx.ws, b)
         return 201, pub(p), "Proposal"
     return await command(request, wid, "POST /proposals", "ProposalCreate", h)
+
+
+@app.get(PUBLIC + "/proposals")
+async def list_proposals(request: Request, wid: str):
+    """rev2 #1: Proposal list filtered by request_id/run_id, newest first."""
+    ctx = authorize(request, wid)
+    rq, rn = request.query_params.get("request_id"), request.query_params.get("run_id")
+    items = [pub(p) for p in reversed(list(ctx.ws.proposals.values()))
+             if (not rq or p["request_id"] == rq) and (not rn or p["run_id"] == rn)]
+    page, nxt = paginate(request, items)
+    return ok_list(ctx, page, "Proposal", nxt)
 
 
 @app.get(PUBLIC + "/proposals/{pid}")
@@ -776,7 +797,7 @@ async def decide(request: Request, wid: str):
             raise invalid("routing_owner must reference an existing person", {"value": "unknown person"})
         for e in b["evidence_ids"]:
             if e not in ws.evidence:
-                raise ApiError(422, "EVIDENCE_INVALID", f"evidence {e} does not exist", {"evidence_id": e})
+                raise invalid(f"evidence {e} does not exist", {"evidence_ids": f"unknown evidence {e}"})
         if not ws.entity_exists(b["scope"]["entity_id"]):
             raise invalid("scope entity does not exist", {"scope/entity_id": "unknown entity"})
         op, t = b["operation"], now()

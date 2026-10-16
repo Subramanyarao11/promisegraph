@@ -46,7 +46,10 @@ def dispatch_local(api, worker, action_id):
 
 def continuation(api, worker, req_id, action_id, *, record_status=True):
     lease = worker.claim(["investigate"])
-    assert lease["checkpoint"]["resume_stage"] == "observe" and lease["checkpoint"]["pending_action_id"] == action_id
+    cp = lease["checkpoint"]
+    assert set(cp) == {"resume_stage", "action_id", "previous_job_id"}  # rev2 #13
+    assert cp["resume_stage"] == "observe" and cp["action_id"] == action_id
+    assert store.workspaces[api.ws].jobs[cp["previous_job_id"]]["kind"] in ("dispatch", "reconcile")
     a = api.get(f"/actions/{action_id}", token=WK).json()["data"]
     if record_status:
         r = api.get(f"/requests/{req_id}", token=WK).json()["data"]
@@ -57,8 +60,8 @@ def continuation(api, worker, req_id, action_id, *, record_status=True):
         assert o.status_code == 201, o.text
         assert o.json()["data"]["request"]["status"] == r["status"]  # connector_status never resolves
         assert o.json()["data"]["observation"]["actor_id"] == "worker:worker_test"
-    worker.checkpoint(lease, "observation_recorded", {"observation_id": "n/a", "kind": "connector_status", "verification": "pending"},
-                      stage="observe")
+    worker.checkpoint(lease, "tool_completed", {"call_id": "inspect", "ok": True, "result_count": 1, "ids": [action_id],
+                                                "duration_ms": 1, "error_code": None}, tool_name="inspect_action", stage="observe")
     return worker.complete(lease, "succeeded", {"run_status_hint": "succeeded", "stage": "remember", "proposal_ids": [],
                                                 "action_ids": [action_id], "summary": "Observed receipt.", "evidence_ids": []})
 
@@ -321,6 +324,8 @@ def test_dispatch_revalidation_never_sends_stale_intent(api, worker):
     assert a["status"] == "failed" and a["receipt"] is None and a["error"]["code"] == "REVISION_CONFLICT"
     rc = worker.complete(lease, "failed", {"action_id": action["id"], "execution_state": "failed", "receipt": None,
                                            "error": a["error"]})
+    replan = store.workspaces["ws_demo"].jobs[rc["next_job_id"]]["checkpoint"]
+    assert replan["resume_stage"] == "investigate" and replan["resume_reason"]  # rev2 #18
     assert rc["run"]["status"] == "queued" and rc["run"]["stage"] == "investigate" and rc["run"]["usage"]["replans"] == 1
     assert worker.claim(["investigate"])["run_id"] == run_id
     assert "work_export_migration" not in api.get(f"/requests/{rid}").json()["data"]["linked_work_ids"]
