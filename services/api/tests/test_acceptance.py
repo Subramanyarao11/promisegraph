@@ -165,7 +165,8 @@ def test_conflicting_decisions_force_clarify_T11(seeded: Api):
     c = propose(api, lease, req, run["id"], "clarify", {"question": "Who owns this?", "missing_fields": ["owner"]})
     assert c["validity"] == "valid"
     b = api.get(f"/requests/{req['id']}/context", "ContextBundle")["data"]
-    assert any("Conflicting active decisions" in m for m in b["missing_information"])
+    assert "2 active decisions about who should own this disagree, so ask or escalate rather than pick one (" \
+        in " ".join(b["missing_information"])
 
 
 def test_changed_owner_invalidates_and_blocks_stale_execution_T12(seeded: Api):
@@ -822,7 +823,8 @@ def test_D5_unlinked_request_gets_unconfirmed_candidate_context(seeded: Api):
     assert any(p["nodes"][1]["id"] == "cap_exports" for p in cand)
     assert any([n["id"] for n in p["nodes"]][-2:] == ["work_migration", "person_li"] for p in cand)
     assert any(w["id"] == "work_export_issue" for w in b["related_work"])
-    assert any("No capability is confirmed" in m and "cap_exports" in m for m in b["missing_information"])
+    assert any(m.startswith("No product area is confirmed for this request yet. From the request text it looks like "
+                            "'Scheduled exports'") and "(cap_exports)" in m for m in b["missing_information"])
     assert all(isinstance(s["stale"], bool) for s in b["sources"])
     # never becomes a confirmed fact (T28)
     assert api.get(f"/requests/{req['id']}", "Request")["data"]["capability_ids"] == []
@@ -848,3 +850,15 @@ def test_D3_attempts_by_work_item(seeded: Api):
     api = seeded
     a = api.get("/attempts", list_of="Attempt", params={"work_item_id": "work_export_issue"})["data"]
     assert [x["id"] for x in a] == ["att_retry_globex"]
+
+
+
+def test_missing_information_plain_language(seeded: Api):
+    api = seeded
+    api.import_doc("json", json.dumps({"workspace_id": "ws_demo", "observed_at": "2026-10-15T09:00:00Z", "work_items": [
+        {**SEED["work_items"][1], "owner_id": "person_gone", "observed_at": "2026-10-02T08:00:00Z"}]}), "upd")
+    req, _ = intake(api, auto=False)
+    mi = api.get(f"/requests/{req['id']}/context", "ContextBundle")["data"]["missing_information"]
+    assert "The owner of 'Export worker migration', Former, is no longer active (work_migration, person_gone)." in mi
+    assert "The status of 'Export worker migration' may be out of date: last checked 2 Oct 2026 (work_migration)." in mi
+    assert not any("T08:" in m or "Z)" in m for m in mi)  # no raw timestamps

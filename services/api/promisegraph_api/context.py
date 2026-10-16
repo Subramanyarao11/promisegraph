@@ -16,7 +16,7 @@ from typing import Any
 from .core import Ctx, evidence_refs, is_stale
 from .errors import not_found
 from .store import RELATION_TYPES, _decode
-from .util import sha256_hex
+from .util import parse_ts, sha256_hex
 
 DEFAULT_DEPTH = 4
 MAX_DEPTH = 6
@@ -370,29 +370,7 @@ def bundle(ctx: Ctx, request_id: str, depth: int) -> dict[str, Any]:
     if len(ev_ids) > 100:
         truncated = True
     sources = evidence_refs(ctx, ev_ids[:100])
-    missing: list[str] = []
-    if not req.get("capability_ids"):
-        if candidates:
-            missing.append("No capability is confirmed for this request; candidate capabilities inferred from the "
-                           "request text (unconfirmed): " + ", ".join(c["id"] for c in candidates) + ".")
-        else:
-            missing.append("No confirmed capability is linked to this request, and no candidate capability matched.")
-    if not related_work:
-        missing.append(f"No tracked or implementing work found within {depth} hops.")
-    owner_ids = [w["owner_id"] for w in related_work if w.get("owner_id")]
-    owners = ctx.store.get_many(ctx.ws, owner_ids)
-    for w in related_work:
-        if not w.get("owner_id"):
-            missing.append(f"Work item {w['id']} has no owner.")
-        elif w["owner_id"] in owners and owners[w["owner_id"]].get("active") is False:
-            missing.append(f"Owner {w['owner_id']} of work item {w['id']} is inactive.")
-        if is_stale("work", w["observed_at"], ctx.ref_now):
-            missing.append(f"Work item {w['id']} status observation is stale (observed {w['observed_at']}).")
-    for group in conflicting(decisions):
-        missing.append("Conflicting active decisions for " + group[0]["rule_type"] + ": "
-                       + ", ".join(d["id"] for d in group) + "; clarify or escalate.")
-    if truncated:
-        missing.append("Context was truncated; coverage is incomplete.")
+    missing = _missing_information(ctx, req, candidates, related_work, decisions, depth, truncated)
     return {"request_id": request_id, "based_on_revision": revision, "sources": sources, "paths": paths,
             "related_work": related_work, "decisions": decisions[:30], "attempts": attempts[:30],
             "missing_information": [m[:1000] for m in missing][:30], "truncated": truncated}
@@ -400,3 +378,51 @@ def bundle(ctx: Ctx, request_id: str, depth: int) -> dict[str, Any]:
 
 def node_titles(ctx: Ctx, ids: list[str]) -> dict[str, dict]:
     return {k: _decode(v) for k, v in ctx.store.get_many(ctx.ws, ids).items()}
+
+
+# ---- plain-language coverage notes (text only; ids kept in parentheses for traceability) ---------------
+RULE_LABEL = {"forbidden_workaround": "a forbidden workaround", "scope_reduction_allowed": "reducing scope",
+              "date_extension_allowed": "extending the date", "allowed_action_types": "which actions are allowed",
+              "routing_owner": "who should own this"}
+
+
+def plain_date(ts: str) -> str:
+    try:
+        d = parse_ts(ts)
+    except ValueError:
+        return ts
+    return f"{d.day} {d.strftime('%b %Y')}"
+
+
+def _missing_information(ctx: Ctx, req: dict[str, Any], candidates: list[dict[str, Any]],
+                         related_work: list[dict[str, Any]], decisions: list[dict[str, Any]], depth: int,
+                         truncated: bool) -> list[str]:
+    missing: list[str] = []
+    if not req.get("capability_ids"):
+        if candidates:
+            names = ", ".join(f"'{c['title']}'" for c in candidates)
+            missing.append(f"No product area is confirmed for this request yet. From the request text it looks like "
+                           f"{names}, but that is a guess to check, not a fact "
+                           f"({', '.join(c['id'] for c in candidates)}).")
+        else:
+            missing.append("No product area is confirmed for this request, and the request text did not match one.")
+    if not related_work:
+        missing.append(f"No existing work was found for this request (searched {depth} steps out).")
+    owner_ids = [w["owner_id"] for w in related_work if w.get("owner_id")]
+    owners = ctx.store.get_many(ctx.ws, owner_ids)
+    for w in related_work:
+        title = f"'{w['title']}'"
+        if not w.get("owner_id"):
+            missing.append(f"Nobody owns {title} ({w['id']}).")
+        elif w["owner_id"] in owners and owners[w["owner_id"]].get("active") is False:
+            name = owners[w["owner_id"]].get("title") or w["owner_id"]
+            missing.append(f"The owner of {title}, {name}, is no longer active ({w['id']}, {w['owner_id']}).")
+        if is_stale("work", w["observed_at"], ctx.ref_now):
+            missing.append(f"The status of {title} may be out of date: last checked {plain_date(w['observed_at'])} "
+                           f"({w['id']}).")
+    for group in conflicting(decisions):
+        missing.append(f"{len(group)} active decisions about {RULE_LABEL.get(group[0]['rule_type'], group[0]['rule_type'])} "
+                       f"disagree, so ask or escalate rather than pick one ({', '.join(d['id'] for d in group)}).")
+    if truncated:
+        missing.append("Not everything related could be shown, so this picture may be incomplete.")
+    return [m[:1000] for m in missing][:30]
