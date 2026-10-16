@@ -73,7 +73,8 @@ def is_stale(kind: str, observed_at: str, ref_now: str) -> bool:
 
 def source_revision(ctx: Ctx, uow: UnitOfWork, source_id: str, *, title: str, kind: str, origin: str, body: str,
                     observed_at: str, excerpts: list[tuple[str, str]] | None = None,
-                    head: dict[str, Any] | None = None, head_known: bool = False) -> dict[str, Any]:
+                    head: dict[str, Any] | None = None, head_known: bool = False,
+                    hash_text: str | None = None) -> dict[str, Any]:
     """Append an immutable SourceRecord revision (no-op when the body hash is unchanged).
 
     `excerpts` = [(excerpt, location)]; default one excerpt of the whole body (<= 4000 chars).
@@ -81,7 +82,7 @@ def source_revision(ctx: Ctx, uow: UnitOfWork, source_id: str, *, title: str, ki
     """
     if not head_known:
         head = ctx.store.get(ctx.ws, source_id, "Source")
-    sha = sha256_hex(body)
+    sha = sha256_hex(body if hash_text is None else hash_text)  # PROTOCOL #36: markdown hash covers full content
     if head and head.get("sha256") == sha:
         return {"source_id": source_id, "revision": int(head["latest_revision"]),
                 "evidence_ids": list(head.get("latest_evidence_ids") or []), "changed": False,

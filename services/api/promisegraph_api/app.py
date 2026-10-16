@@ -417,9 +417,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get(PUB + "/attempts")
     def list_attempts(request: Request, workspace_id: str, request_id: str | None = None,
                       scope_entity_type: str | None = None, scope_entity_id: str | None = None,
-                      cursor: str | None = None, limit: int | None = None):
-        """Rev 3 #19 / rev 5 #31."""
+                      work_item_id: str | None = None, cursor: str | None = None, limit: int | None = None):
+        """Rev 3 #19 / rev 5 #31; `work_item_id` (attempts ATTEMPTED_FOR that work item) is an A extension."""
         make_ctx(request, workspace_id)
+        if work_item_id:
+            n, o = lim(limit), off(cursor)
+            rows = store.read(workspace_id, "MATCH (a:Attempt)-[:ATTEMPTED_FOR]->(:WorkItem {id: $w}) RETURN DISTINCT "
+                                            "a.id, a.doc, a.observed_at ORDER BY a.observed_at DESC, a.id DESC "
+                                            "SKIP $o LIMIT $l", {"w": work_item_id, "o": o, "l": n + 1})
+            items = [json.loads(r[1]) for r in rows]
+            return page(request, workspace_id, items[:n], o, n, len(items) > n)
         return simple_list(request, workspace_id, "Attempt", {"request_id": request_id, "scope_type": scope_entity_type,
                                                               "scope_id": scope_entity_id}, cursor, limit,
                            order="observed_at", desc=True)

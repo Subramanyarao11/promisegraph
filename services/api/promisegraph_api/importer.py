@@ -52,6 +52,9 @@ class Rec:
         return (f"{self.etype.replace('_', ' ').title()} {self.id}: {name}" if self.etype != "document"
                 else d.get("title") or self.id)[:300]
 
+    def hash_text(self) -> str:
+        return self.data["raw"] if self.etype == "document" else self.body()
+
     def body(self) -> str:
         return self.data["body"] if self.etype == "document" else canonical_json(self.data)
 
@@ -196,7 +199,7 @@ def _parse_markdown(content: str, source_key: str) -> tuple[list[Rec], list[dict
     if not title:
         h = re.search(r"^#\s+(.+)$", body, re.M)
         title = h.group(1).strip() if h else source_key
-    data = {"title": title[:300], "capabilities": caps, "body": body, "line_offset": offset}
+    data = {"title": title[:300], "capabilities": caps, "body": body, "line_offset": offset, "raw": content}
     return [Rec("document", source_key, data, "md", observed, _refs("document", data))], rejected
 
 
@@ -345,7 +348,7 @@ def plan(ctx: Ctx, recs: list[Rec], rejected: list[dict[str, str]], default_obse
         head = existing.get(r.source_id)
         if head is None:
             out.append((r, "create"))
-        elif head.get("sha256") == sha256_hex(r.body()):
+        elif head.get("sha256") == sha256_hex(r.hash_text()):
             out.append((r, "noop"))
         else:
             out.append((r, "update"))
@@ -377,7 +380,7 @@ def apply(ctx: Ctx, uow: UnitOfWork, planned: list[tuple[Rec, str]], origin: str
                 excerpts = [(json.dumps({key: r.data[key]}, ensure_ascii=False)[1:-1], f"{r.location}.{key}")]
         res = source_revision(ctx, uow, r.source_id, title=r.title(), kind=SOURCE_KIND.get(r.etype, "documentation"),
                               origin=origin, body=r.body(), observed_at=r.observed_at, excerpts=excerpts,
-                              head=head, head_known=True)
+                              head=head, head_known=True, hash_text=r.hash_text())
         revisions.append({"source_id": r.source_id, "revision": res["revision"]})
         changed_ids += [r.id, r.source_id]
         _apply_entity(ctx, uow, r, res["evidence_ids"], existing.get(r.id))

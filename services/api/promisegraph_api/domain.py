@@ -607,13 +607,24 @@ def patch_work_item(ctx: Ctx, uow: UnitOfWork, work_item_id: str, cmd: dict[str,
         if o.get("label") == "Person" and o.get("active") is False:
             raise invalid("owner is inactive", {"owner_id": f"{cmd['owner_id']} is not active"})
     src_id = wp.get("source_id") or f"src_work_item_{work_item_id}"
-    record = {"id": work_item_id, "title": w["title"], "kind": w["kind"], "status": cmd["status"],
+    prev: dict[str, Any] = {}
+    head = ctx.store.get(ctx.ws, src_id, "Source")
+    if head:
+        rv = ctx.store.get(ctx.ws, f"{src_id}@r{head['latest_revision']}", "SourceRev")
+        try:
+            prev = json.loads(rv["doc"]["body"]) if rv else {}
+            prev = prev if isinstance(prev, dict) else {}
+        except ValueError:
+            prev = {}
+    # full record (previous revision + changes) so the new revision still supports the record's own edges
+    record = {**prev, "id": work_item_id, "title": w["title"], "kind": w["kind"], "status": cmd["status"],
               "owner_id": cmd.get("owner_id"), "forecast_at": cmd.get("forecast_at"), "observed_at": ctx.now,
               "connector": w["connector"], "update_reason": cmd["reason"], "updated_by": ctx.actor_id}
     body = canonical_json(record)
-    src = source_revision(ctx, uow, src_id, title=f"Work item {work_item_id} update", kind="work",
+    src = source_revision(ctx, uow, src_id, title=f"Work item {work_item_id}: {w['title']}"[:300], kind="work",
                           origin="owned_permitted", body=body, observed_at=ctx.now,
-                          excerpts=[(body[:4000], "$")])
+                          excerpts=[(body[:4000], "$")] if len(body) <= 4000 else
+                          [(json.dumps({"title": w["title"], "status": cmd["status"], "owner_id": cmd.get("owner_id")}), "$")])
     new_w = bump(w, ctx.now, status=cmd["status"], owner_id=cmd.get("owner_id"), forecast_at=cmd.get("forecast_at"),
                  observed_at=ctx.now, evidence_ids=(list(w["evidence_ids"]) + src["evidence_ids"])[-100:])
     uow.guard_version(work_item_id, w["version"])

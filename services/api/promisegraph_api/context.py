@@ -28,6 +28,8 @@ STOPWORDS = {"the", "and", "for", "with", "our", "are", "was", "not", "but", "yo
              "that", "from", "they", "them", "their", "will", "can", "cannot", "need", "needs", "please", "what",
              "when", "where", "which", "who", "why", "how", "any", "all", "its", "into", "about", "been", "were",
              "there", "here", "does", "did", "doing", "working", "stopped", "before", "after", "still"}
+CANDIDATE_CAPS = 3
+CANDIDATE_MIN_SCORE = 0.3
 SEARCH_LABEL = {"request": "Request", "capability": "Capability", "work_item": "WorkItem", "source": "Source"}
 
 
@@ -130,6 +132,30 @@ def _path_dto(nodes: list, rels: list) -> dict[str, Any]:
             "evidence_ids": list(dict.fromkeys(ev))[:100]}
 
 
+def current_evidence(ctx: Ctx, ids: list[str]) -> dict[str, list[str]]:
+    """Map evidence ids to the current revision's evidence of the same source (identity when current)."""
+    ids = list(dict.fromkeys(i for i in ids if i))
+    if not ids:
+        return {}
+    rows = ctx.store.read(ctx.ws, "UNWIND $ids AS i MATCH (e:Evidence {id: i}) OPTIONAL MATCH (s:Source {id: e.source_id}) "
+                                  "RETURN e.id, e.source_revision, s.latest_revision, s.latest_evidence_ids", {"ids": ids})
+    out = {i: [i] for i in ids}
+    for eid, rev, latest, latest_ids in rows:
+        if latest is not None and int(rev) < int(latest) and latest_ids:
+            out[eid] = list(latest_ids)
+    return out
+
+
+def refresh_evidence(ctx: Ctx, paths: list[dict], edges: list[dict] | None = None) -> None:
+    """D4: a current edge must cite current-revision evidence, never only a superseded revision."""
+    all_edges = [e for p in paths for e in p["edges"]] + list(edges or [])
+    m = current_evidence(ctx, [i for e in all_edges for i in e["evidence_ids"]])
+    for e in all_edges:
+        e["evidence_ids"] = list(dict.fromkeys(j for i in e["evidence_ids"] for j in m.get(i, [i])))[:100]
+    for p in paths:
+        p["evidence_ids"] = list(dict.fromkeys(i for e in p["edges"] for i in e["evidence_ids"]))[:100]
+
+
 def _maximal(rows: list[tuple]) -> tuple[list[tuple], set[str]]:
     """Drop paths revisiting a node; keep only paths that are not a prefix of another kept path."""
     simple = []
@@ -194,6 +220,7 @@ def expand(ctx: Ctx, cmd: dict[str, Any]) -> dict[str, Any]:
     if len(erows) > 500:
         truncated, truncation = True, "limit"
     edges = [_path_dto([[a, "E", a], [b, "E", b]], [row])["edges"][0] for row in erows[:500] for a, b in [(row[2], row[3])]]
+    refresh_evidence(ctx, paths, edges)
     if truncation is None:
         # depth bound: does any node reached at the maximum depth have an unexplored allowlisted neighbour?
         frontier = list({n[-1][0] for n, _r in maximal if len(n) - 1 >= cmd["depth"]})
@@ -231,11 +258,28 @@ def decisions_for_scopes(ctx: Ctx, scopes: list[tuple[str, str]], only_active: b
     return out
 
 
-def attempts_for(ctx: Ctx, request_id: str, scopes: list[tuple[str, str]]) -> list[dict[str, Any]]:
+def attempts_for(ctx: Ctx, request_id: str, scopes: list[tuple[str, str]], work_ids: list[str] | None = None
+                 ) -> list[dict[str, Any]]:
     rows = ctx.store.read(ctx.ws, "MATCH (a:Attempt) WHERE a.request_id = $rid OR "
                                   "any(sc IN $scopes WHERE a.scope_type = sc[0] AND a.scope_id = sc[1]) "
                                   "RETURN a.doc", {"rid": request_id, "scopes": [list(s) for s in scopes]})
-    out = [json.loads(r[0]) for r in rows]
+    out_map = {d["id"]: d for d in (json.loads(r[0]) for r in rows)}
+    if work_ids:
+        # attempts made for the same work items (e.g. on an earlier request), but only within an applicable scope:
+        # a customer- or request-scoped attempt of ANOTHER customer never leaks (T09)
+        cust = next((sc[1] for sc in scopes if sc[0] == "customer"), None)
+        wrows = ctx.store.read(ctx.ws, "MATCH (a:Attempt)-[:ATTEMPTED_FOR]->(w:WorkItem) WHERE w.id IN $w "
+                                       "OPTIONAL MATCH (r:Request {id: a.scope_id}) RETURN DISTINCT a.doc, r.customer_id",
+                               {"w": work_ids})
+        for doc, scope_req_customer in wrows:
+            d = json.loads(doc)
+            st, sid = d["scope"]["entity_type"], d["scope"]["entity_id"]
+            if st == "customer" and sid != cust:
+                continue
+            if st == "request" and scope_req_customer != cust:
+                continue
+            out_map.setdefault(d["id"], d)
+    out = list(out_map.values())
     out.sort(key=lambda a: (a["observed_at"], a["id"]), reverse=True)
     return out
 
@@ -273,9 +317,28 @@ def bundle(ctx: Ctx, request_id: str, depth: int) -> dict[str, Any]:
                                       "[r IN relationships(p) | [r.id, type(r), startNode(r).id, endNode(r).id, "
                                       "r.evidence_ids, r.confirmed]] LIMIT 20", {"id": request_id})
     path_rows = maximal + [tuple(r) for r in rel_rows]
+    candidates: list[dict[str, Any]] = []
+    src0 = ctx.store.get(ctx.ws, req["source_id"], "Source")
+    req_ev = list(src0.get("latest_evidence_ids") or []) if src0 else []
+    if not req.get("capability_ids"):
+        # D5: bounded, UNCONFIRMED candidate context from the request text; never persisted (T28)
+        found = search(ctx, {"query": (req["subject"] + " " + req["body"])[:500], "entity_types": ["capability"],
+                             "customer_id": None, "limit": CANDIDATE_CAPS})["candidates"]
+        candidates = [c for c in found if c["score"] >= CANDIDATE_MIN_SCORE]
+        for c in candidates:
+            crow, ccap = _traverse(ctx, c["id"], ["IMPLEMENTED_BY", "DEPENDS_ON", "OWNED_BY"], max(1, depth - 1),
+                                   directed=True)
+            truncated = truncated or ccap
+            cmax, _ = _maximal(crow) if crow else ([([[c["id"], "Capability", c["title"]]], [])], set())
+            head_node = [request_id, "Request", req["subject"]]
+            cand_edge = ["cand_" + sha256_hex(f"ABOUT|{request_id}|{c['id']}")[:30], "ABOUT", request_id, c["id"],
+                         req_ev, False]
+            for nodes, rels in cmax:
+                path_rows.append(([head_node] + list(nodes), [cand_edge] + list(rels)))
     if len(path_rows) > 20:
         truncated = True
     paths = [_path_dto(n, r) for n, r in path_rows[:20]]
+    refresh_evidence(ctx, paths)
     work_ids: list[str] = []
     for nodes, _r in path_rows:
         for nid, label, _t in nodes:
@@ -290,7 +353,7 @@ def bundle(ctx: Ctx, request_id: str, depth: int) -> dict[str, Any]:
         truncated = True
     scopes = request_scopes(req, [w["id"] for w in related_work])
     decisions = decisions_for_scopes(ctx, scopes)
-    attempts = attempts_for(ctx, request_id, scopes)
+    attempts = attempts_for(ctx, request_id, scopes, [w["id"] for w in related_work])
     ev_ids: list[str] = []
     src = ctx.store.get(ctx.ws, req["source_id"], "Source")
     if src:
@@ -309,7 +372,11 @@ def bundle(ctx: Ctx, request_id: str, depth: int) -> dict[str, Any]:
     sources = evidence_refs(ctx, ev_ids[:100])
     missing: list[str] = []
     if not req.get("capability_ids"):
-        missing.append("No confirmed capability is linked to this request.")
+        if candidates:
+            missing.append("No capability is confirmed for this request; candidate capabilities inferred from the "
+                           "request text (unconfirmed): " + ", ".join(c["id"] for c in candidates) + ".")
+        else:
+            missing.append("No confirmed capability is linked to this request, and no candidate capability matched.")
     if not related_work:
         missing.append(f"No tracked or implementing work found within {depth} hops.")
     owner_ids = [w["owner_id"] for w in related_work if w.get("owner_id")]

@@ -779,3 +779,72 @@ def test_rev5_retryable_failure_requeues_fresh_attempt(seeded: Api):
     api.as_worker().post(f"/jobs/{l2['job_id']}/complete", lease_body(l2, completion_id="a2", outcome="succeeded",
                          result={"proposal_ids": []}), "CompletionReceipt", private=True)
     assert api.get(f"/runs/{run['id']}", "Run")["data"]["status"] == "succeeded"
+
+
+def test_D4_edges_cite_current_revision_after_patch(seeded: Api):
+    api = seeded
+    w = api.get("/work-items/work_export_issue", "WorkItem")["data"]
+    api.patch("/work-items/work_export_issue", {"expected_version": w["version"], "status": "blocked",
+                                                "owner_id": "person_li", "forecast_at": None, "reason": "moved"},
+              "WorkItemUpdateResult")
+    ex = api.post("/context/expand", {"entity_ids": ["work_export_issue"], "relation_types": ["DEPENDS_ON"], "depth": 1,
+                                      "limit": 10}, "ContextExpandResult", key=None)["data"]
+    dep = [e for p in ex["paths"] for e in p["edges"] if e["type"] == "DEPENDS_ON"] + \
+          [e for e in ex["edges"] if e["type"] == "DEPENDS_ON"]
+    assert dep
+    cited = {i for e in dep for i in e["evidence_ids"]} | {i for p in ex["paths"] for i in p["evidence_ids"]}
+    for i in cited:
+        ev = api.get(f"/evidence/{i}")["data"]
+        assert ev["stale"] is False, ev
+    assert any(i.endswith("_r2_1") for e in dep for i in e["evidence_ids"])
+    src = api.get("/sources/src_work_item_work_export_issue", "SourceRecord")["data"]
+    assert src["revision"] == 2 and "work_migration" in src["body"]  # new revision still supports DEPENDS_ON
+    # the bundle never hands out superseded evidence unflagged, and citing what expand returned is valid
+    req, run = intake(api)
+    b = api.get(f"/requests/{req['id']}/context", "ContextBundle")["data"]
+    for p in b["paths"]:
+        for i in p["evidence_ids"]:
+            assert api.get(f"/evidence/{i}")["data"]["stale"] is False
+    for s in b["sources"]:
+        if s["source_id"] == "src_work_item_work_export_issue" and s["source_revision"] == 1:
+            assert s["stale"] is True
+    lease = api.claim(["investigate"])
+    p = propose(api, lease, req, run["id"], "link_work", LINK, ev=sorted(cited))
+    assert p["validity"] == "valid", p["validation_reasons"]
+
+
+def test_D5_unlinked_request_gets_unconfirmed_candidate_context(seeded: Api):
+    api = seeded
+    req, _ = intake(api, caps=(), subject="Scheduled exports stopped running", auto=False)
+    b = api.get(f"/requests/{req['id']}/context", "ContextBundle")["data"]
+    cand = [p for p in b["paths"] if p["edges"] and p["edges"][0]["type"] == "ABOUT"]
+    assert cand and all(p["claim_kind"] == "inference" and p["edges"][0]["confirmed"] is False for p in cand)
+    assert any(p["nodes"][1]["id"] == "cap_exports" for p in cand)
+    assert any([n["id"] for n in p["nodes"]][-2:] == ["work_migration", "person_li"] for p in cand)
+    assert any(w["id"] == "work_export_issue" for w in b["related_work"])
+    assert any("No capability is confirmed" in m and "cap_exports" in m for m in b["missing_information"])
+    assert all(isinstance(s["stale"], bool) for s in b["sources"])
+    # never becomes a confirmed fact (T28)
+    assert api.get(f"/requests/{req['id']}", "Request")["data"]["capability_ids"] == []
+    assert api.c.app.state.store.edge_count("ws_demo", req["id"], "ABOUT", "cap_exports") == 0
+
+
+def test_36_markdown_hash_covers_front_matter(api: Api):
+    api.import_doc("json", json.dumps(SEED), "seed")
+    body = "# Exports\n\nSchedules run hourly.\n"
+    a = api.import_doc("markdown", "---\ntitle: Exports\ncapabilities: cap_exports\n---\n" + body, "doc_x")
+    s1 = api.get("/sources/doc_x", "SourceRecord")["data"]
+    assert s1["body"] == body
+    same = api.import_doc("markdown", "---\ntitle: Exports\ncapabilities: cap_exports\n---\n" + body, "doc_x")
+    assert same["commit"]["noop_count"] == 1
+    fm = api.import_doc("markdown", "---\ntitle: Exports guide\ncapabilities: cap_exports, cap_sso\n---\n" + body, "doc_x")
+    assert fm["preview"]["changes"][0]["change"] == "update"
+    s2 = api.get("/sources/doc_x", "SourceRecord")["data"]
+    assert s2["revision"] == 2 and s2["body"] == body and s2["sha256"] != s1["sha256"] and s2["title"] == "Exports guide"
+    assert a["commit"]["imported_count"] == 1
+
+
+def test_D3_attempts_by_work_item(seeded: Api):
+    api = seeded
+    a = api.get("/attempts", list_of="Attempt", params={"work_item_id": "work_export_issue"})["data"]
+    assert [x["id"] for x in a] == ["att_retry_globex"]
