@@ -2454,7 +2454,10 @@ export interface ImportCommit {
  */
 export interface ActionReconcile {
   outcome: "succeeded" | "failed";
-  receipt: Receipt | null;
+  target: {
+    target_id: string;
+    target_url: string | null;
+  } | null;
   /**
    * @maxItems 100
    */

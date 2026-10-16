@@ -1115,12 +1115,20 @@ class ImportCommit(BaseModel):
     expected_revision: Annotated[int, Field(ge=0)]
 
 
+class Target(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    target_id: Annotated[str, Field(max_length=128, min_length=1)]
+    target_url: AnyUrl | None
+
+
 class ActionReconcile(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
     outcome: Literal['succeeded', 'failed']
-    receipt: Receipt | None
+    target: Target | None
     evidence_ids: Annotated[list[EvidenceId], Field(max_length=100)]
     expected_action_version: Annotated[int, Field(ge=1)]
 

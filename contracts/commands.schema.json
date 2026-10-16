@@ -1058,10 +1058,33 @@
             "failed"
           ]
         },
-        "receipt": {
+        "target": {
           "anyOf": [
             {
-              "$ref": "resources.schema.json#/$defs/Receipt"
+              "type": "object",
+              "properties": {
+                "target_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "target_url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "target_id",
+                "target_url"
+              ],
+              "additionalProperties": false
             },
             {
               "type": "null"
@@ -1084,7 +1107,7 @@
       },
       "required": [
         "outcome",
-        "receipt",
+        "target",
         "evidence_ids",
         "expected_action_version"
       ],

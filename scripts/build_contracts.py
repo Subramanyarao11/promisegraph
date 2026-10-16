@@ -162,7 +162,8 @@ defs["ImportPreview"] = obj({
 defs["ImportCommit"] = obj({"expected_revision": integer(0)})
 # PROTOCOL.md rev 3 (#20, #21)
 defs["ActionReconcile"] = obj({
-    "outcome": {"enum": ["succeeded", "failed"]}, "receipt": nullable(ref("Receipt")),
+    "outcome": {"enum": ["succeeded", "failed"]},
+    "target": nullable(obj({"target_id": ID, "target_url": nullable({"type": "string", "format": "uri"})})),
     "evidence_ids": arr(ID), "expected_action_version": integer(1),
 })
 defs["RequestClose"] = obj({"reason": s(1, 2000), "expected_request_version": integer(1)})
