@@ -1,0 +1,362 @@
+  $ /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/scripts/stack.sh up --port 8020 --prefix pgeval_20261016163219s_
+    stack: api :8020 prefix=pgeval_20261016163219s_ faults=none state=/private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/../stack/8020
+    stack: api ready: {"status":"ready","database":"ok","contract":"1.0.0 7066692afd2fde6e61a205a5645770e7bb565717a452a89322a5494be7a48910"}
+    stack: seeded in 4s (19 files; log /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/../stack/8020/seed.log)
+    stack: worker pid 82870 (log /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/../stack/8020/worker.log)
+    stack: up: http://127.0.0.1:8020
+[FAIL] t01-answer-supported-export (T01) 1.1s on http://127.0.0.1:8020
+    s1 create_request                       request=req_0b936e6e9fe54883(open) run=run_e80fdf9a257e4f73(queued)
+    s2 await_run                            request=req_0b936e6e9fe54883(awaiting_verification) run=run_e80fdf9a257e4f73(succeeded) proposal=prop_a8a5515ca51d4159(answer/valid) latest_action=act_64e9c98fbc374895(succeeded)
+    s3 get_request                          request=req_0b936e6e9fe54883(awaiting_verification)
+    s4 record_observation                   request=req_0b936e6e9fe54883(resolved)
+    ok   run_status@s2: run run_e80fdf9a257e4f73 status=succeeded stage=verify
+    ok   proposal_kind@s2: proposal prop_a8a5515ca51d4159 kind=answer validity=valid
+    ok   proposal_validity@s2: proposal prop_a8a5515ca51d4159 validity=valid reasons=[]
+    ok   evidence_sources_include_any@s2: proposal prop_a8a5515ca51d4159 (answer) evidence sources=['20-docs-scheduled-exports', '20-docs-scheduled-exports', '20-docs-scheduled-exports']
+    FAIL context_includes@s2: attempts missing=['attempt_corvid_weekly_xlsx']; present=['attempt_corvid_scim_v2']
+    ok   action_status@s2: action act_64e9c98fbc374895 (answer) status=succeeded error=None
+    ok   action_verification@s2: action act_64e9c98fbc374895 verification=pending
+    ok   no_action_kinds@s2: actions=[('act_64e9c98fbc374895', 'answer', 'succeeded')]
+    ok   work_item_count_delta@s2: baseline=22 after s2=22 delta=0
+    ok   request_status@s3: request req_0b936e6e9fe54883 status=awaiting_verification
+    ok   request_status@s4: request req_0b936e6e9fe54883 status=resolved
+[PASS] t02-clarify-provisioning (T02) 1.1s on http://127.0.0.1:8020
+    s1 create_request                       request=req_e197bb8007564e56(open) run=run_fa015482b03540e1(queued)
+    s2 await_run                            request=req_e197bb8007564e56(awaiting_input) run=run_fa015482b03540e1(waiting_for_input) proposal=prop_85ea5513910f40f5(clarify/valid) latest_action=act_78712c6f19294ddc(succeeded)
+    s3 get_request                          request=req_e197bb8007564e56(awaiting_input)
+    ok   proposal_kind@s2: proposal prop_85ea5513910f40f5 kind=clarify validity=valid
+    ok   proposal_payload_matches@s2: proposal prop_85ea5513910f40f5 (clarify) payload.question='To make sure we help with the right thing: do you mean SCIM user provisioning (account creation and deprovisioning) or SCIM group sync and role mapping or SAML single sign-on?'
+    ok   proposal_payload_nonempty@s2: proposal prop_85ea5513910f40f5 (clarify) payload.missing_fields=['capability']
+    ok   run_status@s2: run run_fa015482b03540e1 status=waiting_for_input stage=observe
+    ok   action_status@s2: action act_78712c6f19294ddc (clarify) status=succeeded error=None
+    ok   request_status@s3: request req_e197bb8007564e56 status=awaiting_input
+    ok   work_item_count_delta@s2: baseline=22 after s2=22 delta=0
+    ok   no_action_kinds@s2: actions=[('act_78712c6f19294ddc', 'clarify', 'succeeded')]
+    ok   candidate_capabilities_include@s2: missing=[]; caps seen=['cap_scim_group_sync', 'cap_scim_user_provisioning', 'cap_sso_saml']
+[PASS] t03-reply-resumes-run (T02, T03) 2.7s on http://127.0.0.1:8020
+    s1 create_request                       request=req_ec4089e2996f4b55(open) run=run_8434a31719264bfd(queued)
+    s2 await_run                            request=req_ec4089e2996f4b55(awaiting_input) run=run_8434a31719264bfd(waiting_for_input) proposal=prop_bcfff6b7721c4f4b(clarify/valid) latest_action=act_6c8d6f6b8b8d44ad(succeeded)
+    s3 get_request                          request=req_ec4089e2996f4b55(awaiting_input)
+    s4 reply                                run=run_8434a31719264bfd(queued)
+    s5 await_run                            request=req_ec4089e2996f4b55(awaiting_verification) run=run_8434a31719264bfd(succeeded) proposal=prop_020f6cc288994654(answer/valid) latest_action=act_3670639be27f4d21(succeeded)
+    s6 get_run_events                       
+    ok   proposal_kind@s2: proposal prop_bcfff6b7721c4f4b kind=clarify validity=valid
+    ok   proposal_payload_matches@s2: proposal prop_bcfff6b7721c4f4b (clarify) payload.question='To make sure we help with the right thing: do you mean SCIM user provisioning (account creation and deprovisioning) or SCIM group sync and role mapping or SAML single sign-on?'
+    ok   proposal_payload_nonempty@s2: proposal prop_bcfff6b7721c4f4b (clarify) payload.missing_fields=['capability']
+    ok   run_status@s2: run run_8434a31719264bfd status=waiting_for_input stage=observe
+    ok   action_status@s2: action act_6c8d6f6b8b8d44ad (clarify) status=succeeded error=None
+    ok   request_status@s3: request req_ec4089e2996f4b55 status=awaiting_input
+    ok   work_item_count_delta@s2: baseline=22 after s2=22 delta=0
+    ok   no_action_kinds@s2: actions=[('act_6c8d6f6b8b8d44ad', 'clarify', 'succeeded')]
+    ok   candidate_capabilities_include@s2: missing=[]; caps seen=['cap_scim_group_sync', 'cap_scim_user_provisioning', 'cap_sso_saml']
+    ok   same_id@None: a=run_8434a31719264bfd b=run_8434a31719264bfd
+    ok   run_status@s5: run run_8434a31719264bfd status=succeeded stage=verify
+    ok   proposal_kind@s5: proposal prop_020f6cc288994654 kind=answer validity=valid
+    ok   proposal_payload_in@s5: n/a: kind answer != link_work
+    ok   evidence_sources_include_any@s5: proposal prop_020f6cc288994654 (answer) evidence sources=['20-docs-sso-scim', '20-docs-sso-scim', '20-docs-sso-scim']
+    ok   revision_gte@None: a=16 b=16
+    ok   events_include_types_in_order@s6: event types=['run_started', 'tool_started', 'tool_completed', 'tool_started', 'tool_completed', 'tool_started', 'tool_completed', 'tool_started', 'tool_completed', 'tool_started', 'tool_completed', 'tool_started', 'tool_completed', 'tool_started', 'tool_completed', 'tool_started', 'tool_completed', 'proposal_ready', 'tool_started', 'tool_completed', 'action_updated', 'run_started', 'tool_started',
+    ok   events_seq_contiguous@s6: 52 events, seqs=[1, 2, 3, 4, 5]..[50, 51, 52]
+    ok   work_item_count_delta@s5: baseline=22 after s5=22 delta=0
+[FAIL] t04-link-existing-export-work (T04) 1.6s on http://127.0.0.1:8020
+    s1 create_request                       request=req_75d35d039bea45a0(open) run=run_ee3452e1ac1d4ca8(queued)
+    s2 await_run                            request=req_75d35d039bea45a0(awaiting_review) run=run_ee3452e1ac1d4ca8(awaiting_review) proposal=prop_59f6d65acc7d4aed(link_work/valid)
+    s3 commit_proposal                      action=act_f9f280096d18426a(accepted)
+    s4 await_run                            request=req_75d35d039bea45a0(awaiting_work) run=run_ee3452e1ac1d4ca8(succeeded) proposal=prop_59f6d65acc7d4aed(link_work/valid) latest_action=act_f9f280096d18426a(succeeded)
+    s5 commit_proposal                      action=act_f9f280096d18426a(accepted)
+    s6 get_request                          request=req_75d35d039bea45a0(awaiting_work)
+    ok   run_status@s2: run run_ee3452e1ac1d4ca8 status=awaiting_review stage=decide
+    ok   proposal_kind@s2: proposal prop_59f6d65acc7d4aed kind=link_work validity=valid
+    ok   proposal_payload_equals@s2: proposal prop_59f6d65acc7d4aed (link_work) payload.work_item_id='work_export_issue'
+    ok   rejected_alternative_kind@s2: proposal prop_59f6d65acc7d4aed rejected kinds=['answer', 'answer', 'create_work']
+    FAIL context_includes@s2: attempts missing=['attempt_exports_001']; present=['attempt_acme_sso_jit', 'attempt_acme_utc_recreate', 'attempt_exports_acme_rerun']
+    ok   context_includes@s2: decisions missing=[]; present=['decision_exports_001', 'decision_exports_routing_v2']
+    ok   context_includes@s2: related_work missing=[]; present=['work_csv_async_large', 'work_csv_utf8_bom', 'work_export_dst_skip', 'work_export_issue', 'work_export_migration', 'work_retention_legal_hold', 'work_s3_destination', 'work_sftp_spike']
+    ok   text_not_matches@s2: inspected ['explanation']; hits=[]
+    ok   text_not_matches@s2: inspected ['explanation']; hits=[]
+    ok   action_status@s4: action act_f9f280096d18426a (link_work) status=succeeded error=None
+    ok   action_verification@s4: action act_f9f280096d18426a verification=pending
+    ok   run_status@s4: run run_ee3452e1ac1d4ca8 status=succeeded stage=observe
+    ok   same_id@None: a=act_f9f280096d18426a b=act_f9f280096d18426a
+    ok   request_status@s6: request req_75d35d039bea45a0 status=awaiting_work
+    ok   request_linked_work_equals@s6: linked_work_ids=['work_export_issue']
+    ok   work_item_count_delta@s6: baseline=22 after s6=22 delta=0
+[PASS] t05-similar-incompatible-task (T05) 0.6s on http://127.0.0.1:8020
+    s1 create_request                       request=req_249753b888f04df6(open) run=run_2320ee7430e24093(queued)
+    s2 await_run                            request=req_249753b888f04df6(awaiting_review) run=run_2320ee7430e24093(awaiting_review) proposal=prop_58ad71f16f764bd1(create_work/valid)
+    ok   run_status@s2: run run_2320ee7430e24093 status=awaiting_review stage=decide
+    ok   proposal_kind@s2: proposal prop_58ad71f16f764bd1 kind=create_work validity=valid
+    ok   rejected_alternative@s2: proposal prop_58ad71f16f764bd1 alternative: 'Add S3 bucket destination for scheduled exports' (work_s3_destination) is similar but the request explicitly rules out bucket; it tracks a different capability (S3 bucket destination for exports, Sch evidence=['ev_src_work_item_work_s3_destination_r1_1']
+    ok   proposal_payload_not_in@s2: proposal prop_58ad71f16f764bd1 (create_work) payload.dependency_ids=[]
+    ok   proposal_payload_in@s2: proposal prop_58ad71f16f764bd1 (create_work) payload.capability_id='cap_sftp_export_destination'
+    ok   proposal_payload_in@s2: proposal prop_58ad71f16f764bd1 (create_work) payload.owner_id=None
+    ok   proposal_payload_nonempty@s2: proposal prop_58ad71f16f764bd1 (create_work) payload.acceptance_criteria=['SFTP delivery for exports supports the requested behaviour: Push daily sales export to our SFTP server', 'Requester of req_249753b888f04df6 confirms the outcome (attributable verification)', 'Documentation is updated with a citable source revision']
+    ok   no_link_to@s2: linked_work_ids=[]; proposal kind=create_work payload={"acceptance_criteria": ["SFTP delivery for exports supports the requested behaviour: Push daily sales export to our SFTP server", "Requester of req_249753b888f04df6 confirms the outcome (attributable
+    ok   work_item_count_delta@s2: baseline=22 after s2=22 delta=0
+  $ /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/scripts/stack.sh restart-api --port 8020
+    stack: restarting api :8020 prefix=pgeval_20261016163219s_
+    stack: api ready: {"status":"ready","database":"ok","contract":"1.0.0 7066692afd2fde6e61a205a5645770e7bb565717a452a89322a5494be7a48910"}
+[PASS] t06-create-work-with-receipt (T06) 2.5s on http://127.0.0.1:8020
+    s1 create_request                       request=req_55609f511b4a4a07(open) run=run_88a8d0e74bb54b3f(queued)
+    s2 await_run                            request=req_55609f511b4a4a07(awaiting_review) run=run_88a8d0e74bb54b3f(awaiting_review) proposal=prop_2652756c5eda41a4(create_work/valid)
+    s3 commit_proposal                      action=act_b936d5cace3e4a64(accepted)
+    s4 await_run                            request=req_55609f511b4a4a07(awaiting_work) run=run_88a8d0e74bb54b3f(succeeded) proposal=prop_2652756c5eda41a4(create_work/valid) latest_action=act_b936d5cace3e4a64(succeeded)
+    s5 get_action                           action=act_b936d5cace3e4a64(succeeded)
+    s6 get_work_item                        work_item=work_act_b936d5cace3e4a64(open)
+    s7 get_request                          request=req_55609f511b4a4a07(awaiting_work)
+    ok   proposal_kind@s2: proposal prop_2652756c5eda41a4 kind=create_work validity=valid
+    ok   rejected_alternative@s2: proposal prop_2652756c5eda41a4 alternative: 'Audit log CSV download (365 days)' (work_audit_log_csv_download) is similar but the request explicitly rules out csv, download. evidence=['ev_src_work_item_work_audit_log_csv_download_r1_1']
+    ok   proposal_payload_equals@s2: proposal prop_2652756c5eda41a4 (create_work) payload.connector='local'
+    ok   proposal_payload_in@s2: proposal prop_2652756c5eda41a4 (create_work) payload.capability_id='cap_audit_log'
+    ok   proposal_payload_in@s2: proposal prop_2652756c5eda41a4 (create_work) payload.owner_id='person_jonas'
+    ok   proposal_payload_min_items@s2: proposal prop_2652756c5eda41a4 payload.acceptance_criteria has 3 items
+    ok   action_status@s5: action act_b936d5cace3e4a64 (create_work) status=succeeded error=None
+    ok   receipt_present@s5: action act_b936d5cace3e4a64 receipt={"connector": "local", "id": "rcpt_00df2a0edf324d0d", "observed_at": "2026-10-16T16:32:38Z", "result_hash": "f8a4833256f6878977d59a99c3d957f63df0bff8419daa9b4880004adc5afa6d", "target_id": "work_act_b936d5cace3e4a64", "target_url": null}
+    ok   work_item_field_nonempty@s6: work item work_act_b936d5cace3e4a64 title='Stream audit events to our SIEM (Audit log)'
+    ok   work_item_count_delta@s7: baseline=22 after s7=23 delta=1
+    ok   request_status@s7: request req_55609f511b4a4a07 status=awaiting_work
+    ok   request_linked_work_includes@s7: expected ['work_act_b936d5cace3e4a64']; linked_work_ids=['work_act_b936d5cace3e4a64']
+    ok   stable_after_restart@None: after API restart {'status': 'succeeded', 'receipt.target_id': 'work_act_b936d5cace3e4a64', 'receipt.result_hash': 'f8a4833256f6878977d59a99c3d957f63df0bff8419daa9b4880004adc5afa6d'}; diffs=[]
+[PASS] t07-four-hop-owner-path (T07) 1.6s on http://127.0.0.1:8020
+    s1 create_request                       request=req_8a32ae4f550f4968(open) run=run_ed162ae26f0046c2(queued)
+    s2 await_run                            request=req_8a32ae4f550f4968(awaiting_review) run=run_ed162ae26f0046c2(awaiting_review) proposal=prop_a832e98ba4eb49e6(link_work/valid)
+    s3 get_request_context                  
+    s4 context_expand                       
+    ok   proposal_kind@s2: proposal prop_a832e98ba4eb49e6 kind=link_work validity=valid
+    ok   proposal_payload_in@s2: proposal prop_a832e98ba4eb49e6 (link_work) payload.work_item_id='work_export_issue'
+    ok   proposal_payload_in@s2: n/a: kind link_work != escalate
+    ok   proposal_payload_in@s2: n/a: kind link_work != escalate
+    ok   proposal_payload_not_in@s2: proposal prop_a832e98ba4eb49e6 (link_work) payload.owner_id=<missing>
+    ok   context_includes@s2: decisions missing=[]; present=['decision_corvid_retention_extension', 'decision_exports_routing_v2']
+    ok   text_matches@s2: matched in ['explanation']; texts=[('explanation', "Existing work 'Restore scheduled exports' (work_export_issue) is blocked and tracks Scheduled exports (owner person_maya). No reliable delivery forecast is recorded; no date can be promised. Dependency path: work_export_issue -> work_export_migration -> work_queue_v2_cutover. Coverage limits: a tool")]
+    ok   text_not_matches@s2: inspected ['explanation']; hits=[]
+    ok   path_contains_ordered@s4: path path_8d3cbdd443a48d071b4822d3 nodes=['work_export_issue', 'person_maya', 'work_export_migration', 'work_queue_v2_cutover', 'person_dana']
+    OPT  path_contains_ordered@s3: 0 paths, 0 edges; paths=[]; edges=[]
+    ok   work_item_count_delta@s2: baseline=23 after s2=23 delta=0
+[FAIL] t08-stale-truncated-uncertainty (T08) 1.1s on http://127.0.0.1:8020
+    s1 create_request                       request=req_3e7823f060ef41a4(open) run=run_fe078738079f447d(queued)
+    s2 await_run                            request=req_3e7823f060ef41a4(awaiting_review) run=run_fe078738079f447d(awaiting_review) proposal=prop_324d58395e024307(link_work/valid)
+    s3 get_request_context                  
+    s4 context_expand                       
+    ok   proposal_kind@s2: proposal prop_324d58395e024307 kind=link_work validity=valid
+    ok   proposal_payload_in@s2: proposal prop_324d58395e024307 (link_work) payload.work_item_id='work_retention_legal_hold'
+    FAIL evidence_marked_stale@s3: evidence refs=[('work_retention_legal_hold', [])]
+    ok   context_missing_information_or_explanation@s2: hits=["Existing work 'Legal hold exemption for retention purge' (work_retention_legal_hold) is blocked and tracks Data retention policies (owner person_dana). No reliable delivery forecast is recorded; no da"]; texts=['No confirmed capability is linked to this request.', 'No tracked or implementing work found within 4 hops.', "Existing work 'Legal hold exemption for retention purge' (work_retentio
+    ok   text_not_matches@s2: inspected ['explanation']; hits=[]
+    ok   expand_truncated@s4: truncated=True truncation=limit visited=5
+    ok   work_item_count_delta@s2: baseline=23 after s2=23 delta=0
+[PASS] t09-scoped-failed-workaround (T09) 2.2s on http://127.0.0.1:8020
+    s1 create_request                       request=req_3ca9cbce0a224474(open) run=run_f88011a7a58c4932(queued)
+    s2 await_run                            request=req_3ca9cbce0a224474(awaiting_review) run=run_f88011a7a58c4932(awaiting_review) proposal=prop_bd01558830854f38(link_work/valid)
+    s3 create_request                       request=req_96fc9199232640f1(open) run=run_aa87a2686fe24ab8(queued)
+    s4 await_run                            request=req_96fc9199232640f1(awaiting_review) run=run_aa87a2686fe24ab8(awaiting_review) proposal=prop_d61751827f2747d5(link_work/valid)
+    ok   context_includes@s2: attempts missing=[]; present=['attempt_acme_sso_jit', 'attempt_acme_utc_recreate', 'attempt_exports_acme_rerun']
+    ok   proposal_kind@s2: proposal prop_bd01558830854f38 kind=link_work validity=valid
+    ok   proposal_payload_in@s2: proposal prop_bd01558830854f38 (link_work) payload.work_item_id='work_export_dst_skip'
+    ok   text_not_matches@s2: inspected []; hits=[]
+    ok   proposal_kind@s4: proposal prop_d61751827f2747d5 kind=link_work validity=valid
+    ok   proposal_payload_in@s4: proposal prop_d61751827f2747d5 (link_work) payload.work_item_id='work_export_dst_skip'
+    ok   context_excludes@s4: attempts unexpectedly present=[]
+    ok   context_excludes@s4: decisions unexpectedly present=[]
+    ok   evidence_sources_include_any@s4: proposal prop_d61751827f2747d5 (link_work) evidence sources=['src_work_item_work_export_dst_skip', '20-docs-export-troubleshooting', 'src_decision_decision_exports_routing_v2']
+[PASS] t11-conflicting-active-decisions (T11) 1.1s on http://127.0.0.1:8020
+    s1 create_request                       request=req_18fcdf77410f4e2a(open) run=run_e6d56036e2454b01(queued)
+    s2 await_run                            request=req_18fcdf77410f4e2a(awaiting_review) run=run_e6d56036e2454b01(awaiting_review) proposal=prop_5f57b39299cc4a88(escalate/valid)
+    s3 get_request                          request=req_18fcdf77410f4e2a(awaiting_review)
+    ok   context_includes@s2: decisions missing=[]; present=['decision_corvid_retention_extension', 'decision_retention_no_extension']
+    ok   proposal_kind@s2: proposal prop_5f57b39299cc4a88 kind=escalate validity=valid
+    ok   text_matches@s2: matched in ['explanation']; texts=[('explanation', 'Active decisions decision_corvid_retention_extension (customer) and decision_retention_no_extension (capability) are incompatible: date_extension_allowed: True vs False. The planner may not pick one. Coverage limits: a tool result exceeded the 24 KB context bound and was trimmed.')]
+    ok   proposal_cites_ids@s2: proposal prop_5f57b39299cc4a88 evidence_ids=['ev_src_decision_decision_corvid_retention_extension_r1_1', 'ev_src_decision_decision_retention_no_extension_r1_1'] missing=[]
+    ok   request_status@s3: request req_18fcdf77410f4e2a status=awaiting_review
+    ok   work_item_count_delta@s2: baseline=23 after s2=23 delta=0
+[PASS] t17-completed-work-needs-verification (T17) 2.4s on http://127.0.0.1:8020
+    s1 create_request                       request=req_ef5e371e7bce43fb(open) run=run_2d7b90834fd84972(queued)
+    s2 await_run                            request=req_ef5e371e7bce43fb(awaiting_review) run=run_2d7b90834fd84972(awaiting_review) proposal=prop_2c10e9ec0f654fbe(link_work/valid)
+    s3 commit_proposal_if_awaiting_review   action=act_166135f01cb94612(accepted)
+    s4 await_run                            request=req_ef5e371e7bce43fb(awaiting_verification) run=run_2d7b90834fd84972(succeeded) proposal=prop_2c10e9ec0f654fbe(link_work/valid) latest_action=act_166135f01cb94612(succeeded)
+    s5 get_request                          request=req_ef5e371e7bce43fb(awaiting_verification)
+    s6 record_observation                   request=req_ef5e371e7bce43fb(awaiting_verification)
+    s7 get_request                          request=req_ef5e371e7bce43fb(awaiting_verification)
+    s8 record_observation                   request=req_ef5e371e7bce43fb(resolved)
+    ok   proposal_kind@s2: proposal prop_2c10e9ec0f654fbe kind=link_work validity=valid
+    ok   proposal_payload_in@s2: proposal prop_2c10e9ec0f654fbe (link_work) payload.work_item_id='work_csv_utf8_bom'
+    ok   request_status@s5: request req_ef5e371e7bce43fb status=awaiting_verification
+    ok   request_status@s7: request req_ef5e371e7bce43fb status=awaiting_verification
+    ok   request_status@s8: request req_ef5e371e7bce43fb status=resolved
+    ok   work_item_count_delta@s5: baseline=23 after s5=23 delta=0
+[PASS] t18-failed-verification-reopens (T18) 1.6s on http://127.0.0.1:8020
+    s1 create_request                       request=req_b74d54f31ba8473f(open) run=run_eab11c7000cb4f70(queued)
+    s2 await_run                            request=req_b74d54f31ba8473f(awaiting_verification) run=run_eab11c7000cb4f70(succeeded) proposal=prop_cca8e725c24448c1(answer/valid) latest_action=act_9df72a883adc420d(succeeded)
+    s3 get_request                          request=req_b74d54f31ba8473f(awaiting_verification)
+    s4 record_observation                   request=req_b74d54f31ba8473f(investigating)
+    s5 get_request                          request=req_b74d54f31ba8473f(investigating)
+    s6 list_runs                            
+    s7 await_run                            request=req_b74d54f31ba8473f(awaiting_review) run=run_6752031b306245db(awaiting_review) proposal=prop_02727fa6ce714d9e(create_work/valid)
+    s8 get_request_context                  
+    ok   proposal_kind@s2: proposal prop_cca8e725c24448c1 kind=answer validity=valid
+    ok   evidence_sources_include_any@s2: proposal prop_cca8e725c24448c1 (answer) evidence sources=['20-docs-webhooks', '20-docs-webhooks', '20-docs-webhooks']
+    ok   request_status@s3: request req_b74d54f31ba8473f status=awaiting_verification
+    ok   request_status@s5: request req_b74d54f31ba8473f status=investigating
+    ok   count_runs@s6: runs=[('run_6752031b306245db', 'queued'), ('run_eab11c7000cb4f70', 'succeeded')]
+    ok   context_attempt_recorded@s8: attempt att_0bd1d0aef89e42a8 outcome=failed verification=failed
+    OPT  text_matches@s7: matched in []; texts=[('explanation', 'No open or completed work covering this request was found for Webhooks after search and graph expansion. Owner person_ines (capability owner). Destination connector: local.')]
+[PASS] t20-workspace-isolation (T20) 1.3s on http://127.0.0.1:8020
+    s1 context_search                       
+    s2 context_search                       
+    s3 get_request                          HTTP 404 NOT_FOUND
+    s4 get_work_item                        HTTP 404 NOT_FOUND
+    s5 create_request                       HTTP 422 INVALID_INPUT
+    s6 create_request                       request=req_b84ce2913e794e2f(open) run=run_f9ef2489efe849d5(queued)
+    s7 await_run                            request=req_b84ce2913e794e2f(awaiting_review) run=run_f9ef2489efe849d5(awaiting_review) proposal=prop_15a4c04cf8ae4661(link_work/valid)
+    ok   result_ids_exclude_pattern@s1: ids=['req_75d35d039bea45a0', 'request_tamarind_sftp_old', '20-docs-scheduled-exports', 'src_req_75d35d039bea45a0', 'src_request_request_tamarind_sftp_old', 'src_work_item_work_s3_destination', 'src_work_item_work_sftp_spike', 'work_s3_destination', 'work_sftp_spike', 'cap_scheduled_exports', 'cap_sftp_export_destination', 'req_249753b888f04df6', 'req_3ca9cbce0a224474', 'req_8a32ae4f550f4968', 'req
+    ok   result_ids_exclude@s2: present=[]; ids=['cap_ox_scheduled_exports', 'request_ox_ferro_sftp', 'request_ox_quill_exports', '20-docs-scheduled-exports', 'src_capability_cap_ox_scheduled_exports', 'src_request_request_ox_ferro_sftp', 'src_request_request_ox_quill_exports', 'src_work_item_work_ox_export_outage', 'src_work_item_work_ox_sftp_delivery', 'work_ox_export_outage', 'work_ox_sftp_delivery', 'src_customer_customer_ox
+    ok   result_ids_include_any@s2: ids=['cap_ox_scheduled_exports', 'request_ox_ferro_sftp', 'request_ox_quill_exports', '20-docs-scheduled-exports', 'src_capability_cap_ox_scheduled_exports', 'src_request_request_ox_ferro_sftp', 'src_request_request_ox_quill_exports', 'src_work_item_work_ox_export_outage', 'src_work_item_work_ox_sftp_delivery', 'work_ox_export_outage', 'work_ox_sftp_delivery', 'src_customer_customer_ox_ferro', 'sr
+    ok   http_error@s3: http 404 code=NOT_FOUND message=request request_ox_quill_exports not found
+    ok   http_error@s4: http 404 code=NOT_FOUND message=work item work_export_issue not found
+    ok   http_error@s5: http 422 code=INVALID_INPUT message=unknown customer
+    ok   proposal_payload_in@s7: proposal prop_15a4c04cf8ae4661 (link_work) payload.work_item_id='work_ox_export_outage'
+    ok   context_ids_exclude_pattern@s7: matching ids=[]
+[FAIL] t26-reimport-noop-and-revision (T26) 0.1s on http://127.0.0.1:8020
+    s1 import_file                          
+    s2 import_content                       
+    s3 get_source                           
+    ok   import_counts@s1: imported=0 noop=1 rejected=0 preview changes=['noop']
+    ok   import_counts@s2: imported=1 noop=0 rejected=0 preview changes=['update']
+    ok   source_revision@s2: source_revisions=[('20-docs-api-rate-limits', 2)]
+    FAIL source_body_unchanged@s3: source 20-docs-api-rate-limits@1 body length 617 vs file 723
+[FAIL] t28-similarity-not-duplicate (T28) 0.5s on http://127.0.0.1:8020
+    s1 create_request                       request=req_06c831c06c7d437a(open) run=run_785470ab7b1a454a(queued)
+    s2 await_run                            request=req_06c831c06c7d437a(awaiting_review) run=run_785470ab7b1a454a(awaiting_review) proposal=prop_1ae0380885214932(create_work/valid)
+    s3 get_request_context                  
+    s4 context_expand                       
+    FAIL proposal_kind@s2: proposal prop_1ae0380885214932 kind=create_work validity=valid
+    ok   proposal_payload_not_in@s2: proposal prop_1ae0380885214932 (create_work) payload.work_item_id=<missing>
+    ok   no_confirmed_edge@s4: RELATED_TO edges=[]
+    ok   text_not_matches@s2: inspected ['explanation']; hits=[]
+    ok   path_claim_kind_not@s3: paths involving ids=[]; violating=[]
+    ok   context_excludes@s3: attempts unexpectedly present=[]
+  $ /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/scripts/stack.sh down --port 8020
+    stack: stopped worker
+    stack: stopped api
+    stack: deleted 2 graph(s) with prefix pgeval_20261016163219s_
+  $ /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/scripts/stack.sh up --port 8021 --prefix pgeval_20261016163219t10_
+    stack: api :8021 prefix=pgeval_20261016163219t10_ faults=none state=/private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/../stack/8021
+    stack: api ready: {"status":"ready","database":"ok","contract":"1.0.0 7066692afd2fde6e61a205a5645770e7bb565717a452a89322a5494be7a48910"}
+    stack: seeded in 5s (19 files; log /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/../stack/8021/seed.log)
+    stack: worker pid 84639 (log /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/../stack/8021/worker.log)
+    stack: up: http://127.0.0.1:8021
+[FAIL] t10-superseded-expired-decision (T10) 4.5s on http://127.0.0.1:8021
+    s1 create_request                       request=req_67ad613b725940a2(open) run=run_ab49820d12244d04(queued)
+    s2 await_run                            request=req_67ad613b725940a2(awaiting_review) run=run_ab49820d12244d04(awaiting_review) proposal=prop_dfc51e2433c04506(escalate/valid)
+    s3 decision_command                     decision=dec_595ab43a32b941d6(active)
+    s4 get_proposal                         proposal=prop_dfc51e2433c04506(escalate/stale)
+    s5 start_run                            run=run_708c4ca109874dc2(queued)
+    s6 await_run                            request=req_67ad613b725940a2(awaiting_review) run=run_708c4ca109874dc2(awaiting_review) proposal=prop_468fc06b40af46bb(create_work/valid)
+    s7 list_decisions                       
+    s8 create_request                       request=req_6ce8b9640e71496d(open) run=run_f629e6586d7e4d95(queued)
+    s9 await_run                            request=req_6ce8b9640e71496d(awaiting_verification) run=run_f629e6586d7e4d95(succeeded) proposal=prop_0d47ee0af1914f19(answer/valid) latest_action=act_cbf09d27df9c442d(succeeded)
+    ok   context_includes@s2: decisions missing=[]; present=['decision_brightpath_actions', 'decision_exports_routing_v2']
+    ok   proposal_kind@s2: proposal prop_dfc51e2433c04506 kind=escalate validity=valid
+    ok   proposal_validity@s4: proposal prop_dfc51e2433c04506 validity=stale reasons=['REVISION_CONFLICT: decision supersede on customer customer_brightpath']
+    ok   proposal_kind@s6: proposal prop_468fc06b40af46bb kind=create_work validity=valid
+    ok   proposal_payload_in@s6: proposal prop_468fc06b40af46bb (create_work) payload.capability_id='cap_scheduled_exports'
+    ok   decision_state@s7: decision decision_brightpath_actions status=superseded supersedes_id=None
+    FAIL decision_state@s7: decision dec_595ab43a32b941d6 not in list ['decision_brightpath_actions']
+    ok   context_excludes_active@s9: active in context=[]; decision status={'decision_helix_scope_reduction': 'expired'}
+    ok   text_not_matches@s9: inspected ['explanation', 'payload.draft_text']; hits=[]
+  $ /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/scripts/stack.sh down --port 8021
+    stack: stopped worker
+    stack: stopped api
+    stack: deleted 2 graph(s) with prefix pgeval_20261016163219t10_
+  $ /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/scripts/stack.sh up --port 8021 --prefix pgeval_20261016163219t12_
+    stack: api :8021 prefix=pgeval_20261016163219t12_ faults=none state=/private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/../stack/8021
+    stack: api ready: {"status":"ready","database":"ok","contract":"1.0.0 7066692afd2fde6e61a205a5645770e7bb565717a452a89322a5494be7a48910"}
+    stack: seeded in 4s (19 files; log /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/../stack/8021/seed.log)
+    stack: worker pid 85321 (log /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/../stack/8021/worker.log)
+    stack: up: http://127.0.0.1:8021
+[FAIL] t12-owner-change-invalidates-proposal (T12) 3.2s on http://127.0.0.1:8021
+    s1 create_request                       request=req_a4643a8b1cb444c2(open) run=run_e8ad978cc4dd4944(queued)
+    s2 await_run                            request=req_a4643a8b1cb444c2(awaiting_review) run=run_e8ad978cc4dd4944(awaiting_review) proposal=prop_53bf233e5dfa4852(link_work/valid)
+    s3 get_work_item                        work_item=work_webhook_retry_queue(in_progress)
+    s4 patch_work_item                      work_item=work_webhook_retry_queue(in_progress)
+    s5 commit_proposal                      HTTP 409 REVISION_CONFLICT
+    s6 get_proposal                         proposal=prop_53bf233e5dfa4852(link_work/stale)
+    s7 list_actions                         
+    s8 start_run                            run=run_cf7a47ef157c4c7c(queued)
+    s9 await_run                            request=req_a4643a8b1cb444c2(investigating) run=run_cf7a47ef157c4c7c(failed) proposal=prop_cc33c95bb99e4d15(link_work/stale)
+    ok   proposal_kind@s2: proposal prop_53bf233e5dfa4852 kind=link_work validity=valid
+    ok   proposal_payload_equals@s2: proposal prop_53bf233e5dfa4852 (link_work) payload.work_item_id='work_webhook_retry_queue'
+    FAIL context_includes@s2: attempts missing=['attempt_helix_webhook_retry_backoff']; present=['attempt_helix_alert_sensitivity', 'attempt_helix_scim_accounts']
+    ok   http_error@s5: http 409 code=REVISION_CONFLICT message=proposal is stale; re-investigate
+    ok   proposal_validity@s6: proposal prop_53bf233e5dfa4852 validity=stale reasons=['REVISION_CONFLICT: work item work_webhook_retry_queue changed']
+    ok   no_action_status@s7: actions=[]
+    ok   revision_gt@None: a=16 b=15
+    ok   text_matches@s9: matched in ['explanation']; texts=[('explanation', "Existing work 'Durable webhook retry queue (24h)' (work_webhook_retry_queue) is of unknown status and tracks Webhooks (owner person_leo). Its current status is unknown (not observable through the tools); verify it before relying on this link. No reliable delivery forecast is recorded; no date can be")]
+  $ /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/scripts/stack.sh down --port 8021
+    stack: stopped worker
+    stack: stopped api
+    stack: deleted 2 graph(s) with prefix pgeval_20261016163219t12_
+  $ /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/scripts/stack.sh up --port 8021 --prefix pgeval_20261016163219t15_ --faults local_create_timeout_after_effect
+    stack: api :8021 prefix=pgeval_20261016163219t15_ faults=local_create_timeout_after_effect state=/private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/../stack/8021
+    stack: api ready: {"status":"ready","database":"ok","contract":"1.0.0 7066692afd2fde6e61a205a5645770e7bb565717a452a89322a5494be7a48910"}
+    stack: seeded in 3s (19 files; log /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/../stack/8021/seed.log)
+    stack: worker pid 85910 (log /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/../stack/8021/worker.log)
+    stack: up: http://127.0.0.1:8021
+[PASS] t15-unknown-create-reconciles (T15) 3.2s on http://127.0.0.1:8021
+    s1 create_request                       request=req_183639161d6c4240(open) run=run_1bb5b7a7d82e4595(queued)
+    s2 await_run                            request=req_183639161d6c4240(awaiting_review) run=run_1bb5b7a7d82e4595(awaiting_review) proposal=prop_69d7a67d86884bb4(create_work/valid)
+    s3 commit_proposal                      action=act_556d27666b21412b(accepted)
+    s4 await_run                            request=req_183639161d6c4240(awaiting_work) run=run_1bb5b7a7d82e4595(succeeded) proposal=prop_69d7a67d86884bb4(create_work/valid) latest_action=act_556d27666b21412b(succeeded)
+    s5 get_action                           action=act_556d27666b21412b(succeeded)
+    s6 get_run_events                       
+    s7 list_actions                         
+    ok   proposal_kind@s2: proposal prop_69d7a67d86884bb4 kind=create_work validity=valid
+    ok   rejected_alternative@s2: proposal prop_69d7a67d86884bb4 alternative: 'Daily email digest for metric alerts' (work_alert_digest) is similar but the request explicitly rules out email. evidence=['ev_src_work_item_work_alert_digest_r1_1']
+    OPT  event_payload_seen@s6: action_updated payloads=[{'action_id': 'act_556d27666b21412b', 'connector': 'local', 'status': 'accepted'}, {'action_id': 'act_556d27666b21412b', 'connector': 'local', 'status': 'succeeded'}]
+    ok   action_status@s5: action act_556d27666b21412b (create_work) status=succeeded error=None
+    ok   receipt_present@s5: action act_556d27666b21412b receipt={"connector": "local", "id": "rcpt_6be5757adb774a60", "observed_at": "2026-10-16T16:33:25Z", "result_hash": "9866ffe0c9dbbad18373ac63e64f9b1794a433fec12818b6f01f0be9ceddb9a8", "target_id": "work_act_556d27666b21412b", "target_url": null}
+    ok   count_actions@s7: create_work actions=[('act_556d27666b21412b', 'succeeded')]
+    ok   work_item_count_delta@s7: baseline=22 after s7=23 delta=1
+    ok   run_status@s4: run run_1bb5b7a7d82e4595 status=succeeded stage=observe
+  $ /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/scripts/stack.sh down --port 8021
+    stack: stopped worker
+    stack: stopped api
+    stack: deleted 2 graph(s) with prefix pgeval_20261016163219t15_
+  $ /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/scripts/stack.sh up --port 8021 --prefix pgeval_20261016163219h_
+    stack: api :8021 prefix=pgeval_20261016163219h_ faults=none state=/private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/../stack/8021
+    stack: api ready: {"status":"ready","database":"ok","contract":"1.0.0 7066692afd2fde6e61a205a5645770e7bb565717a452a89322a5494be7a48910"}
+    stack: seeded in 3s (19 files; log /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/../stack/8021/seed.log)
+    stack: worker pid 86972 (log /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/../stack/8021/worker.log)
+    stack: up: http://127.0.0.1:8021
+[MISS] holdout h01-weekly-pdf-acme: kind=create_work run=awaiting_review 
+    FAIL acceptable_disposition: kind=create_work payload={"acceptance_criteria": ["Dashboard sharing and embedding supports the requested behaviour: Friday PDF of the pipeline dashboard", "Requester of req_f9cc6746089647c5 confirms the outcome (attributable verification)", "Documentation is updated with a citable source revision"]
+    FAIL must_not create_work: kind=create_work
+    ok   must_not link_work:work_export_issue: kind=create_work
+[MISS] holdout h02-provisioning-brightpath: kind=escalate run=awaiting_review 
+    FAIL acceptable_disposition: kind=escalate payload={"owner_id": null, "reason": "Action kind create_work is not permitted by active decision(s) decision_brightpath_actions.", "team_id": null}
+    ok   must_not create_work: kind=escalate
+    ok   no work item created: delta=0
+[OK] holdout h03-finance-export-corvid: kind=link_work run=awaiting_review 
+    ok   acceptable_disposition: kind=link_work payload={"comment_text": null, "work_item_id": "work_export_issue"}
+    ok   must_not create_work: kind=link_work
+    ok   must_not promise_date (text heuristic): hit=None
+    ok   no work item created: delta=0
+[MISS] holdout h04-chat-alerts-helix: kind=link_work run=awaiting_review 
+    FAIL acceptable_disposition: kind=link_work payload={"comment_text": null, "work_item_id": "work_alert_sensitivity"}
+    ok   must_not link_work:work_alert_digest: kind=link_work
+    FAIL must_not link_work:work_alert_sensitivity: kind=link_work
+    ok   no work item created: delta=0
+[MISS] holdout h05-purge-extension-helix: kind=create_work run=awaiting_review 
+    FAIL acceptable_disposition: kind=create_work payload={"acceptance_criteria": ["Audit log supports the requested behaviour: Two more months before purge", "Requester of req_5c00d89c853f4bcb confirms the outcome (attributable verification)", "Documentation is updated with a citable source revision"], "capability_id": "cap_audit_
+    ok   must_not grant_extension (text heuristic): hit=None
+[MISS] holdout h06-public-link-acme: kind=answer run=succeeded 
+    ok   acceptable_disposition: kind=answer payload={"draft_text": "Thanks for reaching out about \"Auditor access without logins\". Our documentation (20-docs-export-troubleshooting) says: \"## Temporary access while a schedule is failing As a temporary workaround, a workspace admin can create a share link to the dashboard so rec
+    FAIL must_not recommend_public_link (text heuristic): hit=Public (no-login) share links
+    ok   must_not create_work: kind=answer
+    ok   no work item created: delta=0
+  $ /private/tmp/claude-501/-Users-subramanyarao-Desktop-webknot-PromiseGraph/34aa4b1f-22f2-45a6-a524-3b972342cc23/scratchpad/head-08b9c00/scripts/stack.sh down --port 8021
+    stack: stopped worker
+    stack: stopped api
+    stack: deleted 2 graph(s) with prefix pgeval_20261016163219h_
+
+scenarios: 11/18 PASS; holdouts: 1/6 acceptable

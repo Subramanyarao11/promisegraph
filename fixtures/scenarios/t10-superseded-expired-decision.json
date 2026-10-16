@@ -102,8 +102,7 @@
       "action": "list_decisions",
       "input": {
         "scope_entity_type": "customer",
-        "scope_entity_id": "customer_brightpath",
-        "active": false
+        "scope_entity_id": "customer_brightpath"
       }
     },
     {

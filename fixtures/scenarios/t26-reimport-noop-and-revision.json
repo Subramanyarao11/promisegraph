@@ -62,7 +62,8 @@
     {
       "assert": "source_body_unchanged",
       "step": "s3",
-      "content_from": "fixtures/seed/ws_demo/20-docs-api-rate-limits.md"
+      "content_from": "fixtures/seed/ws_demo/20-docs-api-rate-limits.md",
+      "strip_front_matter": true
     }
   ]
 }
