@@ -180,18 +180,23 @@ def operator_reconcile(ws: Workspace, action: dict, body: dict) -> dict:
     prev = max((j for j in ws.jobs.values() if j["action_id"] == action["id"]), key=lambda j: j["seq"])
     action["_reconciled_by"] = {"actor_id": "person_operator", "evidence_ids": body["evidence_ids"], "at": now()}
     if body["outcome"] == "succeeded":
-        rc = body["receipt"]
+        tgt = body["target"]  # PROTOCOL.md #28: operator names the target; the API issues the Receipt
         if action["connector"] == "local":
             eff = ws.local_effects.get(action["id"])
             if not eff:
                 raise ApiError(422, "POLICY_VIOLATION", "receipt target does not exist: no local effect was recorded for this "
-                               "action (PROTOCOL.md #26)", {"action_id": action["id"], "target_id": rc["target_id"]})
-            if rc["target_id"] != eff["target_id"]:
+                               "action (PROTOCOL.md #26)", {"action_id": action["id"], "target_id": tgt["target_id"]})
+            if tgt["target_id"] != eff["target_id"]:
                 raise ApiError(422, "POLICY_VIOLATION", "receipt target does not exist for this action (PROTOCOL.md #26)",
-                               {"action_id": action["id"], "target_id": rc["target_id"]})
-            finalize_local(ws, action, eff)
+                               {"action_id": action["id"], "target_id": tgt["target_id"]})
+            finalize_local(ws, action, eff)  # receipt id/result_hash issued from the local readback
         else:
-            apply_effect(ws, action, external_receipt=rc)
+            # Mock cannot read Linear back; it attributes the operator-named target and issues the receipt itself.
+            readback = {"action_id": action["id"], "target_id": tgt["target_id"], "target_url": tgt["target_url"],
+                        "reconciled_by": "person_operator"}
+            apply_effect(ws, action, external_receipt={
+                "id": bounded_id("receipt", action["id"]), "connector": action["connector"], "target_id": tgt["target_id"],
+                "target_url": tgt["target_url"], "observed_at": now(), "result_hash": sha256(canonical(readback))})
         nxt = _continuation(ws, run, action, prev) if run["status"] not in ("running",) else None
     else:
         action["status"] = "failed"

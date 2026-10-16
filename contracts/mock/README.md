@@ -117,13 +117,18 @@ On startup and on each reset:
 - **Other API-created jobs (rev 2 #18).** Reply-resume, replan-after-failed-dispatch and operator-resume jobs carry
   the run's last worker checkpoint plus `resume_stage` and one of `reply_source_id` or `resume_reason`.
 - **Rev 3 reads (#19).** `GET /evidence/{id}` returns an EvidenceRef, `GET /work-items/{id}` a WorkItem, and
-  `GET /observations?request_id=` and `GET /attempts?request_id=` return lists, newest first.
+  `GET /observations?request_id=` and `GET /attempts?request_id=` return lists. All four Rev 2/3 lists (runs, proposals,
+  observations, attempts) are ordered per #27: (`created_at` or `observed_at` desc, `id` desc).
 - **Operator reconciliation (#20).** `POST /actions/{id}/reconcile` is operator only, and its body is validated
   against `ActionReconcile`. It works only on `unknown` actions; anything else returns 409 `INVALID_TRANSITION`, and
   so does a reconcile job leased by a worker. Closing a request cancels its active runs (#25). A version mismatch returns 409 `REVISION_CONFLICT`.
-  - `succeeded` needs a receipt whose connector matches the action. For local actions the receipt's `target_id`
-    must match the effect the mock recorded; the mock keeps its own receipt. If there is no recorded effect, or the
-    target doesn't match it, the call returns 422 `POLICY_VIOLATION` (#26). After that, the normal continuation is
+  - The body names a `target: {target_id, target_url}` (#28), which is required for `succeeded`. The mock issues
+    the Receipt (`id`, `result_hash`) itself; operators never supply one.
+    - For local actions the target must match the effect the mock recorded, and the receipt hash comes from that
+      record. If there is no recorded effect, or the target doesn't match it, the call returns 422
+      `POLICY_VIOLATION` (#26).
+    - For linear actions the mock can't read Linear back. It attributes the operator-named target and hashes that
+      readback record. This is a deviation from the real API, which reads the target back from Linear. After that, the normal continuation is
     queued.
   - `failed` marks the action failed and queues a replan.
   - Any queued reconcile job is cancelled, and the operator's `evidence_ids` are kept on the action.

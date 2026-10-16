@@ -231,6 +231,12 @@ def worker(api):
     return Worker(api)
 
 
+def assert_newest_first(items: list, ts_key: str) -> None:
+    """PROTOCOL.md #27: (timestamp desc, id desc)."""
+    keys = [(x[ts_key], x["id"]) for x in items]
+    assert keys == sorted(keys, reverse=True), keys
+
+
 def new_request(api: Api, *, subject="Scheduled exports stopped again", body="Our scheduled exports stopped running.",
                 caps=("cap_scheduled_exports",), auto_start=True, mode="scripted", customer="customer_acme"):
     r = api.post("/requests", {"customer_id": customer, "subject": subject, "body": body, "channel": "manual",

@@ -258,6 +258,11 @@ def decode_cursor(cursor: str | None) -> int:
         raise invalid("cursor is not valid", {"cursor": "opaque cursor from page.next_cursor"})
 
 
+def newest_first(items, ts_key: str) -> list:
+    """PROTOCOL.md #27: newest first by (timestamp desc, id desc)."""
+    return sorted(items, key=lambda x: (x[ts_key], x["id"]), reverse=True)
+
+
 def paginate(request: Request, items: list) -> tuple[list, str | None]:
     q = request.query_params
     try:
@@ -459,7 +464,7 @@ async def list_request_runs(request: Request, wid: str, rid: str):
     """rev2 #1: Run list for a request, newest first."""
     ctx = authorize(request, wid)
     ctx.ws.get("requests", rid, "request")
-    items = [pub(r) for r in reversed(list(ctx.ws.runs.values())) if r["request_id"] == rid]
+    items = [pub(r) for r in newest_first(ctx.ws.runs.values(), "created_at") if r["request_id"] == rid]
     page, nxt = paginate(request, items)
     return ok_list(ctx, page, "Run", nxt)
 
@@ -620,7 +625,7 @@ async def list_proposals(request: Request, wid: str):
     """rev2 #1: Proposal list filtered by request_id/run_id, newest first."""
     ctx = authorize(request, wid)
     rq, rn = request.query_params.get("request_id"), request.query_params.get("run_id")
-    items = [pub(p) for p in reversed(list(ctx.ws.proposals.values()))
+    items = [pub(p) for p in newest_first(ctx.ws.proposals.values(), "created_at")
              if (not rq or p["request_id"] == rq) and (not rn or p["run_id"] == rn)]
     page, nxt = paginate(request, items)
     return ok_list(ctx, page, "Proposal", nxt)
@@ -881,7 +886,7 @@ async def get_work_item(request: Request, wid: str, work_id: str):
 async def list_observations(request: Request, wid: str):
     ctx = authorize(request, wid)
     rq = request.query_params.get("request_id")
-    items = [pub(o) for o in reversed(list(ctx.ws.observations.values())) if not rq or o["request_id"] == rq]
+    items = [pub(o) for o in newest_first(ctx.ws.observations.values(), "observed_at") if not rq or o["request_id"] == rq]
     page, nxt = paginate(request, items)
     return ok_list(ctx, page, "Observation", nxt)
 
@@ -890,7 +895,7 @@ async def list_observations(request: Request, wid: str):
 async def list_attempts(request: Request, wid: str):
     ctx = authorize(request, wid)
     rq = request.query_params.get("request_id")
-    items = [pub(a) for a in reversed(list(ctx.ws.attempts.values())) if not rq or a["request_id"] == rq]
+    items = [pub(a) for a in newest_first(ctx.ws.attempts.values(), "observed_at") if not rq or a["request_id"] == rq]
     page, nxt = paginate(request, items)
     return ok_list(ctx, page, "Attempt", nxt)
 
@@ -898,15 +903,13 @@ async def list_attempts(request: Request, wid: str):
 @app.post(PUBLIC + "/actions/{aid}/reconcile")
 async def reconcile_action(request: Request, wid: str, aid: str):
     def h(ctx: Ctx, b: dict):
-        if b["outcome"] == "succeeded" and b["receipt"] is None:
-            raise invalid("outcome succeeded requires a receipt", {"receipt": "required when outcome=succeeded"})
+        if b["outcome"] == "succeeded" and b["target"] is None:
+            raise invalid("outcome succeeded requires a target", {"target": "required when outcome=succeeded"})
         ws = ctx.ws
         for e in b["evidence_ids"]:
             if e not in ws.evidence:
                 raise invalid(f"evidence {e} does not exist", {"evidence_ids": f"unknown evidence {e}"})
         action = ws.get("actions", aid, "action")
-        if b["receipt"] is not None and b["receipt"]["connector"] != action["connector"]:
-            raise invalid("receipt connector does not match the action", {"receipt/connector": f"expected {action['connector']}"})
         return 200, pub(engine.operator_reconcile(ws, action, b)), "Action"
     return await command(request, wid, "POST /actions/{action_id}/reconcile", "ActionReconcile", h, operator_only=True)
 

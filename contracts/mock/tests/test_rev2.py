@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from conftest import WK, new_request
+from conftest import WK, assert_newest_first, new_request
 from test_flows import investigate_to_proposal
 
 
@@ -12,10 +12,12 @@ def test_request_runs_list_newest_first(api, worker):
     api.post(f"/runs/{r1}/cancel", {"reason": "restart"})
     r2 = api.post(f"/requests/{rid}/runs", {"mode": "scripted", "instruction": "", "authorization_id": None}).json()["data"]["id"]
     runs = api.get(f"/requests/{rid}/runs").json()
-    assert [r["id"] for r in runs["data"]] == [r2, r1] and runs["page"]["next_cursor"] is None
+    order = [r["id"] for r in runs["data"]]
+    assert set(order) == {r1, r2} and runs["page"]["next_cursor"] is None
+    assert_newest_first(runs["data"], "created_at")
     p1 = api.get(f"/requests/{rid}/runs", params={"limit": 1}).json()
     p2 = api.get(f"/requests/{rid}/runs", params={"limit": 1, "cursor": p1["page"]["next_cursor"]}).json()
-    assert [r["id"] for r in p1["data"] + p2["data"]] == [r2, r1] and p2["page"]["next_cursor"] is None
+    assert [r["id"] for r in p1["data"] + p2["data"]] == order and p2["page"]["next_cursor"] is None
     assert api.get("/requests/request_exports_001/runs").json()["data"][0]["id"] == "run_exports_001"
     assert api.get("/requests/nope/runs").json()["error"]["code"] == "NOT_FOUND"
     assert api.get(f"/requests/{rid}/runs", ws="ws_other").status_code == 404  # isolation
@@ -28,8 +30,10 @@ def test_proposals_list_filters_newest_first(api, worker):
     lease, p1 = investigate_to_proposal(api, worker, rid, "answer", {"draft_text": "a", "resolution_criteria": []})
     p2 = worker.propose(lease, rid, "clarify", {"question": "Which?", "missing_fields": []}, [], api.rev())
     by_req = api.get("/proposals", params={"request_id": rid}).json()["data"]
-    assert [p["id"] for p in by_req] == [p2["id"], p1["id"]]
-    assert [p["id"] for p in api.get("/proposals", params={"run_id": run_id}).json()["data"]] == [p2["id"], p1["id"]]
+    assert {p["id"] for p in by_req} == {p1["id"], p2["id"]}
+    assert_newest_first(by_req, "created_at")
+    assert [p["id"] for p in api.get("/proposals", params={"run_id": run_id}).json()["data"]] == [p["id"] for p in by_req]
+    assert_newest_first(api.get("/proposals", params={"limit": 100}).json()["data"], "created_at")
     assert api.get("/proposals", params={"request_id": rid, "run_id": "run_other"}).json()["data"] == []
     assert any(p["id"] == "proposal_exports_001" for p in api.get("/proposals", params={"limit": 100}).json()["data"])
     assert api.get("/proposals", params={"request_id": rid}, ws="ws_other").json()["data"] == []

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from conftest import WK, new_request
+from conftest import WK, assert_newest_first, new_request
 from mock_api.app import store
+from mock_api.common import canonical, sha256
 from test_flows import investigate_to_proposal
 
 
@@ -45,8 +46,12 @@ def test_additive_reads_item_19(api, worker):
         api.post(f"/requests/{rid}/observations", {"action_id": None, "kind": "operator_confirmation", "verification": verdict,
                                                    "body": f"Check {verdict}.", "evidence_ids": [], "expected_request_version": v})
     atts = api.get("/attempts", params={"request_id": rid}).json()["data"]
-    assert [a["verification"] for a in atts] == ["passed", "failed"]  # newest first
-    assert [o["verification"] for o in api.get("/observations", params={"request_id": rid}).json()["data"]] == ["passed", "failed"]
+    obs = api.get("/observations", params={"request_id": rid}).json()["data"]
+    assert sorted(a["verification"] for a in atts) == sorted(o["verification"] for o in obs) == ["failed", "passed"]
+    assert_newest_first(atts, "observed_at")
+    assert_newest_first(obs, "observed_at")
+    assert_newest_first(api.get("/attempts", params={"limit": 100}).json()["data"], "observed_at")
+    assert_newest_first(api.get("/observations", params={"limit": 100}).json()["data"], "observed_at")
     assert len(api.get("/attempts", params={"limit": 1}).json()["data"]) == 1
 
 
@@ -54,21 +59,24 @@ def test_operator_reconcile_succeeded_item_20(api, worker):
     rid, run_id, a = _unknown_action_awaiting_review(api, worker)
     path = f"/actions/{a['id']}/reconcile"
     target = store.workspaces["ws_demo"].local_effects[a["id"]]["target_id"]
-    receipt = {"id": "receipt_op_1", "connector": "local", "target_id": target, "target_url": None,
-               "observed_at": "2026-10-16T05:00:00Z", "result_hash": "b" * 64}
-    base = {"outcome": "succeeded", "receipt": receipt, "evidence_ids": [], "expected_action_version": a["version"]}
+    base = {"outcome": "succeeded", "target": {"target_id": target, "target_url": None}, "evidence_ids": [],
+            "expected_action_version": a["version"]}
     assert api.post(path, base, token=WK).status_code == 403
-    r = api.post(path, {**base, "receipt": None})
-    assert r.status_code == 422 and "receipt" in r.json()["error"]["details"]["fields"]
+    r = api.post(path, {**base, "target": None})
+    assert r.status_code == 422 and "target" in r.json()["error"]["details"]["fields"]
+    legacy = api.post(path, {k: v for k, v in base.items() if k != "target"} | {"receipt": None})  # #28: receipt removed
+    assert legacy.status_code == 422
     assert api.post(path, {**base, "extra": 1}).status_code == 422
     r = api.post(path, {**base, "expected_action_version": a["version"] + 1})
     assert r.status_code == 409 and r.json()["error"]["code"] == "REVISION_CONFLICT"
-    r = api.post(path, {**base, "receipt": {**receipt, "target_id": "draft_wrong"}})
+    r = api.post(path, {**base, "target": {"target_id": "draft_wrong", "target_url": None}})
     assert r.status_code == 422 and r.json()["error"]["code"] == "POLICY_VIOLATION"
     r = api.post(path, base, key="op-reconcile-1")
     assert r.status_code == 200
     done = r.json()["data"]
     assert done["status"] == "succeeded" and done["receipt"]["target_id"] == target
+    eff = store.workspaces["ws_demo"].local_effects[a["id"]]["record"]
+    assert done["receipt"]["result_hash"] == sha256(canonical(eff))  # API-issued from the readback, not operator-supplied
     again = api.post(path, base, key="op-reconcile-1")
     assert again.headers["Idempotent-Replayed"] == "true" and again.json()["data"] == done
     run = api.get(f"/runs/{run_id}").json()["data"]
@@ -85,7 +93,7 @@ def test_operator_reconcile_succeeded_item_20(api, worker):
 
 def test_operator_reconcile_failed_replans(api, worker):
     rid, run_id, a = _unknown_action_awaiting_review(api, worker)
-    r = api.post(f"/actions/{a['id']}/reconcile", {"outcome": "failed", "receipt": None, "evidence_ids": ["ev_export_issue_1"],
+    r = api.post(f"/actions/{a['id']}/reconcile", {"outcome": "failed", "target": None, "evidence_ids": ["ev_export_issue_1"],
                                                     "expected_action_version": a["version"]})
     assert r.status_code == 200 and r.json()["data"]["status"] == "failed"
     run = api.get(f"/runs/{run_id}").json()["data"]
@@ -138,9 +146,8 @@ def test_reconcile_without_local_effect_item_26(api, worker):
     rl = worker.claim(["reconcile"])
     worker.complete(rl, "succeeded", {"action_id": action["id"], "lookup_evidence": {}, "established": False, "receipt": None})
     a = api.get(f"/actions/{action['id']}").json()["data"]
-    receipt = {"id": "receipt_x", "connector": "local", "target_id": "draft_ghost", "target_url": None,
-               "observed_at": "2026-10-16T05:00:00Z", "result_hash": "c" * 64}
-    r = api.post(f"/actions/{a['id']}/reconcile", {"outcome": "succeeded", "receipt": receipt, "evidence_ids": [],
+    r = api.post(f"/actions/{a['id']}/reconcile", {"outcome": "succeeded", "target": {"target_id": "draft_ghost", "target_url": None},
+                                                    "evidence_ids": [],
                                                     "expected_action_version": a["version"]})
     assert r.status_code == 422 and r.json()["error"]["code"] == "POLICY_VIOLATION"
     assert api.get(f"/actions/{a['id']}").json()["data"]["status"] == "unknown"
