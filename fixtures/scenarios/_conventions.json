@@ -22,5 +22,12 @@
   "step_fields": {
     "workspace_id": "Optional override of the scenario workspace for this step"
   },
-  "assertions": "Each expectation is {assert, step, ...}. Text assertions (text_matches/text_not_matches) inspect only the named fields that exist; when_kind limits a payload assertion to proposals of that kind; optional=true records but does not fail. work_item_count_delta compares GET /work-items count against the post-seed baseline."
+  "assertions": "Each expectation is {assert, step, ...}. Text assertions (text_matches/text_not_matches) inspect only the named fields that exist; when_kind limits a payload assertion to proposals of that kind; optional=true records but does not fail. work_item_count_delta compares GET /work-items count against the post-seed baseline.",
+  "assertion_fields": {
+    "source_body_unchanged.strip_front_matter": "When true, compare SourceRecord.body with content_from minus its leading YAML front matter (--- ... ---) and following blank lines (PROTOCOL #36)."
+  },
+  "runner": {
+    "command": "uv run --no-project --with httpx==0.28.1 --with jsonschema==4.25.1 python scripts/run_scenarios.py --manage --port 8020 [--secondary-port 8021] [--only t04,t12] [--holdouts] [--json out.json]",
+    "stacks": "--manage starts private stacks via scripts/stack.sh: the shared stack on --port; each fresh_seed / 'server env K=V' scenario and the holdout set get a fresh stack on --secondary-port (default --port+1), one at a time. Use distinct port pairs (e.g. 8040/8041) and graph prefixes (--prefix) when several runners share the host. --base-url runs everything against one existing stack instead."
+  }
 }

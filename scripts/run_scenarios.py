@@ -11,7 +11,8 @@ Run:
 
 Stacks:
   --manage   the runner owns its stacks through scripts/stack.sh: one shared freshly seeded stack on --port
-             for scenarios without preconditions, and a dedicated freshly seeded stack on --port+1 for every
+             for scenarios without preconditions, and a dedicated freshly seeded stack on --secondary-port
+             (default --port+1; e.g. --port 8040 --secondary-port 8041 to run beside other users) for every
              scenario with `fresh_seed` or a `server env K=V` precondition (env applied, e.g. FAULTS) and for
              the holdout set. Every stack is torn down (graphs deleted) afterwards unless --keep.
   --base-url run everything against one existing stack. `fresh_seed` scenarios run first; scenarios that need
@@ -883,6 +884,8 @@ class ScenarioRun:
         if not s:
             raise StepError(f"no source captured: {self.cap(step).get('error')}")
         want = (ROOT / e["content_from"]).read_text(encoding="utf-8")
+        if e.get("strip_front_matter"):
+            want = strip_front_matter(want)
         return s["body"] == want, f"source {s['id']}@{s['revision']} body length {len(s['body'])} vs file {len(want)}"
 
     def a_stable_after_restart(self, e, step):
@@ -897,6 +900,16 @@ class ScenarioRun:
                  if get_path(s["before"], f) != get_path(s["after"], f)]
         vals = {f: get_path(s["after"], f) for f in e["fields"]}
         return not diffs and all(v not in (None, _MISSING) for v in vals.values()), f"after API restart {vals}; diffs={diffs}"
+
+
+def strip_front_matter(text: str) -> str:
+    """PROTOCOL #36: markdown front matter (`---` ... `---` at the top) is metadata, not body."""
+    lines = text.split("\n")
+    if lines and lines[0].strip() == "---":
+        for i in range(1, len(lines)):
+            if lines[i].strip() == "---":
+                return "\n".join(lines[i + 1:]).lstrip("\n")
+    return text
 
 
 def summarize(cap: dict) -> str:
@@ -1037,7 +1050,9 @@ def main() -> int:
     ap.add_argument("--base-url")
     ap.add_argument("--fault-base-url", help="stack started with the FAULTS a scenario requires (with --base-url)")
     ap.add_argument("--manage", action="store_true", help="bring up/tear down private stacks via scripts/stack.sh")
-    ap.add_argument("--port", type=int, default=8020)
+    ap.add_argument("--port", type=int, default=8020, help="managed shared stack port")
+    ap.add_argument("--secondary-port", type=int, default=None,
+                    help="managed port for fresh_seed/env/holdout stacks (default --port + 1)")
     ap.add_argument("--prefix", default=None, help="graph prefix stem for managed stacks (default pgeval_<ts>)")
     ap.add_argument("--keep", action="store_true", help="keep managed stacks' graphs (processes still stop)")
     ap.add_argument("--only", help="comma list of scenario id prefixes, e.g. t04,t12")
@@ -1047,6 +1062,10 @@ def main() -> int:
     args = ap.parse_args()
     if not args.manage and not args.base_url:
         ap.error("--base-url or --manage is required")
+    if args.secondary_port is None:
+        args.secondary_port = args.port + 1
+    if args.manage and args.secondary_port == args.port:
+        ap.error("--secondary-port must differ from --port")
 
     scen = [json.loads(p.read_text()) for p in sorted(SCEN_DIR.glob("t*.json"))]
     if args.only:
@@ -1092,13 +1111,13 @@ def main() -> int:
                 stacks.down(args.port)
             for s in fresh:
                 env = scenario_env(s)
-                p = args.port + 1
+                p = args.secondary_port
                 tag = s["id"].split("-")[0]
                 base = stacks.up(p, f"{stem}{tag}_", env.get("FAULTS", ""))
                 results.append(run_one(s, base, lambda p=p: stacks.restart_api(p)))
                 stacks.down(p)
             if holdouts:
-                p = args.port + 1
+                p = args.secondary_port
                 base = stacks.up(p, f"{stem}h_")
                 for h in holdouts:
                     holdout_results.append(run_hold(base, h))
