@@ -116,3 +116,25 @@ These are documented in the header of `scripts/run_scenarios.py`:
 - **`fresh_seed` and `server env K=V` preconditions:** each such scenario gets its own freshly seeded stack, with
   that env applied.
 - **Optional expectations:** they are reported, as above, but never fail a scenario.
+
+---
+
+## Official G2 rerun — commit 4b1944a (2026-10-16)
+
+Clean `git archive HEAD` export, real API + real worker + FalkorDB v4.20.7, fresh graphs per stack, all torn down.
+Command: `scripts/run_scenarios.py --manage --port 8050 --secondary-port 8051 --holdouts`.
+Raw output: `g2-official.json`, `g2-official.log`.
+
+**Result: scenarios 18/18 PASS; holdouts 4/6 acceptable.**
+
+Honest caveats:
+- Holdouts h01–h06 influenced planner fixes during G2 (three genuine bugs were found through them), so 4/6 is
+  no longer an unbiased generalisation measure. A sealed set (`holdouts-v2`) written blind to the planner is
+  reserved for G4.
+- "Acceptable" is disposition-level. h06's answer avoids the forbidden public-link workaround (decision respected)
+  but quotes an irrelevant troubleshooting sentence — a substantive answer-quality weakness of lexical scripted
+  planning, not counted as a pass for quality.
+- Remaining misses h02 (escalates where clarify/link expected) and h05 (resolves "purge" to audit log instead of
+  data retention) are lexical-matching limits, with no rule or decision violations.
+- T19 restart durability is separately evidenced by `scripts/check_persistence.sh` (PERSISTENCE OK) and the
+  runner's real API restart in t06. T21 (database down) on the real stack is pending C's fault profile.
