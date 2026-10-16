@@ -691,13 +691,11 @@ def operator_reconcile(ctx: Ctx, uow: UnitOfWork, action_id: str, cmd: dict[str,
            for j in active_jobs(ctx, run["id"])):
         raise conflict("INVALID_TRANSITION", "a reconcile/dispatch job is still active for this run", {})
     if cmd["outcome"] == "succeeded":
-        if cmd.get("receipt") is None:
-            raise invalid("succeeded reconciliation requires a receipt", {"receipt": "required"})
-        receipt = _receipt_from({"receipt": cmd["receipt"]}, action)
+        target = cmd.get("target")
+        if not target:
+            raise invalid("succeeded reconciliation requires a target", {"target": "required for succeeded"})
+        receipt = _readback_receipt(ctx, action, target)
         if action["connector"] == "local":
-            if not ctx.store.get(ctx.ws, receipt["target_id"]) and not ctx.store.read(
-                    ctx.ws, "MATCH ()-[r:TRACKED_BY {id: $id}]->() RETURN r.id", {"id": receipt["target_id"]}):
-                raise policy("local receipt target does not exist in the graph", {"target_id": receipt["target_id"]})
             reqp = load(ctx, "Request", action["request_id"], "request")
             _finish_effect(ctx, uow, action, reqp, receipt, effect_request_status(action["kind"], None), {})
         else:
@@ -716,3 +714,29 @@ def operator_reconcile(ctx: Ctx, uow: UnitOfWork, action_id: str, cmd: dict[str,
         _save_run(uow, runp, new_run)
     uow.guard_version(action_id, action["version"])
     return 200, new_action
+
+
+def _readback_receipt(ctx: Ctx, action: dict[str, Any], target: dict[str, Any]) -> dict[str, Any]:
+    """Rev 4 #28: the API reads the target back and issues the Receipt id/result_hash itself."""
+    tid = target["target_id"]
+    if action["connector"] == "local":
+        rows = ctx.store.read(ctx.ws, "MATCH (a:E)-[r:TRACKED_BY {id: $id}]->(b:E) RETURN r.id, a.id, b.id", {"id": tid})
+        if rows:
+            readback: Any = {"edge_id": rows[0][0], "type": "TRACKED_BY", "from_id": rows[0][1], "to_id": rows[0][2]}
+        else:
+            p = ctx.store.get(ctx.ws, tid)
+            if not p or p.get("label") not in ("Draft", "EscalationCase", "WorkItem") or not isinstance(p.get("doc"), dict):
+                raise policy("local reconcile target does not exist in the graph", {"target_id": tid})
+            readback = p["doc"]
+    else:
+        # attributed connector observation: a worker-recorded connector_status on this action naming the target
+        obs = ctx.store.find(ctx.ws, "Observation", {"action_id": action["id"], "kind": "connector_status"},
+                             order="observed_at", desc=True)
+        match = [o for o in obs if str(o.get("actor_id", "")).startswith("worker:") and tid in o["doc"]["body"]]
+        if not match:
+            raise policy("no attributed connector_status observation on this action names the target; refresh first",
+                         {"target_id": tid})
+        readback = {"target_id": tid, "target_url": target.get("target_url"), "observation": match[0]["doc"]}
+    return {"id": new_id("rcpt"), "connector": action["connector"], "target_id": tid,
+            "target_url": target.get("target_url") if action["connector"] != "local" else None,
+            "observed_at": ctx.now, "result_hash": sha256_hex(canonical_json(readback))}

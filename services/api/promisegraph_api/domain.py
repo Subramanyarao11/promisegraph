@@ -504,7 +504,8 @@ def record_observation(ctx: Ctx, uow: UnitOfWork, request_id: str, cmd: dict[str
     obs = {"id": obs_id, "workspace_id": ctx.ws, "request_id": request_id, "action_id": cmd.get("action_id"),
            "kind": cmd["kind"], "verification": cmd["verification"], "body": cmd["body"],
            "evidence_ids": cmd["evidence_ids"], "actor_id": ctx.actor_id, "observed_at": ctx.now}
-    uow.node("Observation", obs_id, doc=obs, request_id=request_id, title=f"{cmd['kind']} ({cmd['verification']})",
+    uow.node("Observation", obs_id, doc=obs, request_id=request_id, observed_at=obs["observed_at"],
+             action_id=obs["action_id"] or "", kind=obs["kind"], actor_id=obs["actor_id"], title=f"{cmd['kind']} ({cmd['verification']})",
              source_id=src["source_id"])
     uow.edge("SUPPORTED_BY", edge_id("SUPPORTED_BY", obs_id, src["source_id"]), obs_id, src["source_id"],
              evidence_ids=src["evidence_ids"], confirmed=True, via="observation")
@@ -528,7 +529,7 @@ def record_observation(ctx: Ctx, uow: UnitOfWork, request_id: str, cmd: dict[str
                "verification": cmd["verification"], "summary": cmd["body"][:4000],
                "evidence_ids": list(dict.fromkeys(src["evidence_ids"] + cmd["evidence_ids"]))[:100],
                "observed_at": ctx.now}
-        uow.node("Attempt", attempt_id, doc=att, request_id=request_id, scope_type=scope["entity_type"],
+        uow.node("Attempt", attempt_id, doc=att, request_id=request_id, observed_at=att["observed_at"], scope_type=scope["entity_type"],
                  scope_id=scope["entity_id"], title=f"Attempt {att['procedure_key']} ({att['outcome']})", version=1)
         uow.edge("ATTEMPTED_FOR", edge_id("ATTEMPTED_FOR", attempt_id, request_id), attempt_id, request_id,
                  evidence_ids=src["evidence_ids"], confirmed=True)

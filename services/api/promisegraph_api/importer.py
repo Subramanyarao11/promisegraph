@@ -496,6 +496,7 @@ def _apply_entity(ctx: Ctx, uow: UnitOfWork, r: Rec, ev: list[str], prev: dict[s
                "verification": d["verification"], "summary": d["summary"], "evidence_ids": ev[:100],
                "observed_at": d["observed_at"]}
         uow.node("Attempt", nid, doc=doc, title=f"Attempt {d['procedure_key']}", request_id=d["request_id"],
+                 observed_at=d["observed_at"],
                  scope_type=d["scope"]["entity_type"], scope_id=d["scope"]["entity_id"], version=version)
         _edge(uow, "ATTEMPTED_FOR", nid, d["request_id"], ev)
         if d.get("work_item_id"):

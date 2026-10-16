@@ -284,7 +284,8 @@ class Store:
             clauses.append(f"n.{k} CONTAINS $c{i}")
             params[f"c{i}"] = v
         where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
-        q = f"MATCH (n:{label}){where} RETURN properties(n) ORDER BY n.{order}{' DESC' if desc else ''}, n.id"
+        q = (f"MATCH (n:{label}){where} RETURN properties(n) ORDER BY n.{order}{' DESC' if desc else ''}, "
+             f"n.id{' DESC' if desc else ''}")
         if skip:
             q += " SKIP $skip"
             params["skip"] = skip

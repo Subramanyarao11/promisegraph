@@ -338,14 +338,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ctx = make_ctx(request, workspace_id)
         domain.load(ctx, "Request", request_id, "request")
         return simple_list(request, workspace_id, "Run", {"request_id": request_id}, cursor, limit,
-                           order="ts", desc=True)
+                           order="created_at", desc=True)
 
     @app.get(PUB + "/proposals")
     def list_proposals(request: Request, workspace_id: str, request_id: str | None = None, run_id: str | None = None,
                        cursor: str | None = None, limit: int | None = None):
         make_ctx(request, workspace_id)
         return simple_list(request, workspace_id, "Proposal", {"request_id": request_id, "run_id": run_id}, cursor,
-                           limit, order="ts", desc=True)
+                           limit, order="created_at", desc=True)
 
     @app.get(PUB + "/proposals/{proposal_id}")
     def get_proposal(request: Request, workspace_id: str, proposal_id: str):
@@ -401,14 +401,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                           cursor: str | None = None, limit: int | None = None):
         """Convenience read (not in the frozen matrix)."""
         make_ctx(request, workspace_id)
-        return simple_list(request, workspace_id, "Observation", {"request_id": request_id}, cursor, limit)
+        return simple_list(request, workspace_id, "Observation", {"request_id": request_id}, cursor, limit,
+                           order="observed_at", desc=True)
 
     @app.get(PUB + "/attempts")
     def list_attempts(request: Request, workspace_id: str, request_id: str | None = None,
                       cursor: str | None = None, limit: int | None = None):
         """Convenience read (not in the frozen matrix)."""
         make_ctx(request, workspace_id)
-        return simple_list(request, workspace_id, "Attempt", {"request_id": request_id}, cursor, limit)
+        return simple_list(request, workspace_id, "Attempt", {"request_id": request_id}, cursor, limit,
+                           order="observed_at", desc=True)
 
     # ---- public commands ------------------------------------------------------------------------------
     @app.post(PUB + "/requests")
@@ -500,25 +502,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post(PUB + "/actions/{action_id}/reconcile")
     def post_reconcile(request: Request, workspace_id: str, action_id: str, body: Any = Body(None)):
-        """PROTOCOL rev 3 #20 (no schema in commands.schema.json yet; validated here)."""
+        """PROTOCOL rev 3 #20 / rev 4 #28."""
         ctx = make_ctx(request, workspace_id, operator_only=True)
-        b = body if isinstance(body, dict) else {}
-        errs: dict[str, str] = {}
-        extra = set(b) - {"outcome", "receipt", "evidence_ids", "expected_action_version"}
-        if extra:
-            errs["<root>"] = f"unexpected fields {sorted(extra)}"
-        if b.get("outcome") not in ("succeeded", "failed"):
-            errs["outcome"] = "succeeded|failed"
-        if "receipt" not in b or not (b["receipt"] is None or isinstance(b["receipt"], dict)):
-            errs["receipt"] = "Receipt|null required"
-        ev = b.get("evidence_ids")
-        if not isinstance(ev, list) or len(ev) > 100 or not all(isinstance(x, str) and 0 < len(x) <= 128 for x in ev):
-            errs["evidence_ids"] = "ID[] required"
-        v = b.get("expected_action_version")
-        if not isinstance(v, int) or isinstance(v, bool) or v < 1:
-            errs["expected_action_version"] = "integer >= 1 required"
-        if errs:
-            raise invalid("reconcile validation failed", errs)
+        b = body_of(body, "ActionReconcile")
         return mutate(request, ctx, "/actions/{action_id}/reconcile", b,
                       lambda u: jobs.operator_reconcile(ctx, u, action_id, b))
 
@@ -526,17 +512,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def post_close(request: Request, workspace_id: str, request_id: str, body: Any = Body(None)):
         """PROTOCOL rev 3 #21."""
         ctx = make_ctx(request, workspace_id, operator_only=True)
-        b = body if isinstance(body, dict) else {}
-        errs: dict[str, str] = {}
-        if set(b) - {"reason", "expected_request_version"}:
-            errs["<root>"] = "unexpected fields"
-        if not isinstance(b.get("reason"), str) or not 1 <= len(b["reason"]) <= 2000:
-            errs["reason"] = "string 1..2000 required"
-        v = b.get("expected_request_version")
-        if not isinstance(v, int) or isinstance(v, bool) or v < 1:
-            errs["expected_request_version"] = "integer >= 1 required"
-        if errs:
-            raise invalid("close validation failed", errs)
+        b = body_of(body, "RequestClose")
         return mutate(request, ctx, "/requests/{request_id}/close", b,
                       lambda u: domain.close_request(ctx, u, request_id, b))
 

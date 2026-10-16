@@ -383,7 +383,9 @@ def test_verification_failure_reopens_and_connector_status_never_resolves_T17_T1
     att = api.get("/attempts", list_of="Attempt", params={"request_id": req["id"]})["data"]
     assert att[0]["outcome"] == "failed" and att[0]["verification"] == "failed"
     runs = api.get(f"/requests/{req['id']}/runs", list_of="Run")["data"]
-    assert len(runs) == 2 and runs[0]["status"] == "queued" and runs[1]["id"] == run["id"]
+    assert len(runs) == 2 and {r["id"]: r["status"] for r in runs if r["id"] != run["id"]}.popitem()[1] == "queued"
+    keys = [(r["created_at"], r["id"]) for r in runs]
+    assert keys == sorted(keys, reverse=True)  # rev4 #27 normative order
     # stale expected version
     api.post(f"/requests/{req['id']}/observations", {"action_id": None, "kind": "operator_confirmation",
                                                      "verification": "passed", "body": "x", "evidence_ids": [],
@@ -613,19 +615,20 @@ def test_operator_reconcile_and_close_rev3(seeded: Api):
            result={"action_id": dl["action_id"], "execution_state": "unknown", "receipt": None, "error": None}),
            "CompletionReceipt", private=True)
     act = api.get(f"/actions/{dl['action_id']}", "Action")["data"]
-    body = {"outcome": "succeeded", "receipt": None, "evidence_ids": [], "expected_action_version": act["version"]}
+    body = {"outcome": "succeeded", "target": None, "evidence_ids": [], "expected_action_version": act["version"]}
     api.post(f"/actions/{act['id']}/reconcile", body, expect=409)  # reconcile job still active
     rc = api.claim(["reconcile"])
     w.post(f"/jobs/{rc['job_id']}/complete", lease_body(rc, completion_id="r", outcome="succeeded",
            result={"action_id": act["id"], "lookup_evidence": "none", "established": False, "receipt": None}),
            "CompletionReceipt", private=True)
     assert api.get(f"/runs/{run['id']}", "Run")["data"]["status"] == "awaiting_review"
-    api.post(f"/actions/{act['id']}/reconcile", body, expect=422)  # succeeded needs a receipt
+    api.post(f"/actions/{act['id']}/reconcile", body, expect=422)  # succeeded needs a target
+    api.post(f"/actions/{act['id']}/reconcile", {**body, "receipt": None}, expect=422)  # old shape rejected
     api.as_worker().post(f"/actions/{act['id']}/reconcile", body, expect=403)  # operator only
-    bad = {**body, "receipt": {"id": "rcpt_x", "connector": "local", "target_id": "nope", "target_url": None,
-                               "observed_at": "2026-10-16T05:00:00Z", "result_hash": "b" * 64}}
-    api.post(f"/actions/{act['id']}/reconcile", bad, expect=422)  # target does not exist
-    fb = {"outcome": "failed", "receipt": None, "evidence_ids": [], "expected_action_version": act["version"]}
+    bad = {**body, "target": {"target_id": "nope", "target_url": None}}
+    e = api.post(f"/actions/{act['id']}/reconcile", bad, expect=422)  # target does not exist
+    assert e["error"]["code"] == "POLICY_VIOLATION"
+    fb = {"outcome": "failed", "target": None, "evidence_ids": [], "expected_action_version": act["version"]}
     out = api.post(f"/actions/{act['id']}/reconcile", fb, "Action", 200, key="rec-1")["data"]
     assert out["status"] == "failed"
     assert api.post(f"/actions/{act['id']}/reconcile", fb, "Action", 200, key="rec-1")["data"] == out  # replay
@@ -663,15 +666,23 @@ def test_operator_reconcile_succeeded_linear(app_factory):
            result={"action_id": dl["action_id"], "execution_state": "unknown", "receipt": None, "error": None}),
            "CompletionReceipt", private=True)
     rc = api.claim(["reconcile"])
+    act = api.get(f"/actions/{dl['action_id']}", "Action")["data"]
+    tgt = {"outcome": "succeeded", "target": {"target_id": "LIN-7", "target_url": "https://linear.app/t/LIN-7"},
+           "evidence_ids": [], "expected_action_version": act["version"]}
+    rq = api.get(f"/requests/{req['id']}", "Request")["data"]
+    api.worker_with(rc).post(f"/requests/{req['id']}/observations",
+                             {"action_id": act["id"], "kind": "connector_status", "verification": "pending",
+                              "body": "Provider lookup found issue LIN-7 with our action marker; not established by id.",
+                              "evidence_ids": [], "expected_request_version": rq["version"]}, "ObservationResult", 201)
     w.post(f"/jobs/{rc['job_id']}/complete", lease_body(rc, completion_id="r", outcome="succeeded",
            result={"action_id": dl["action_id"], "lookup_evidence": "none", "established": False, "receipt": None}),
            "CompletionReceipt", private=True)
-    act = api.get(f"/actions/{dl['action_id']}", "Action")["data"]
-    receipt = {"id": "rcpt_op", "connector": "linear", "target_id": "LIN-7", "target_url": None,
-               "observed_at": "2026-10-16T05:00:00Z", "result_hash": "c" * 64}
-    out = api.post(f"/actions/{act['id']}/reconcile", {"outcome": "succeeded", "receipt": receipt, "evidence_ids": [],
-                                                       "expected_action_version": act["version"]}, "Action")["data"]
+    e = api.post(f"/actions/{act['id']}/reconcile", {**tgt, "target": {"target_id": "LIN-999", "target_url": None}},
+                 expect=422)  # no attributed observation names it
+    assert e["error"]["code"] == "POLICY_VIOLATION"
+    out = api.post(f"/actions/{act['id']}/reconcile", tgt, "Action")["data"]
     assert out["status"] == "succeeded" and out["receipt"]["target_id"] == "LIN-7"
+    assert out["receipt"]["id"].startswith("rcpt_") and len(out["receipt"]["result_hash"]) == 64
     assert api.get(f"/requests/{req['id']}", "Request")["data"]["status"] == "awaiting_work"
     cont = api.claim(["investigate"])
     assert cont["checkpoint"]["resume_stage"] == "observe" and cont["checkpoint"]["action_id"] == act["id"]
