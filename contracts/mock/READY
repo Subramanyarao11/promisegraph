@@ -1,1 +1,1 @@
-37 passed in 3.35s; contract-validated responses: 683; routes exercised: 44/44; PROTOCOL.md rev 2 (#1-#18) + Rev 3 (#19-#26) + Rev 4 (#27-#29); CONTRACT_HASH a68d0a49 (cd contracts/mock && uv run pytest -q)
+43 passed in 3.99s; contract-validated responses: 733; routes exercised: 45/45; PROTOCOL.md rev 2 (#1-#18) + Rev 3 (#19-#26) + Rev 4 (#27-#29) + Rev 5 (#30-#35); CONTRACT_HASH 7066692a (cd contracts/mock && uv run pytest -q)

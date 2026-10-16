@@ -97,7 +97,7 @@ def enqueue(ws: Workspace, kind: str, *, run: dict | None = None, action_id: str
         "id": new_id("job"), "kind": kind, "run_id": run["id"] if run else None, "action_id": action_id,
         "request_id": request_id or (run["request_id"] if run else None), "status": "queued", "attempt": 0,
         "fencing_token": 0, "lease_token": None, "expires_dt": None, "lease_seconds": 60, "worker_id": None,
-        "checkpoint": checkpoint, "due_dt": now_dt(), "seq": ws.job_seq, "completion": None,
+        "checkpoint": checkpoint, "due_dt": now_dt(), "seq": ws.job_seq, "completions": {},
     }
     ws.jobs[job["id"]] = job
     return job
@@ -147,7 +147,7 @@ def run_leased(ws: Workspace, run_id: str) -> bool:
     return any(j["run_id"] == run_id and _lease_live(j) for j in ws.jobs.values())
 
 
-def cancel_run(ws: Workspace, run: dict, reason: str) -> None:
+def cancel_run(ws: Workspace, run: dict, reason: str, extra: dict | None = None) -> None:
     """Cooperative cancellation: queued investigate/undispatched dispatch jobs are cancelled; leases may still record."""
     for j in ws.jobs.values():
         if j["run_id"] == run["id"] and j["status"] == "queued" and j["kind"] in ("investigate", "dispatch"):
@@ -162,7 +162,18 @@ def cancel_run(ws: Workspace, run: dict, reason: str) -> None:
     run["_cancel_reason"] = reason
     if not run_leased(ws, run["id"]):  # rev2 #6; otherwise appended when the leased job completes
         req = ws.requests[run["request_id"]]
-        append_event(ws, run, "run_finished", {"run_status": "cancelled", "request_status": req["status"], "action_id": None})
+        append_event(ws, run, "run_finished", {"run_status": "cancelled", "request_status": req["status"], "action_id": None,
+                                               **(extra or {})})
+
+
+def supersede_run(ws: Workspace, old: dict, new_run_id: str) -> None:
+    """PROTOCOL.md #34: a new run replaces an awaiting_review run; its uncommitted proposals remain as (stale) history."""
+    cancel_run(ws, old, f"superseded by {new_run_id}", {"superseded_by": new_run_id})
+    for p in ws.proposals.values():
+        if p["run_id"] == old["id"] and p["validity"] == "valid" and not any(a["proposal_id"] == p["id"] for a in ws.actions.values()):
+            p["validity"] = "stale"
+            p["validation_reasons"] = (p["validation_reasons"] + [f"run superseded by {new_run_id}"])[-30:]
+            touch(p)
 
 
 def operator_reconcile(ws: Workspace, action: dict, body: dict) -> dict:
@@ -311,7 +322,8 @@ def complete(ws: Workspace, job: dict, body: dict) -> dict:
                                                "request_status": ws.requests[run["request_id"]]["status"], "action_id": None})
     receipt = {"job_id": job["id"], "completion_id": body["completion_id"], "outcome": outcome, "recorded_at": now(),
                "run": pub(run) if run else None, "next_job_id": next_job["id"] if next_job else None}
-    job["completion"] = {"completion_id": body["completion_id"], "receipt": receipt}
+    # PROTOCOL.md #35: completion ids are per attempt; a retryable_failure requeues the job with no final completion
+    job["completions"][body["completion_id"]] = receipt
     return receipt
 
 
@@ -575,6 +587,10 @@ def create_proposal(ws: Workspace, body: dict) -> dict:
 def commit_proposal(ws: Workspace, p: dict, body: dict, *, caller: str, idem_key: str) -> tuple[dict, dict]:
     if any(a["proposal_id"] == p["id"] for a in ws.actions.values()):
         raise ApiError(409, "INVALID_TRANSITION", "proposal is already committed")
+    if ws.runs[p["run_id"]]["status"] == "cancelled" and p["validity"] == "valid":
+        p["validity"] = "stale"  # PROTOCOL.md #34: stale proposals conflict, never INVALID_TRANSITION
+        p["validation_reasons"] = (p["validation_reasons"] + ["proposal's run was cancelled"])[-30:]
+        touch(p)
     if body["expected_revision"] != ws.revision:
         raise ApiError(409, "REVISION_CONFLICT", "expected_revision does not match current knowledge_revision",
                        {"expected_revision": body["expected_revision"], "knowledge_revision": ws.revision})

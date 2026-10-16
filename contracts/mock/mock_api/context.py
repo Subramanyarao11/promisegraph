@@ -50,9 +50,8 @@ def search(ws: Workspace, q: dict) -> dict:
             if cust is None or r["customer_id"] == cust:
                 consider("request", r["id"], r["subject"], f"{r['subject']} {r['body']}")
     if "capability" in types:
-        for c in ws.capabilities.values():
-            if cust is None or cust in c.get("_customer_ids", []):
-                consider("capability", c["id"], c["name"], " ".join([c["name"], *c["aliases"]]))
+        for c in ws.capabilities.values():  # PROTOCOL.md #32: product-wide, never filtered by customer
+            consider("capability", c["id"], c["name"], " ".join([c["name"], *c["aliases"]]))
     if "work_item" in types:
         for w in ws.work_items.values():
             consider("work_item", w["id"], w["title"], f"{w['title']} {w.get('_description', '')}")
@@ -120,8 +119,17 @@ def expand(ws: Workspace, q: dict) -> dict:
     paths = [build_path(ws, parent, n) for n in order[:lim]]
     visited = list(parent)
     nodes = [dict(ws.nodes[n]) for n in visited[:200]]
-    return {"paths": paths, "nodes": nodes, "truncated": more or len(order) > lim or len(visited) > 200,
-            "visited_count": len(visited)}
+    vs, rs = set(visited), set(q["relation_types"])
+    edges = [pub(e) for e in sorted(ws.edges.values(), key=lambda e: e["id"])
+             if e["type"] in rs and e["from_id"] in vs and e["to_id"] in vs]
+    if len(order) > lim or len(visited) > 200 or len(edges) > 500:
+        truncation = "limit"
+    elif more:
+        truncation = "depth"
+    else:
+        truncation = None
+    return {"paths": paths, "nodes": nodes, "truncated": truncation is not None, "visited_count": len(visited),
+            "edges": edges[:500], "truncation": truncation}
 
 
 def _decision_active(d: dict) -> bool:

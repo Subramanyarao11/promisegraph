@@ -442,11 +442,16 @@ async def create_run(request: Request, wid: str, rid: str):
     def h(ctx: Ctx, b: dict):
         ws = ctx.ws
         req = ws.get("requests", rid, "request")
-        if any(r["request_id"] == rid and r["status"] in engine.ACTIVE_RUN for r in ws.runs.values()):
+        mine = [r for r in ws.runs.values() if r["request_id"] == rid]
+        latest = max(mine, key=lambda r: (r["created_at"], r["id"])) if mine else None
+        reviewing = latest if latest and latest["status"] == "awaiting_review" else None  # PROTOCOL.md #34
+        if any(r["status"] in engine.ACTIVE_RUN and r is not reviewing for r in mine):
             raise ApiError(409, "INVALID_TRANSITION", "request already has an active run")
         if b["authorization_id"] is not None and b["authorization_id"] not in ws.authorizations:
             raise ApiError(422, "POLICY_VIOLATION", f"authorization {b['authorization_id']} does not exist")
         run = engine.create_run(ws, req, b["mode"], b["instruction"], b["authorization_id"])
+        if reviewing:
+            engine.supersede_run(ws, reviewing, run["id"])
         return 202, pub(run), "Run"
     return await command(request, wid, "POST /requests/{request_id}/runs", "RunCreate", h, operator_only=True)
 
@@ -894,10 +899,23 @@ async def list_observations(request: Request, wid: str):
 @app.get(PUBLIC + "/attempts")
 async def list_attempts(request: Request, wid: str):
     ctx = authorize(request, wid)
-    rq = request.query_params.get("request_id")
-    items = [pub(a) for a in newest_first(ctx.ws.attempts.values(), "observed_at") if not rq or a["request_id"] == rq]
+    q = request.query_params
+    rq, et, eid = q.get("request_id"), q.get("scope_entity_type"), q.get("scope_entity_id")  # PROTOCOL.md #31
+    items = [pub(a) for a in newest_first(ctx.ws.attempts.values(), "observed_at")
+             if (not rq or a["request_id"] == rq) and (not et or a["scope"]["entity_type"] == et)
+             and (not eid or a["scope"]["entity_id"] == eid)]
     page, nxt = paginate(request, items)
     return ok_list(ctx, page, "Attempt", nxt)
+
+
+@app.get(PUBLIC + "/people/{person_id}")
+async def get_person(request: Request, wid: str, person_id: str):
+    """PROTOCOL.md #33."""
+    ctx = authorize(request, wid)
+    p = ctx.ws.get("people", person_id, "person")
+    data = {"id": p["id"], "name": p["name"], "role": p["role"], "team_id": p.get("team_id"),
+            "active": p.get("active", True), "version": p.get("version", 1)}
+    return ok(ctx, data, "PersonSummary")
 
 
 @app.post(PUBLIC + "/actions/{aid}/reconcile")
@@ -966,9 +984,10 @@ async def checkpoint(request: Request, wid: str, job_id: str):
 async def complete(request: Request, wid: str, job_id: str):
     def h(ctx: Ctx, b: dict):
         job = engine.get_job(ctx.ws, job_id)
-        if job["completion"]:
-            if job["completion"]["completion_id"] == b["completion_id"]:
-                return 200, job["completion"]["receipt"], "CompletionReceipt"
+        prior = job["completions"].get(b["completion_id"])
+        if prior is not None:  # same completion id (any attempt) -> original receipt
+            return 200, prior, "CompletionReceipt"
+        if job["status"] == "completed":
             raise ApiError(409, "LEASE_LOST", "job is already completed", {"job_id": job_id})
         job = engine.check_lease(ctx.ws, job_id, b["lease_token"], b["fencing_token"])
         return 200, engine.complete(ctx.ws, job, b), "CompletionReceipt"

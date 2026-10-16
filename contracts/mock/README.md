@@ -32,7 +32,7 @@ cd contracts/mock && uv run pytest -q
 
 The harness checks every HTTP response against `contracts/tools/validate.py`. That covers the `{data, meta}` and list
 envelopes, `EventsPage`, `ErrorEnvelope` and the DTO for each route. It also reports how many of the 36 contract
-routes the run exercised (44 in total). `tests/test_rev2.py` covers the rev 2 clarifications (including #17), and `tests/test_rev3.py` covers Rev 3 (items 19–24).
+routes the run exercised (45 in total). `tests/test_rev2.py` covers the rev 2 clarifications (including #17), `tests/test_rev3.py` covers Rev 3 (items 19–26), and `tests/test_rev5.py` covers Rev 5 (items 30–35).
 
 ## Seed
 
@@ -137,6 +137,18 @@ On startup and on each reset:
   already-closed request returns 409 `INVALID_TRANSITION`.
 - **Refresh target (#22).** Refresh jobs keep `run_id: null`; their checkpoint is
   `{request_id, reason, work_item_ids}`, where `work_item_ids` are the request's linked work.
+- **Rev 5.**
+  - #30: `POST /context/expand` also returns `edges`, which are all allowlisted edges among the visited nodes (at
+    most 500, in their real direction), plus `truncation`, which is `limit`, `depth` or `null`.
+  - #31: `GET /attempts` also filters on `scope_entity_type` and `scope_entity_id`.
+  - #32: `ContextSearch.customer_id` filters request candidates only.
+  - #33: `GET /people/{id}` returns a PersonSummary.
+  - #34: `POST /requests/{id}/runs` while the latest run is `awaiting_review` returns 202. It cancels that run with
+    `run_finished {superseded_by}` and marks its uncommitted proposals `stale`, so committing one returns 409
+    `REVISION_CONFLICT`. A proposal from any cancelled run is treated as stale on commit.
+  - #35: completion ids are per attempt. A `retryable_failure` requeues the job without finalizing it, so the next
+    lease holder's `complete` is accepted. Repeating a `completion_id` returns its original receipt, and any new
+    completion after the final one returns 409 `LEASE_LOST`.
 - **Investigate completion.** Only `proposal_ids` is required in `result`. A `waiting` outcome also needs
   `awaiting: "review"`.
 - **Run control.** Cancel is cooperative: queued jobs are cancelled, and leased jobs may still record receipts. If a

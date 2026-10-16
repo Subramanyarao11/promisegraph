@@ -206,7 +206,7 @@ def _apply(ws: Workspace, op: dict, ev: str) -> None:
 
     def version_of(coll):
         old = coll.get(eid)
-        return old["version"] + 1 if old else 1
+        return old.get("version", 1) + 1 if old else 1
 
     if et == "customer":
         ws.customers[eid] = {"id": eid, "workspace_id": ws.id, "name": r["name"], "version": version_of(ws.customers),
@@ -214,7 +214,7 @@ def _apply(ws: Workspace, op: dict, ev: str) -> None:
     elif et == "team":
         ws.teams[eid] = dict(r)
     elif et == "person":
-        ws.people[eid] = dict(r)
+        ws.people[eid] = {**r, "version": version_of(ws.people)}
         if r.get("team_id"):
             edge("RELATED_TO", eid, r["team_id"])
     elif et == "capability":

@@ -60,6 +60,7 @@ ROUTES = [
     ("GET", r"/observations", "Observation", "list"),
     ("GET", r"/attempts", "Attempt", "list"),
     ("POST", rf"/actions/{ID}/reconcile", "Action", "single"),
+    ("GET", rf"/people/{ID}", "PersonSummary", "single"),
     ("POST", rf"/requests/{ID}/close", "Request", "single"),
     # private
     ("POST", r"/jobs/claim", "JobLease", "single"),
