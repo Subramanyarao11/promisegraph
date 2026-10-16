@@ -2829,6 +2829,23 @@ export interface ContextExpandResult {
   nodes: GraphNode[];
   truncated: boolean;
   visited_count: number;
+  /**
+   * @maxItems 500
+   */
+  edges: GraphEdge[];
+  truncation: ("limit" | "depth") | null;
+}
+/**
+ * This interface was referenced by `PromiseGraphContracts`'s JSON-Schema
+ * via the `definition` "PersonSummary".
+ */
+export interface PersonSummary {
+  id: string;
+  name: string;
+  role: string;
+  team_id: string | null;
+  active: boolean;
+  version: number;
 }
 /**
  * This interface was referenced by `PromiseGraphContracts`'s JSON-Schema

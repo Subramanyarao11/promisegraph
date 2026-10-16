@@ -1445,13 +1445,83 @@
         "visited_count": {
           "type": "integer",
           "minimum": 0
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "$ref": "resources.schema.json#/$defs/GraphEdge"
+          },
+          "maxItems": 500
+        },
+        "truncation": {
+          "anyOf": [
+            {
+              "enum": [
+                "limit",
+                "depth"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
         "paths",
         "nodes",
         "truncated",
-        "visited_count"
+        "visited_count",
+        "edges",
+        "truncation"
+      ],
+      "additionalProperties": false
+    },
+    "PersonSummary": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "team_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "role",
+        "team_id",
+        "active",
+        "version"
       ],
       "additionalProperties": false
     },

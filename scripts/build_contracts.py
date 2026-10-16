@@ -196,7 +196,11 @@ defs["ContextExpandResult"] = obj({
     "nodes": arr(ref("GraphNode"), 0, 200),
     "truncated": {"type": "boolean"},
     "visited_count": integer(0),
+    "edges": arr(ref("GraphEdge"), 0, 500),
+    "truncation": nullable({"enum": ["limit", "depth"]}),
 })
+defs["PersonSummary"] = obj({"id": ID, "name": s(1, 200), "role": s(1, 200), "team_id": nullable(ID),
+                             "active": {"type": "boolean"}, "version": integer(1)})
 defs["ProposalCommitResult"] = obj({"action": ref("Action"), "job_id": ID})
 defs["ObservationResult"] = obj({"observation": ref("Observation"), "request": ref("Request")})
 defs["RefreshResult"] = obj({"job_id": ID, "coalesced": {"type": "boolean"}})

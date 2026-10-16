@@ -1260,6 +1260,20 @@ class ContextExpandResult(BaseModel):
     nodes: Annotated[list[GraphNode], Field(max_length=200)]
     truncated: bool
     visited_count: Annotated[int, Field(ge=0)]
+    edges: Annotated[list[GraphEdge], Field(max_length=500)]
+    truncation: Literal['limit', 'depth'] | None
+
+
+class PersonSummary(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: Annotated[str, Field(max_length=128, min_length=1)]
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    role: Annotated[str, Field(max_length=200, min_length=1)]
+    team_id: TeamId | None
+    active: bool
+    version: Annotated[int, Field(ge=1)]
 
 
 class ProposalCommitResult(BaseModel):

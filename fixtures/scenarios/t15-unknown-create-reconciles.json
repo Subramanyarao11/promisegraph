@@ -111,7 +111,9 @@
       "type": "action_updated",
       "payload": {
         "status": "unknown"
-      }
+      },
+      "optional": true,
+      "note": "Only observable when the API itself cannot establish the effect; the real API commits the local effect atomically before the injected 503, so the action may go straight to succeeded. Invariants: one action, receipt present, no duplicate work item."
     },
     {
       "assert": "action_status",
