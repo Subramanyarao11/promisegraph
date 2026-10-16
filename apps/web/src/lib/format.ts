@@ -44,3 +44,18 @@ export function durationMs(ms: number): string {
   if (ms < 1000) return `${ms} ms`;
   return `${(ms / 1000).toFixed(1)} s`;
 }
+
+/** Source excerpts can be whole structured records; show their human-readable field instead of raw JSON. */
+export function friendlyExcerpt(text: string, max = 220): string {
+  let out = text;
+  const t = text.trim();
+  if (t.startsWith("{")) {
+    try {
+      const o = JSON.parse(t) as Record<string, unknown>;
+      const pick = ["summary", "title", "subject", "body", "description", "rationale", "name"].map((k) => o[k]).find((v) => typeof v === "string" && v.trim());
+      if (typeof pick === "string") out = pick;
+    } catch { /* truncated or not JSON: fall back to the raw text */ }
+  }
+  return out.length > max ? `${out.slice(0, max)}…` : out;
+}
+

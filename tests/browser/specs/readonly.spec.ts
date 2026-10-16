@@ -48,6 +48,7 @@ test("inbox filters and an investigation render real evidence paths as ordered t
   const path = page.getByTestId("evidence-path").first();
   await expect(path.locator("ol.path > li").first()).toBeVisible();
   await expect(path.locator("ol.path")).toHaveAttribute("aria-label", /Graph path 1: /);
+  if ((await page.getByTestId("open-source").count()) === 0) await page.getByTestId("toggle-sources").click();
   await page.getByTestId("open-source").first().click();
   await expect(page.getByTestId("drawer-excerpt")).not.toBeEmpty();
   await expect(page.getByTestId("drawer-revision")).toContainText("version ");
@@ -115,4 +116,44 @@ test("'Try an example' only prefills the form (customer found by name); nothing 
   await dlg.getByRole("button", { name: "Cancel" }).click();
   const after = (await (await page.request.get(`${WS}/requests?limit=100`)).json()).data.length;
   expect(after).toBe(before);
+});
+
+test("'What we found' is collapsed to one count line per group; uncited items appear only on request", async ({ page }) => {
+  // A seeded request with context but no suggestion yet: nothing is cited, so every group starts collapsed.
+  const reqs = (await (await page.request.get(`${WS}/requests?limit=100`)).json()).data as { id: string }[];
+  let target: { id: string; decisions: number } | null = null;
+  for (const r of reqs.slice(0, 20)) {
+    const props = (await (await page.request.get(`${WS}/proposals?request_id=${r.id}`)).json()).data ?? [];
+    if (props.length) continue;
+    const ctx = (await (await page.request.get(`${WS}/requests/${r.id}/context`)).json()).data;
+    if (ctx?.decisions?.length) { target = { id: r.id, decisions: ctx.decisions.length }; break; }
+  }
+  test.skip(!target, "no unplanned request with company rules in this workspace");
+  await page.goto(`/requests/${target!.id}`);
+  const group = page.getByTestId("decisions");
+  await expect(group).toContainText(new RegExp(`${target!.decisions} company rules? appl`));
+  await expect(group.locator("li")).toHaveCount(0);
+  await page.getByTestId("toggle-decisions").click();
+  await expect(group.locator("li")).toHaveCount(target!.decisions);
+});
+
+test("rule values and scopes show names from the API, not raw IDs", async ({ page }) => {
+  const decisions = (await (await page.request.get(`${WS}/decisions?limit=100`)).json()).data as { rule_type: string; value: unknown; scope: { entity_type: string; entity_id: string } }[];
+  const caps = (await (await page.request.get(`${WS}/capabilities?limit=100`)).json()).data as { id: string; name: string }[];
+  await page.goto("/memory");
+  const list = page.getByTestId("decision-list");
+  await expect(list.getByTestId("decision").first()).toBeVisible();
+  const routing = decisions.find((d) => d.rule_type === "routing_owner" && typeof d.value === "string");
+  if (routing) {
+    const person = (await (await page.request.get(`${WS}/people/${routing.value}`)).json()).data;
+    await expect(list).toContainText(person.name);
+  }
+  const capScoped = decisions.find((d) => d.scope.entity_type === "capability");
+  if (capScoped) {
+    const cap = caps.find((c) => c.id === capScoped.scope.entity_id)!;
+    await expect(list).toContainText(`product area “${cap.name}”`);
+  }
+  test.skip(!routing && !capScoped, "no routing or capability-scoped rules to check");
+  // Rendered setting/scope fragments never fall back to the raw-ID form when the name resolved.
+  await expect(list.locator("strong").filter({ hasText: /^person[ _]/ })).toHaveCount(0);
 });

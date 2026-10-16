@@ -67,6 +67,10 @@ test("T25 real: keyboard + 390px intake → evidence → reviewed action → out
   await noHorizontalScroll(page);
 
   // Evidence by keyboard (real source revision from FalkorDB).
+  if ((await page.getByTestId("open-source").count()) === 0) {
+    await page.getByTestId("toggle-sources").focus();
+    await page.keyboard.press("Enter");
+  }
   await page.getByTestId("open-source").first().focus();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("drawer-excerpt")).not.toBeEmpty();

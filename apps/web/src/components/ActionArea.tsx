@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Action, EvidenceRef, Proposal, ProposalCommit, ProposalCommitResult, Request, WorkItem, WorkspaceInfo } from "@contracts";
 import { useCommand, keys, useWorkItem } from "../api/hooks";
 import { ReconcileForm } from "./Forms";
+import { EntityName } from "./Names";
 import { ApiError } from "../api/client";
 import { Icon } from "./Icon";
 import { EvidenceChip } from "./Evidence";
@@ -68,8 +69,8 @@ function Payload({ p, work }: { p: Proposal; work: WorkItem[] }) {
           <dl className="kv">
             <dt>Task</dt><dd><strong>{p.payload.title}</strong></dd>
             <dt>Owner</dt><dd data-testid="proposal-owner">{p.payload.owner_id ? <Owner id={p.payload.owner_id} /> : <Tag tone="warn" icon="alert">No owner yet: someone will need to pick this up</Tag>}</dd>
-            <dt>Product area</dt><dd>{p.payload.capability_id ? <span>{p.payload.capability_id.replace(/^cap_/, "").replace(/_/g, " ")}</span> : <span className="muted">Not specified</span>}</dd>
-            <dt>Depends on</dt><dd>{p.payload.dependency_ids.length ? p.payload.dependency_ids.map((d) => <Mono key={d}>{d}</Mono>) : <span className="muted">Nothing else</span>}</dd>
+            <dt>Product area</dt><dd>{p.payload.capability_id ? <EntityName type="capability" id={p.payload.capability_id} /> : <span className="muted">Not specified</span>}</dd>
+            <dt>Depends on</dt><dd>{p.payload.dependency_ids.length ? <span className="stack" style={{ gap: 2 }}>{p.payload.dependency_ids.map((d) => <EntityName key={d} type="work_item" id={d} />)}</span> : <span className="muted">Nothing else</span>}</dd>
           </dl>
           <p className="small" style={{ whiteSpace: "pre-wrap" }}>{p.payload.description}</p>
           <Criteria title="Done when" items={p.payload.acceptance_criteria} testId="acceptance-criteria" />

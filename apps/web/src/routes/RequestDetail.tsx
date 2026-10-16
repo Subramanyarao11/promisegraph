@@ -8,10 +8,11 @@ import { Icon } from "../components/Icon";
 import { Badge, Callout, Empty, ErrorPanel, Loading, Mono, Owner, Section, StatusBadge, Tag, Ts, useAnnounce } from "../components/ui";
 import { EvidenceChip, PathText, SourceDrawerProvider, useOpenSource } from "../components/Evidence";
 import { ActionArea, nextStep } from "../components/ActionArea";
+import { RuleValue, ScopeName } from "../components/Names";
 import { RunTimeline } from "../components/Timeline";
 import { CloseRequest, ObservationForm, ReplyForm, RunControls } from "../components/Forms";
 import { ACTION_STATUS, ACTIVE_RUN, ATTEMPT_OUTCOME, DECISION_STATUS, KIND_EXPLAIN, KIND_LABEL, REQUEST_STATUS, RULE_LABEL, RUN_STATUS, VALIDITY, VERIFICATION, WORK_STATUS, spec } from "../lib/status";
-import { humanize, plural } from "../lib/format";
+import { friendlyExcerpt, humanize, plural } from "../lib/format";
 
 export function RequestDetail() {
   const { id = "" } = useParams();
@@ -58,7 +59,6 @@ function Workspace({ id }: { id: string }) {
   const latestRun = runs.length ? runs[runs.length - 1] : null;
 
   const [showAllPaths, setShowAllPaths] = useState(false);
-  const [showAllSources, setShowAllSources] = useState(false);
   const [timelines, setTimelines] = useState<Record<string, Timeline>>({});
   const onUpdate = useCallback((rid: string, t: Timeline) => setTimelines((s) => (s[rid] === t ? s : { ...s, [rid]: t })), []);
   const lastAnnounced = useRef<string>("");
@@ -153,7 +153,16 @@ function Workspace({ id }: { id: string }) {
   const kindOf = (k: string) => KIND_LABEL[k] ?? humanize(k);
   const firstPath = bundle?.paths[0];
   const chain = firstPath ? (firstPath.nodes as { title: string }[]).map((n) => n.title).join(" → ") : null;
-  const visibleSources = showAllSources ? bundle?.sources ?? [] : (bundle?.sources ?? []).slice(0, 2);
+  // What actually shaped the recommendation: evidence it cites (incl. rejected options), its target work, and IDs named in its reasons.
+  const cited = {
+    evidence: new Set<string>([...(proposal?.evidence_ids ?? []), ...(proposal?.rejected_alternatives ?? []).flatMap((a) => a.evidence_ids)]),
+    work: new Set<string>([
+      ...(proposal?.kind === "link_work" ? [proposal.payload.work_item_id] : []),
+      ...(proposal?.kind === "create_work" ? proposal.payload.dependency_ids : []),
+    ]),
+    text: [proposal?.explanation ?? "", ...(proposal?.validation_reasons ?? []), ...(proposal?.rejected_alternatives ?? []).map((a) => a.reason)].join("\n"),
+  };
+  const citedStale = (bundle?.sources ?? []).some((x) => x.stale && cited.evidence.has(x.id));
 
   return (
     <div data-testid="request-workspace" className="story">
@@ -218,7 +227,7 @@ function Workspace({ id }: { id: string }) {
 
       <Section title="2. What we found" testId="found">
         {ctx.isLoading ? <Loading label="Checking what we know" /> : ctx.error ? <ErrorPanel error={ctx.error} onRetry={() => ctx.refetch()} what="what we know" /> : !bundle ? null : (
-          <div className="stack-lg">
+          <div className="stack">
             <p className="finding">
               PromiseGraph checked {plural(bundle.sources.length, "source")}, {plural(bundle.related_work.length, "related engineering item")}, {plural(bundle.decisions.length, "company rule")} and {plural(bundle.attempts.length, "past attempt")}.
             </p>
@@ -226,89 +235,63 @@ function Workspace({ id }: { id: string }) {
               <div>
                 <h3 className="sub">How we know this</h3>
                 <p data-testid="chain">{chain}</p>
-                {bundle.paths.length > 1 && <p className="small muted">{bundle.paths.length - 1} more connections in Technical details.</p>}
               </div>
             )}
-            {bundle.truncated && (
-              <Callout tone="warn" icon="alert" title="We didn't check everything" testId="truncated">
-                <p>There was more to look through than we could check, so something relevant may be missing.</p>
+            {citedStale ? (
+              <Callout tone="warn" icon="alert" title="This suggestion relies on information that may be out of date" testId="stale-evidence">
+                <p>At least one source it is based on hasn't been updated recently. Double-check before approving.</p>
               </Callout>
-            )}
-            {bundle.sources.some((x) => x.stale) && (
-              <Callout tone="warn" icon="alert" title="Some information may be out of date" testId="stale-evidence"><p>A few sources haven't been updated recently, so treat what they say with care.</p></Callout>
-            )}
+            ) : (bundle.truncated || bundle.sources.some((x) => x.stale)) ? (
+              <p className="small muted note" data-testid="coverage-note">
+                <Icon name="info" size={12} />{" "}
+                {bundle.truncated && <span data-testid="truncated">We didn't have time to check everything. </span>}
+                {bundle.sources.some((x) => x.stale) && <span data-testid="stale-evidence">Some background sources may be out of date (none that this suggestion relies on).</span>}
+              </p>
+            ) : null}
             {bundle.missing_information.length > 0 && (
               <div data-testid="missing">
                 <h3 className="sub">What we still don't know</h3>
                 <ul>{bundle.missing_information.map((m, i) => <li key={i}>{m}</li>)}</ul>
               </div>
             )}
-            <div>
-              <h3 className="sub">Sources</h3>
-              {bundle.sources.length === 0 ? <p className="muted">No sources found.</p> : (
-                <ul className="list" data-testid="sources">
-                  {visibleSources.map((x) => (
-                    <li key={x.id} className="stack" style={{ gap: 4 }}>
-                      <blockquote className="quote">{friendlyExcerpt(x.excerpt)}</blockquote>
-                      <div className="row small">
-                        <button type="button" className="btn btn-sm" onClick={() => openSource({ source_id: x.source_id, revision: x.source_revision, ref: x })} data-testid="open-source">
-                          <Icon name="doc" /> Open source
-                        </button>
-                        {x.stale ? <Tag tone="warn" icon="alert">May be out of date</Tag> : <Tag tone="success" icon="check">Up to date</Tag>}
-                        <span className="muted">as of <Ts iso={x.observed_at} /></span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {bundle.sources.length > 2 && (
-                <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} aria-expanded={showAllSources} onClick={() => setShowAllSources((v) => !v)}>
-                  {showAllSources ? "Show fewer" : `Show all ${bundle.sources.length} sources`}
-                </button>
-              )}
-            </div>
-            <div data-testid="work">
-              <h3 className="sub">Related engineering work</h3>
-              {bundle.related_work.length === 0 ? <p className="muted">None found.</p> : (
-                <Capped items={[...bundle.related_work].sort((a, b) => Number(request.linked_work_ids.includes(b.id)) - Number(request.linked_work_ids.includes(a.id)))} noun="engineering items" render={(w) => (
-                    <li className="stack" style={{ gap: 3 }}>
-                      <span className="row"><strong>{w.title}</strong> <StatusBadge map={WORK_STATUS} value={w.status} />{request.linked_work_ids.includes(w.id) && <Tag tone="info" icon="link">Attached to this request</Tag>}</span>
-                      <span className="row small">Owner: <Owner id={w.owner_id} /> · {w.forecast_at ? <>expected <Ts iso={w.forecast_at} /></> : "no expected date"}</span>
-                    </li>
-                  )} />
-              )}
-            </div>
-            <div data-testid="decisions">
-              <h3 className="sub">Company rules that apply</h3>
-              {conflicts.length > 0 && (
-                <Callout tone="warn" icon="alert" title="Hint: some rules may conflict" testId="conflicting-decisions">
-                  <p>{conflicts.map((c) => `${RULE_LABEL[c[0].rule_type] ?? humanize(c[0].rule_type)}: ${c.length} rules say different things`).join("; ")}.</p>
-                  <p className="muted small">This is only a hint from the screen. What counts is whether the suggested action below is allowed, or whether it was handed off.</p>
-                  {proposal && proposal.validation_reasons.length > 0 && <ul className="small" data-testid="conflict-authoritative">{proposal.validation_reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>}
-                  {proposal?.kind === "escalate" && <p className="small"><strong>Handed off:</strong> {proposal.payload.reason}</p>}
-                </Callout>
-              )}
-              {bundle.decisions.length === 0 ? <p className="muted">No company rules apply.</p> : (
-                <Capped items={[...bundle.decisions].sort((a, b) => Number(b.status === "active") - Number(a.status === "active"))} noun="company rules" render={(d) => (
-                    <li className="stack" style={{ gap: 3 }}>
-                      <span className="row"><strong>{RULE_LABEL[d.rule_type] ?? humanize(d.rule_type)}</strong>: {ruleValue(d.value)} <StatusBadge map={DECISION_STATUS} value={d.status} /></span>
-                      <span className="small muted">{d.rationale} · applies to {d.scope.entity_type === "customer" ? customerName(d.scope.entity_id) : `${humanize(d.scope.entity_type)} ${d.scope.entity_id}`}</span>
-                    </li>
-                  )} />
-              )}
-            </div>
-            <div data-testid="attempts">
-              <h3 className="sub">What was tried before</h3>
-              {bundle.attempts.length === 0 ? <p className="muted">Nothing similar was tried before.</p> : (
-                <Capped items={[...bundle.attempts].sort((a, b) => Number(b.verification !== "pending") - Number(a.verification !== "pending") || b.observed_at.localeCompare(a.observed_at))} noun="past attempts" render={(t) => (
-                    <li className="stack" style={{ gap: 3 }}>
-                      <span className="row"><StatusBadge map={ATTEMPT_OUTCOME} value={t.outcome} /> <StatusBadge map={VERIFICATION} value={t.verification} /></span>
-                      <span>{t.summary}</span>
-                      <span className="small muted"><Ts iso={t.observed_at} /> · for {t.scope.entity_type === "customer" ? customerName(t.scope.entity_id) : `${humanize(t.scope.entity_type)} ${t.scope.entity_id}`}</span>
-                    </li>
-                  )} />
-              )}
-            </div>
+            <FoundGroup testId="sources" items={bundle.sources} cited={(x) => cited.evidence.has(x.id)} count={(n) => `${plural(n, "source")} checked`} render={(x) => (
+              <>
+                <blockquote className="quote">{friendlyExcerpt(x.excerpt)}</blockquote>
+                <div className="row small">
+                  <button type="button" className="btn btn-sm" onClick={() => openSource({ source_id: x.source_id, revision: x.source_revision, ref: x })} data-testid="open-source">
+                    <Icon name="doc" /> Open source
+                  </button>
+                  {x.stale ? <Tag tone="warn" icon="alert">May be out of date</Tag> : <Tag tone="success" icon="check">Up to date</Tag>}
+                  <span className="muted">as of <Ts iso={x.observed_at} /></span>
+                </div>
+              </>
+            )} />
+            <FoundGroup testId="work" items={bundle.related_work} cited={(w) => cited.work.has(w.id) || w.evidence_ids.some((e) => cited.evidence.has(e)) || cited.text.includes(w.id)} count={(n) => `${plural(n, "related engineering item")}`} render={(w) => (
+              <>
+                <span className="row"><strong>{w.title}</strong> <StatusBadge map={WORK_STATUS} value={w.status} />{request.linked_work_ids.includes(w.id) && <Tag tone="info" icon="link">Attached to this request</Tag>}</span>
+                <span className="row small">Owner: <Owner id={w.owner_id} /> · {w.forecast_at ? <>expected <Ts iso={w.forecast_at} /></> : "no expected date"}</span>
+              </>
+            )} />
+            <FoundGroup testId="decisions" items={bundle.decisions} cited={(d) => d.evidence_ids.some((e) => cited.evidence.has(e)) || cited.text.includes(d.id)} count={(n) => `${plural(n, "company rule")} ${n === 1 ? "applies" : "apply"}`} render={(d) => (
+              <>
+                <span className="row"><strong>{RULE_LABEL[d.rule_type] ?? humanize(d.rule_type)}</strong>: <RuleValue ruleType={d.rule_type} value={d.value} /> <StatusBadge map={DECISION_STATUS} value={d.status} /></span>
+                <span className="small muted">{d.rationale} · applies to <ScopeName scope={d.scope} currentRequestId={request.id} /></span>
+              </>
+            )} before={conflicts.length > 0 ? (
+              <Callout tone="warn" icon="alert" title="Hint: some rules may conflict" testId="conflicting-decisions">
+                <p>{conflicts.map((c) => `${RULE_LABEL[c[0].rule_type] ?? humanize(c[0].rule_type)}: ${c.length} rules say different things`).join("; ")}.</p>
+                <p className="muted small">This is only a hint from the screen. What counts is whether the suggested action below is allowed, or whether it was handed off.</p>
+                {proposal && proposal.validation_reasons.length > 0 && <ul className="small" data-testid="conflict-authoritative">{proposal.validation_reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>}
+                {proposal?.kind === "escalate" && <p className="small"><strong>Handed off:</strong> {proposal.payload.reason}</p>}
+              </Callout>
+            ) : null} />
+            <FoundGroup testId="attempts" items={bundle.attempts} cited={(t) => t.evidence_ids.some((e) => cited.evidence.has(e)) || cited.text.includes(t.id) || cited.text.includes(t.procedure_key)} count={(n) => `${plural(n, "past attempt")}`} render={(t) => (
+              <>
+                <span className="row"><StatusBadge map={ATTEMPT_OUTCOME} value={t.outcome} /> <StatusBadge map={VERIFICATION} value={t.verification} /></span>
+                <span>{t.summary}</span>
+                <span className="small muted"><Ts iso={t.observed_at} /> · for <ScopeName scope={t.scope} currentRequestId={request.id} /></span>
+              </>
+            )} />
           </div>
         )}
       </Section>
@@ -447,34 +430,38 @@ function Workspace({ id }: { id: string }) {
   );
 }
 
-/** Shows the first few items (most relevant first) with a toggle for the rest, so the story stays readable. */
-function Capped<T extends { id: string }>({ items, noun, render, limit = 3 }: { items: T[]; noun: string; render: (t: T) => React.ReactNode; limit?: number }) {
+/**
+ * One collapsed line per kind of finding ("3 company rules apply · Show"). Items that shaped the recommendation
+ * (cited in its evidence, target or reasons) are shown expanded, labelled; everything else sits behind the toggle.
+ */
+function FoundGroup<T extends { id: string }>({ items, cited, count, render, testId, before }: { items: T[]; cited: (t: T) => boolean; count: (n: number) => string; render: (t: T) => React.ReactNode; testId: string; before?: React.ReactNode }) {
   const [all, setAll] = useState(false);
-  const shown = all ? items : items.slice(0, limit);
+  const used = items.filter(cited);
+  const shown = all ? [...used, ...items.filter((t) => !cited(t))] : used;
+  if (items.length === 0) return <p className="small muted found-line" data-testid={testId}>{count(0)}.</p>;
   return (
-    <>
-      <ul className="list">{shown.map((t) => <li key={t.id} className="stack" style={{ gap: 3 }}>{render(t)}</li>)}</ul>
-      {items.length > limit && (
-        <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} aria-expanded={all} onClick={() => setAll((v) => !v)}>
-          {all ? "Show fewer" : `Show all ${items.length} ${noun}`}
-        </button>
+    <div className="found-group" data-testid={testId}>
+      <p className="found-line">
+        <span>{count(items.length)}{used.length > 0 && <span className="muted"> · {used.length} used in this suggestion</span>}</span>
+        {items.length > used.length && (
+          <button type="button" className="btn btn-ghost btn-sm" aria-expanded={all} onClick={() => setAll((v) => !v)} data-testid={`toggle-${testId}`}>
+            {all ? "Hide" : used.length ? "Show all" : "Show"}
+          </button>
+        )}
+      </p>
+      {before}
+      {shown.length > 0 && (
+        <ul className="list found-list">
+          {shown.map((t) => (
+            <li key={t.id} className="stack" style={{ gap: 3 }}>
+              {cited(t) && <span className="used-tag"><Tag tone="info" icon="check">Used in this suggestion</Tag></span>}
+              {render(t)}
+            </li>
+          ))}
+        </ul>
       )}
-    </>
+    </div>
   );
-}
-
-/** Source excerpts can be whole structured records; show their human-readable field instead of raw JSON. */
-function friendlyExcerpt(text: string, max = 220): string {
-  let out = text;
-  const t = text.trim();
-  if (t.startsWith("{")) {
-    try {
-      const o = JSON.parse(t) as Record<string, unknown>;
-      const pick = ["summary", "title", "subject", "body", "description", "rationale", "name"].map((k) => o[k]).find((v) => typeof v === "string" && v.trim());
-      if (typeof pick === "string") out = pick;
-    } catch { /* truncated or not JSON: fall back to the raw text */ }
-  }
-  return out.length > max ? `${out.slice(0, max)}…` : out;
 }
 
 const OBS_KIND: Record<string, string> = {
@@ -483,11 +470,6 @@ const OBS_KIND: Record<string, string> = {
   acceptance_check: "Checked against the criteria",
   connector_status: "Status update from a connected tool",
 };
-function ruleValue(v: unknown): string {
-  if (typeof v === "boolean") return v ? "yes" : "no";
-  if (Array.isArray(v)) return v.map((k) => KIND_LABEL[k as string] ?? String(k)).join(", ");
-  return String(v).replace(/_/g, " ");
-}
 
 /** Groups active decisions with the same rule type and scope but different values — a visible fact, not a resolution. */
 function findConflicts(ds: Decision[]): Decision[][] {

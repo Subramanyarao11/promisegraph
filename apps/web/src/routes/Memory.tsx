@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { Attempt, ContextBundle, Decision, DecisionCommand, Request } from "@contracts";
-import { useAttempts, useCommand, useCustomerName, useDecisions } from "../api/hooks";
+import { useAttempts, useCommand, useDecisions } from "../api/hooks";
+import { RuleValue, ScopeName } from "../components/Names";
 import { api, ApiError, getLastMeta, qs } from "../api/client";
 import { Icon } from "../components/Icon";
 import { Dialog, Empty, ErrorPanel, Field, Loading, Mono, Owner, Section, StatusBadge, Tag, Ts, useAnnounce } from "../components/ui";
@@ -40,7 +41,6 @@ export function MemoryPage() {
 }
 
 function Decisions() {
-  const customerName = useCustomerName();
   const [activeOnly, setActiveOnly] = useState(false);
   const q = useDecisions(activeOnly ? { active: "true" } : {});
   const [dialog, setDialog] = useState<{ op: DecisionCommand["operation"]; target: Decision | null } | null>(null);
@@ -76,7 +76,7 @@ function Decisions() {
                       </>
                     )}
                   </div>
-                  <div className="small">Setting: <strong>{typeof d.value === "boolean" ? (d.value ? "yes" : "no") : Array.isArray(d.value) ? (d.value as string[]).join(", ") : String(d.value)}</strong> · applies to {d.scope.entity_type === "customer" ? customerName(d.scope.entity_id) : `${humanize(d.scope.entity_type)} ${d.scope.entity_id}`}</div>
+                  <div className="small">Setting: <strong><RuleValue ruleType={d.rule_type} value={d.value} /></strong> · applies to <ScopeName scope={d.scope} /></div>
                   <div className="small">{d.rationale}</div>
                   <div className="small muted">
                     from <Ts iso={d.effective_at} /> · {d.expires_at ? <>until <Ts iso={d.expires_at} /></> : "no end date"} · added by <Owner id={d.author_id} />
@@ -223,7 +223,6 @@ function Attempts() {
 }
 
 function AttemptList({ attempts, note }: { attempts: Attempt[]; note: string | null }) {
-  const customerName = useCustomerName();
   const d = { attempts };
   return (
     <Section title="What was tried before" count={d.attempts.length} testId="attempt-list">
@@ -234,7 +233,7 @@ function AttemptList({ attempts, note }: { attempts: Attempt[]; note: string | n
             <li key={a.id} className="stack" style={{ gap: 3 }}>
               <span className="row"><strong>{a.procedure_key.replace(/_/g, " ")}</strong> <StatusBadge map={ATTEMPT_OUTCOME} value={a.outcome} /> <StatusBadge map={VERIFICATION} value={a.verification} /></span>
               <span>{a.summary}</span>
-              <span className="small muted"><Link to={`/requests/${encodeURIComponent(a.request_id)}`}>Open the request</Link> · for {a.scope.entity_type === "customer" ? customerName(a.scope.entity_id) : `${humanize(a.scope.entity_type)} ${a.scope.entity_id}`} · <Ts iso={a.observed_at} /></span>
+              <span className="small muted"><Link to={`/requests/${encodeURIComponent(a.request_id)}`}>Open the request</Link> · for <ScopeName scope={a.scope} /> · <Ts iso={a.observed_at} /></span>
               {a.verification === "passed" && <span><Tag tone="success" icon="shield">Confirmed result</Tag></span>}
             </li>
           ))}

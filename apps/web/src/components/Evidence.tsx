@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import type { EvidencePath, EvidenceRef, GraphEdge, GraphNode } from "@contracts";
 import { useEvidence, useSource } from "../api/hooks";
+import { friendlyExcerpt } from "../lib/format";
 import { Icon } from "./Icon";
 import { Callout, Dialog, ErrorPanel, Loading, Mono, Tag, Ts } from "./ui";
 
@@ -100,13 +101,13 @@ export function EvidenceChip({ id, refs }: { id: string; refs: Map<string, Evide
   const ref = refs.get(id);
   if (!ref)
     return (
-      <button type="button" className="btn btn-sm" onClick={() => open({ source_id: null, revision: null, evidence_id: id })} title="Open cited evidence">
-        <Icon name="doc" /> {id}
+      <button type="button" className="btn btn-sm" onClick={() => open({ source_id: null, revision: null, evidence_id: id })} title={id}>
+        <Icon name="doc" /> Cited source
       </button>
     );
   return (
     <button type="button" className="btn btn-sm" onClick={() => open({ source_id: ref.source_id, revision: ref.source_revision, ref })} title={ref.excerpt}>
-      <Icon name="doc" /> “{ref.excerpt.length > 40 ? `${ref.excerpt.slice(0, 40)}…` : ref.excerpt}”
+      <Icon name="doc" /> “{friendlyExcerpt(ref.excerpt, 40)}”
       {ref.stale && <span className="sr-only"> (may be out of date)</span>}
       {ref.stale && <Icon name="alert" />}
     </button>

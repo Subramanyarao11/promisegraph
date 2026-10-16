@@ -80,6 +80,11 @@ test("T25 keyboard + 390px journey: intake → evidence → reviewed action → 
   await expect(page.getByTestId("timeline").first()).toContainText("Rule-based mode");
 
   // Source drawer by keyboard: exact excerpt + revision + freshness; Escape closes.
+  // Sources are collapsed unless the suggestion cites them; open the group by keyboard when needed.
+  if ((await page.getByTestId("open-source").count()) === 0) {
+    await page.getByTestId("toggle-sources").focus();
+    await page.keyboard.press("Enter");
+  }
   const openSource = page.getByTestId("open-source").first();
   await openSource.focus();
   await page.keyboard.press("Enter");

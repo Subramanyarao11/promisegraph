@@ -331,3 +331,7 @@ details.tech > summary { cursor: pointer; padding: 11px 14px; font-weight: 600; 
 details.tech[open] > summary { border-bottom: 1px solid var(--border); }
 details > summary { cursor: pointer; }
 details > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.found-group { border-top: 1px solid var(--border); padding-top: 8px; }
+.found-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 550; }
+.found-list { margin-top: 6px; }
+.note { display: flex; gap: 6px; align-items: flex-start; }
