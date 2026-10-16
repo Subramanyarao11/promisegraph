@@ -1,0 +1,17 @@
+{
+  "name": "@promisegraph/browser-tests",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "test": "playwright test",
+    "test:mock": "PG_TARGET=mock playwright test",
+    "test:real": "PG_TARGET=real playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "22.18.0",
+    "typescript": "7.0.2"
+  }
+}
