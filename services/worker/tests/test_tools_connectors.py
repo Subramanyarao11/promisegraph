@@ -16,7 +16,6 @@ from promisegraph_worker.jobs.effects import EffectRunner
 from promisegraph_worker.jobs.lease import LeaseKeeper
 from promisegraph_worker.markers import action_marker
 from promisegraph_worker.planner.base import CapabilityDisabled
-from promisegraph_worker.planner.model import ModelPlanner
 from promisegraph_worker.tools import TOOL_NAMES, TOOL_SCHEMAS, ToolClient, bound_result
 
 from .conftest import Router, err, no_sleep, ok
@@ -293,13 +292,3 @@ def test_linear_unconfigured_dispatch_fails_honestly_without_network(router: Rou
     assert runner.dispatch(keeper)["result"]["error"]["code"] == "CAPABILITY_DISABLED"
 
 
-# ----------------------------------------------------------------------------------------------- model adapter
-def test_model_planner_disabled_makes_no_calls():
-    made = []
-    with pytest.raises(CapabilityDisabled):
-        ModelPlanner(enabled=False, api_key="k", client_factory=lambda k: made.append(k))
-    with pytest.raises(CapabilityDisabled):
-        ModelPlanner(enabled=True, api_key="", client_factory=lambda k: made.append(k))
-    assert not made
-    p = ModelPlanner(enabled=True, api_key="k", client_factory=lambda k: made.append(k))
-    assert p.model == "claude-opus-5-5" and {t["name"] for t in p.tools()} == set(TOOL_NAMES) and not made  # lazy: no client until a run

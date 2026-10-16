@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 
 from .config import REPO_ROOT, load_settings
+from .planner.spend import SpendConfigError
 from .worker import Worker, install_signal_handlers
 
 
@@ -25,7 +26,11 @@ def main(argv: list[str] | None = None) -> int:
         settings.worker_id, settings.api_base_url, ",".join(settings.workspaces),
         "+model" if settings.model_configured else " (model disabled)", "enabled" if settings.linear_configured else "disabled",
     )
-    worker = Worker(settings)
+    try:
+        worker = Worker(settings)
+    except SpendConfigError as exc:
+        logging.getLogger("promisegraph.worker").error("%s", exc)
+        return 2
     install_signal_handlers(worker)
     if args.once:
         worker.run_once()

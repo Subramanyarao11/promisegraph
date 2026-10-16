@@ -17,9 +17,10 @@ from .http import ApiClient, ApiError, ApiTimeout, ApiUnavailable, Backoff, Leas
 from .jobs.effects import EffectRunner
 from .jobs.investigate import InvestigateRunner
 from .jobs.lease import LeaseKeeper, claim
-from .planner.base import CapabilityDisabled, Planner
+from .planner.base import Planner
 from .planner.model import ModelPlanner
 from .planner.scripted import ScriptedPlanner
+from .planner.spend import Prices, SpendConfigError, SpendGuard
 
 log = logging.getLogger("promisegraph.worker")
 KINDS = ["reconcile", "dispatch", "investigate", "refresh"]
@@ -32,6 +33,7 @@ class Worker:
         *,
         transport: httpx.BaseTransport | None = None,
         linear_transport: httpx.BaseTransport | None = None,
+        model_transport: httpx.BaseTransport | None = None,
         sleep: Callable[[float], None] = time.sleep,
         heartbeat_interval: float | None = None,
     ) -> None:
@@ -39,10 +41,22 @@ class Worker:
         self.sleep = sleep
         self.api = ApiClient(settings.api_base_url, settings.worker_token, timeout=settings.http_timeout_seconds, transport=transport, backoff=Backoff(sleep=sleep))
         planners: dict[str, Planner] = {"scripted": ScriptedPlanner()}
-        try:
-            planners["model"] = ModelPlanner(enabled=settings.ai_enabled, api_key=settings.ai_api_key, model=settings.ai_model)
-        except CapabilityDisabled:
-            pass  # model runs fail with CAPABILITY_DISABLED; never silently scripted
+        if settings.ai_enabled:
+            errors = settings.model_config_errors()
+            if errors:  # refuse to start in model mode (Rev 6): never run without the hard spend guard
+                raise SpendConfigError("model mode refused: " + "; ".join(errors))
+            guard = SpendGuard(
+                budget_usd=settings.ai_budget_usd,
+                prices=Prices(float(settings.ai_price_input_per_mtok), float(settings.ai_price_output_per_mtok)),
+                max_output_tokens=settings.ai_max_output_tokens_per_call,
+                ledger_path=settings.ledger_path,
+            )
+            planners["model"] = ModelPlanner(
+                enabled=True, provider=settings.ai_provider, api_key=settings.ai_api_key, model=settings.ai_model, guard=guard,
+                max_calls_per_run=settings.ai_max_calls_per_run, max_output_tokens=settings.ai_max_output_tokens_per_call,
+                transport=model_transport, backoff=Backoff(base=1.0, cap=20.0, sleep=sleep),
+            )
+        # AI disabled: model runs fail with CAPABILITY_DISABLED; never silently scripted, no provider client exists.
         self.linear = LinearConnector(
             enabled=settings.linear_enabled, api_key=settings.linear_api_key, team_id=settings.linear_team_id,
             url=settings.linear_api_url, transport=linear_transport, backoff=Backoff(base=1.0, cap=30.0, sleep=sleep),

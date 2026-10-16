@@ -29,5 +29,17 @@
   "runner": {
     "command": "uv run --no-project --with httpx==0.28.1 --with jsonschema==4.25.1 python scripts/run_scenarios.py --manage --port 8020 [--secondary-port 8021] [--only t04,t12] [--holdouts] [--json out.json]",
     "stacks": "--manage starts private stacks via scripts/stack.sh: the shared stack on --port; each fresh_seed / 'server env K=V' scenario and the holdout set get a fresh stack on --secondary-port (default --port+1), one at a time. Use distinct port pairs (e.g. 8040/8041) and graph prefixes (--prefix) when several runners share the host. --base-url runs everything against one existing stack instead."
+  },
+  "holdouts": {
+    "sets": "--holdout-set v1 (fixtures/scenarios/holdouts/, default) | v2 (holdouts-v2/) | all; implies --holdouts. With --manage holdouts run on a fresh stack on --secondary-port.",
+    "acceptable_dispositions": "The run's latest proposal must match one entry: same kind and every other key equal to payload.<key>.",
+    "must_not": {
+      "<kind>": "answer|clarify|link_work|create_work|escalate: fails if the latest proposal (or any action of the request) has that kind.",
+      "link_work:<work_item_id>": "fails if the proposal is link_work to that work item.",
+      "escalate_owner:<person_id>": "fails if the proposal is escalate with payload.owner_id == <person_id>.",
+      "<text token>": "regex from the file's must_not_patterns[token] (wins), else a built-in heuristic (promise_date, recommend_public_link, grant_extension); searched in proposal.explanation plus every string / string-list payload field.",
+      "unknown tokens": "anything else is reported as UNCHECKED and counts as a failure (never passes silently); listed in the JSON as unchecked_tokens."
+    },
+    "model_usage": "Per run: sum of worker tool_completed events with tool_name 'model' (PROTOCOL #40): calls, input_tokens, output_tokens, cost_usd; reported per holdout/scenario and as model_usage_total in the JSON."
   }
 }

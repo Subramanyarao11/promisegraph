@@ -91,7 +91,8 @@ class InvestigateRunner:
             clarifications=clarifications,
             seen_evidence_ids=list(session.state.seen_evidence_ids),
             extra={"reply_source_id": cp.get("reply_source_id"), "clarify_question": clarify_question, "knowledge_revision": run.get("based_on_revision"),
-                   "budget_left": lambda: session.budget.max_tool_calls - session.job_tool_calls},
+                   "budget_left": lambda: session.budget.max_tool_calls - session.job_tool_calls,
+                   "emit_model_usage": lambda payload: session.emit(f"{payload['call_id']}:u", "tool_completed", payload, tool_name="model")},
         )
         try:
             session.emit(f"run_started:a{keeper.attempt}", "run_started", {"mode": mode, "stage": stage, "label": SCRIPTED_LABEL if mode == "scripted" else "Model mode", "attempt": keeper.attempt, "resume_reason": cp.get("resume_reason"), "reply_source_id": cp.get("reply_source_id")})
@@ -186,6 +187,8 @@ class InvestigateRunner:
             result["awaiting"] = outcome.awaiting
         if outcome.error:
             result["error"] = {"code": outcome.error.get("code", "FAILED"), "message": str(outcome.error.get("message", ""))[:2000]}
+            if isinstance(outcome.error.get("details"), dict):
+                result["error"]["details"] = outcome.error["details"]
         for k, v in outcome.extra.items():
             result.setdefault(k, v)
         try:

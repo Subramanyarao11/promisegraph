@@ -414,6 +414,13 @@ class ScenarioRun:
                                            "spec": {k: v for k, v in exp.items() if k not in ("assert",)}})
         result["seconds"] = round(time.monotonic() - t0, 1)
         result["ids"] = self.ids_summary()
+        per_run: dict[str, dict] = {}
+        for cap in self.caps.values():  # latest capture of each run wins (events are cumulative)
+            if isinstance(cap.get("run"), dict) and "events" in cap:
+                per_run[cap["run"]["id"]] = model_usage(cap["events"])
+        result["model_usage"] = {}
+        for u in per_run.values():
+            add_usage(result["model_usage"], u)
         return result
 
     def ids_summary(self) -> dict:
@@ -943,6 +950,39 @@ MUST_NOT_TEXT = {
 }
 
 
+ACTION_KINDS = {"answer", "clarify", "link_work", "create_work", "escalate"}
+
+
+def customer_text(p: dict) -> str:
+    """Explanation plus every string (or list of strings) in the proposal payload."""
+    parts = [p.get("explanation") or ""]
+    for v in (p.get("payload") or {}).values():
+        if isinstance(v, str):
+            parts.append(v)
+        elif isinstance(v, list):
+            parts.extend(x for x in v if isinstance(x, str))
+    return " ".join(x for x in parts if x)
+
+
+def model_usage(events: list[dict]) -> dict:
+    """PROTOCOL #40: sum worker `tool_completed` events with tool_name "model"."""
+    u = {"calls": 0, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0}
+    for e in events:
+        if e.get("type") == "tool_completed" and e.get("tool_name") == "model":
+            pl = e.get("payload") or {}
+            u["calls"] += 1
+            u["input_tokens"] += int(pl.get("input_tokens") or 0)
+            u["output_tokens"] += int(pl.get("output_tokens") or 0)
+            u["cost_usd"] += float(pl.get("cost_usd") or 0.0)
+    u["cost_usd"] = round(u["cost_usd"], 6)
+    return u
+
+
+def add_usage(total: dict, u: dict) -> None:
+    for k, v in u.items():
+        total[k] = round(total.get(k, 0) + v, 6) if k == "cost_usd" else total.get(k, 0) + v
+
+
 def run_holdout(api: Api, h: dict) -> dict:
     ws = h.get("workspace_id", "ws_demo")
     sr = ScenarioRun(api, {"id": h["id"], "workspace_id": ws})
@@ -958,24 +998,40 @@ def run_holdout(api: Api, h: dict) -> dict:
     p = snap.get("proposal") or {}
     res.update(request_id=created["request"]["id"], run_id=snap["run"]["id"], run_status=snap["run"]["status"],
                proposal_id=p.get("id"), kind=p.get("kind"), payload=p.get("payload"),
-               explanation=p.get("explanation"))
+               explanation=p.get("explanation"), run_mode=snap["run"].get("mode"),
+               run_error=snap["run"].get("error"), model_usage=model_usage(snap.get("events", [])))
     disp_ok = False
     for d in h.get("acceptable_dispositions", []):
         if p.get("kind") == d["kind"] and all((p.get("payload") or {}).get(k) == v for k, v in d.items() if k != "kind"):
             disp_ok = True
     res["checks"].append({"check": "acceptable_disposition", "ok": disp_ok,
                           "detail": f"kind={p.get('kind')} payload={json.dumps(p.get('payload'))[:300]}"})
-    text = " ".join(str(x) for x in [p.get("explanation"), *((p.get("payload") or {}).values())] if isinstance(x, str))
+    text = customer_text(p)
+    patterns = dict(MUST_NOT_TEXT)
+    patterns.update(h.get("must_not_patterns") or {})  # file-supplied regex per token wins
+    payload = p.get("payload") or {}
+    unchecked = []
     for m in h.get("must_not", []):
-        if m in MUST_NOT_TEXT:
-            hit = re.search(MUST_NOT_TEXT[m], text)
-            res["checks"].append({"check": f"must_not {m} (text heuristic)", "ok": not hit,
+        kind, _, target = m.partition(":")
+        if m in patterns:
+            hit = re.search(patterns[m], text)
+            src = "file pattern" if m in (h.get("must_not_patterns") or {}) else "built-in heuristic"
+            res["checks"].append({"check": f"must_not {m} (text, {src})", "ok": not hit,
                                   "detail": f"hit={hit.group(0) if hit else None}"})
-        else:
-            kind, _, target = m.partition(":")
-            bad = p.get("kind") == kind and (not target or (p.get("payload") or {}).get("work_item_id") == target)
+        elif kind == "escalate_owner" and target:
+            bad = p.get("kind") == "escalate" and payload.get("owner_id") == target
+            res["checks"].append({"check": f"must_not {m}", "ok": not bad,
+                                  "detail": f"kind={p.get('kind')} owner_id={payload.get('owner_id')!r}"})
+        elif kind in ACTION_KINDS and (not target or kind == "link_work"):
+            bad = p.get("kind") == kind and (not target or payload.get("work_item_id") == target)
             bad = bad or any(a["kind"] == kind and not target for a in snap.get("actions", []))
-            res["checks"].append({"check": f"must_not {m}", "ok": not bad, "detail": f"kind={p.get('kind')}"})
+            res["checks"].append({"check": f"must_not {m}", "ok": not bad,
+                                  "detail": f"kind={p.get('kind')} work_item_id={payload.get('work_item_id')!r}"})
+        else:  # never pass silently
+            unchecked.append(m)
+            res["checks"].append({"check": f"must_not {m}", "ok": False, "unchecked": True,
+                                  "detail": "UNCHECKED: unknown token (no must_not_patterns entry, not a kind token)"})
+    res["unchecked_tokens"] = unchecked
     if p.get("kind") != "create_work":
         n = sr.work_count(ws) - base
         res["checks"].append({"check": "no work item created", "ok": n == 0, "detail": f"delta={n}"})
@@ -1056,7 +1112,9 @@ def main() -> int:
     ap.add_argument("--prefix", default=None, help="graph prefix stem for managed stacks (default pgeval_<ts>)")
     ap.add_argument("--keep", action="store_true", help="keep managed stacks' graphs (processes still stop)")
     ap.add_argument("--only", help="comma list of scenario id prefixes, e.g. t04,t12")
-    ap.add_argument("--holdouts", action="store_true")
+    ap.add_argument("--holdouts", action="store_true", help="also run the holdout set chosen by --holdout-set")
+    ap.add_argument("--holdout-set", choices=["v1", "v2", "all"], default=None,
+                    help="holdouts/ (v1, default), holdouts-v2/ (v2) or both; implies --holdouts")
     ap.add_argument("--no-scenarios", action="store_true", help="only holdouts")
     ap.add_argument("--json", dest="json_out")
     args = ap.parse_args()
@@ -1073,7 +1131,12 @@ def main() -> int:
         scen = [s for s in scen if any(s["id"].startswith(w) for w in wanted)]
     if args.no_scenarios:
         scen = []
-    holdouts = [json.loads(p.read_text()) for p in sorted((SCEN_DIR / "holdouts").glob("*.json"))] if args.holdouts else []
+    if args.holdout_set:
+        args.holdouts = True
+    hset = args.holdout_set or "v1"
+    hdirs = {"v1": ["holdouts"], "v2": ["holdouts-v2"], "all": ["holdouts", "holdouts-v2"]}[hset]
+    holdouts = [json.loads(p.read_text()) for d in hdirs for p in sorted((SCEN_DIR / d).glob("*.json"))] \
+        if args.holdouts else []
 
     stem = args.prefix or f"pgeval_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
     stacks = Stacks(args.port, stem, args.keep) if args.manage else None
@@ -1143,13 +1206,28 @@ def main() -> int:
             stacks.down_all()
 
     npass = sum(r["status"] == "PASS" for r in results)
-    print(f"\nscenarios: {npass}/{len(results)} PASS; holdouts: "
-          f"{sum(all(c['ok'] for c in h['checks']) and not h.get('error') for h in holdout_results)}/{len(holdout_results)} acceptable")
+    hok = sum(holdout_ok(h) for h in holdout_results)
+    unchecked = sorted({t for h in holdout_results for t in h.get("unchecked_tokens", [])})
+    usage: dict = {}
+    for r in results + holdout_results:
+        add_usage(usage, r.get("model_usage") or {})
+    print(f"\nscenarios: {npass}/{len(results)} PASS; holdouts ({hset if holdouts else '-'}): "
+          f"{hok}/{len(holdout_results)} acceptable"
+          + (f"; UNCHECKED must_not tokens: {unchecked}" if unchecked else ""))
+    if usage.get("calls"):
+        print(f"model usage: {usage['calls']} calls, {usage['input_tokens']} in / {usage['output_tokens']} out tokens, "
+              f"${usage['cost_usd']:.4f}")
     if args.json_out:
         Path(args.json_out).write_text(json.dumps({
             "started_at": started.isoformat(), "finished_at": datetime.now(timezone.utc).isoformat(),
-            "stem": stem, "results": results, "holdouts": holdout_results}, indent=2, default=str))
+            "stem": stem, "holdout_set": hset if holdouts else None, "model_usage_total": usage,
+            "unchecked_tokens": unchecked, "results": results, "holdouts": holdout_results}, indent=2, default=str))
     return 0 if npass == len(results) else 1
+
+
+def holdout_ok(r: dict) -> bool:
+    return not r.get("error") and bool(r.get("checks")) and all(c["ok"] for c in r["checks"]) \
+        and not r.get("contract_errors")
 
 
 def run_hold(base: str, h: dict) -> dict:
@@ -1157,11 +1235,14 @@ def run_hold(base: str, h: dict) -> dict:
     api = Api(base, log, cerrs)
     r = run_holdout(api, h)
     r["contract_errors"] = cerrs
-    ok = not r.get("error") and all(c["ok"] for c in r["checks"]) and not cerrs
+    ok = holdout_ok(r)
+    u = r.get("model_usage") or {}
     print(f"[{'OK' if ok else 'MISS'}] holdout {h['id']}: kind={r.get('kind')} run={r.get('run_status')} "
+          f"mode={r.get('run_mode')} model_calls={u.get('calls', 0)} cost=${u.get('cost_usd', 0):.4f} "
           f"{r.get('error') or ''}")
     for c in r["checks"]:
-        print(f"    {'ok  ' if c['ok'] else 'FAIL'} {c['check']}: {c['detail'][:300]}")
+        mark = "ok  " if c["ok"] else ("UNCHECKED" if c.get("unchecked") else "FAIL")
+        print(f"    {mark} {c['check']}: {c['detail'][:300]}")
     for c in cerrs[:5]:
         print(f"    CONTRACT {c[:300]}")
     return r

@@ -160,4 +160,4 @@ def test_settings_from_env_file(tmp_path):
     env.write_text("API_BASE_URL=http://x:1/\nWORKER_TOKEN=w\nWORKSPACE_ACL=operator:a;worker:ws_a,ws_b\nAI_ENABLED=false\nLINEAR_ENABLED=true\nLINEAR_API_KEY=\n")
     s = load_settings(env, environ={})
     assert s.api_base_url == "http://x:1" and s.workspaces == ("ws_a", "ws_b") and not s.ai_enabled and not s.linear_configured
-    assert s.ai_model == "claude-opus-5-5"
+    assert s.ai_model == ""  # Rev 6: no default model
