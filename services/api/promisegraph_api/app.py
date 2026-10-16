@@ -382,6 +382,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ctx = make_ctx(request, workspace_id)
         return ok(request, workspace_id, domain.load(ctx, "WorkItem", work_item_id, "work item")["doc"])
 
+    @app.get(PUB + "/people/{person_id}")
+    def get_person(request: Request, workspace_id: str, person_id: str):
+        """Rev 5 #33."""
+        ctx = make_ctx(request, workspace_id)
+        p = domain.load(ctx, "Person", person_id, "person")
+        d = p["doc"]
+        return ok(request, workspace_id, {"id": d["id"], "name": d["name"], "role": d["role"],
+                                          "team_id": d.get("team_id"), "active": bool(d["active"]),
+                                          "version": int(p.get("version") or 1)})
+
     @app.get(PUB + "/decisions")
     def list_decisions(request: Request, workspace_id: str, scope_entity_type: str | None = None,
                        scope_entity_id: str | None = None, active: bool | None = None, cursor: str | None = None,
@@ -406,10 +416,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get(PUB + "/attempts")
     def list_attempts(request: Request, workspace_id: str, request_id: str | None = None,
+                      scope_entity_type: str | None = None, scope_entity_id: str | None = None,
                       cursor: str | None = None, limit: int | None = None):
-        """Convenience read (not in the frozen matrix)."""
+        """Rev 3 #19 / rev 5 #31."""
         make_ctx(request, workspace_id)
-        return simple_list(request, workspace_id, "Attempt", {"request_id": request_id}, cursor, limit,
+        return simple_list(request, workspace_id, "Attempt", {"request_id": request_id, "scope_type": scope_entity_type,
+                                                              "scope_id": scope_entity_id}, cursor, limit,
                            order="observed_at", desc=True)
 
     # ---- public commands ------------------------------------------------------------------------------

@@ -57,7 +57,6 @@ def search(ctx: Ctx, cmd: dict[str, Any]) -> dict[str, Any]:
                  "AND ($cust IS NULL OR n.customer_id = $cust) RETURN n.id, n.title, n.search_text LIMIT 500")
         elif label == "Capability":
             q = ("MATCH (n:Capability) WHERE any(t IN $toks WHERE n.search_text CONTAINS t) "
-                 "AND ($cust IS NULL OR n.customer_ids IS NULL OR size(n.customer_ids) = 0 OR $cust IN n.customer_ids) "
                  "RETURN n.id, n.title, n.search_text LIMIT 500")
         elif label == "WorkItem":
             q = ("MATCH (n:WorkItem) WHERE any(t IN $toks WHERE n.search_text CONTAINS t) "
@@ -172,8 +171,9 @@ def expand(ctx: Ctx, cmd: dict[str, Any]) -> dict[str, Any]:
         all_rows.extend(rows)
         truncated = truncated or capped
     maximal, visited = _maximal(all_rows)
+    truncation = "limit" if truncated else None
     if len(maximal) > limit:
-        truncated = True
+        truncated, truncation = True, "limit"
     paths = [_path_dto(n, r) for n, r in maximal[:limit]]
     nodes: dict[str, dict] = {}
     for i in ids:
@@ -184,9 +184,27 @@ def expand(ctx: Ctx, cmd: dict[str, Any]) -> dict[str, Any]:
             nodes.setdefault(n["id"], n)
     node_list = list(nodes.values())
     if len(node_list) > 200:
-        truncated = True
+        truncated, truncation = True, "limit"
         node_list = node_list[:200]
-    return {"paths": paths, "nodes": node_list, "truncated": truncated, "visited_count": len(visited | set(ids))}
+    node_ids = [n["id"] for n in node_list]
+    # all allowlisted edges among the returned nodes (shared-neighbour edges included), real direction
+    erows = ctx.store.read(ctx.ws, "MATCH (a:E)-[r]->(b:E) WHERE a.id IN $ids AND b.id IN $ids AND type(r) IN $types "
+                                   "RETURN r.id, type(r), a.id, b.id, r.evidence_ids, r.confirmed ORDER BY r.id LIMIT 501",
+                           {"ids": node_ids, "types": rel_types})
+    if len(erows) > 500:
+        truncated, truncation = True, "limit"
+    edges = [_path_dto([[a, "E", a], [b, "E", b]], [row])["edges"][0] for row in erows[:500] for a, b in [(row[2], row[3])]]
+    if truncation is None:
+        # depth bound: does any node reached at the maximum depth have an unexplored allowlisted neighbour?
+        frontier = list({n[-1][0] for n, _r in maximal if len(n) - 1 >= cmd["depth"]})
+        if frontier:
+            hit = ctx.store.read(ctx.ws, "MATCH (a:E)-[r]-(b:E) WHERE a.id IN $f AND type(r) IN $types "
+                                         "AND NOT b.id IN $seen RETURN count(r) > 0",
+                                 {"f": frontier, "types": rel_types, "seen": list(visited | set(ids))})
+            if hit and hit[0][0]:
+                truncated, truncation = True, "depth"
+    return {"paths": paths, "nodes": node_list, "edges": edges, "truncated": truncated, "truncation": truncation,
+            "visited_count": len(visited | set(ids))}
 
 
 # ---- decisions / attempts (memory) -----------------------------------------------------------------

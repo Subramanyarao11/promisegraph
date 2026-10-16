@@ -701,3 +701,81 @@ def test_close_cancels_active_runs_25(seeded: Api):
     assert evs[-1]["type"] == "run_finished" and evs[-1]["payload"]["request_status"] == "closed"
     api.as_worker().post(f"/jobs/{lease['job_id']}/heartbeat", lease_body(lease), expect=409, private=True, key=None)
     assert api.claim() is None
+
+
+def test_rev5_expand_edges_people_attempt_scope_search(seeded: Api):
+    api = seeded
+    ex = api.post("/context/expand", {"entity_ids": ["work_export_issue"], "relation_types": ["OWNED_BY", "DEPENDS_ON"],
+                                      "depth": 2, "limit": 50}, "ContextExpandResult", key=None)["data"]
+    pairs = {(e["type"], e["from_id"], e["to_id"]) for e in ex["edges"]}
+    # shared-neighbour edges present with real direction (not just a BFS tree)
+    assert ("DEPENDS_ON", "work_export_issue", "work_migration") in pairs
+    assert ("OWNED_BY", "work_migration", "person_li") in pairs and ("OWNED_BY", "work_export_issue", "person_maya") in pairs
+    assert ("OWNED_BY", "work_sso_done", "person_maya") in pairs  # maya is shared by two work items
+    ids = {n["id"] for n in ex["nodes"]}
+    assert all(e["from_id"] in ids and e["to_id"] in ids for e in ex["edges"])
+    one = api.post("/context/expand", {"entity_ids": ["req_prior_exports"], "relation_types": ["ABOUT", "IMPLEMENTED_BY",
+                                                                                                "DEPENDS_ON", "OWNED_BY"],
+                                       "depth": 1, "limit": 50}, "ContextExpandResult", key=None)["data"]
+    assert one["truncated"] is True and one["truncation"] == "depth"
+    lim = api.post("/context/expand", {"entity_ids": ["req_prior_exports"], "relation_types": ["ABOUT", "IMPLEMENTED_BY"],
+                                       "depth": 2, "limit": 1}, "ContextExpandResult", key=None)["data"]
+    assert lim["truncation"] == "limit"
+    full = api.post("/context/expand", {"entity_ids": ["work_migration"], "relation_types": ["OWNED_BY"], "depth": 1,
+                                        "limit": 50}, "ContextExpandResult", key=None)["data"]
+    assert full["truncated"] is False and full["truncation"] is None
+    p = api.get("/people/person_li", "PersonSummary")["data"]
+    assert p == {"id": "person_li", "name": "Li", "role": "Engineer", "team_id": "team_data", "active": True,
+                 "version": 1}
+    api.get("/people/nobody", expect=404)
+    a = api.get("/attempts", list_of="Attempt", params={"scope_entity_type": "customer",
+                                                        "scope_entity_id": "cust_globex"})["data"]
+    assert [x["id"] for x in a] == ["att_retry_globex"]
+    assert api.get("/attempts", list_of="Attempt", params={"scope_entity_type": "customer",
+                                                           "scope_entity_id": "cust_acme"})["data"] == []
+    s = api.post("/context/search", {"query": "export", "entity_types": ["capability", "request", "work_item"],
+                                     "customer_id": "cust_acme", "limit": 20}, "ContextSearchResult", key=None)["data"]
+    types = {(c["entity_type"], c["id"]) for c in s["candidates"]}
+    assert ("capability", "cap_exports") in types and ("work_item", "work_export_issue") in types
+    assert ("request", "req_prior_exports") not in types and ("request", "req_similar") in types
+
+
+def test_rev5_new_run_supersedes_review_and_stale_commit_409(seeded: Api):
+    api = seeded
+    req, run, prop = to_review(api, "link_work", LINK)
+    # knowledge changes -> proposal stale; a new run supersedes the waiting one
+    w = api.get("/work-items/work_export_issue", "WorkItem")["data"]
+    api.patch("/work-items/work_export_issue", {"expected_version": w["version"], "status": "blocked",
+                                                "owner_id": "person_li", "forecast_at": None, "reason": "moved"},
+              "WorkItemUpdateResult")
+    new = api.post(f"/requests/{req['id']}/runs", {"mode": "scripted", "instruction": "", "authorization_id": None},
+                   "Run", 202)["data"]
+    old = api.get(f"/runs/{run['id']}", "Run")["data"]
+    assert old["status"] == "cancelled"
+    evs = api.get(f"/runs/{run['id']}/events", "EventsPage")["data"]
+    assert evs[-1]["type"] == "run_finished" and evs[-1]["payload"]["superseded_by"] == new["id"]
+    assert api.get(f"/proposals/{prop['id']}", "Proposal")["data"]["id"] == prop["id"]  # kept as history
+    e = api.post(f"/proposals/{prop['id']}/commit", {"expected_revision": api.revision(), "authorization_id": None},
+                 expect=409)
+    assert e["error"]["code"] == "REVISION_CONFLICT"
+    # a running run still blocks a second run
+    api.claim(["investigate"])
+    api.post(f"/requests/{req['id']}/runs", {"mode": "scripted", "instruction": "", "authorization_id": None},
+             expect=409)
+
+
+def test_rev5_retryable_failure_requeues_fresh_attempt(seeded: Api):
+    api = seeded
+    req, run = intake(api)
+    l1 = api.claim(["investigate"])
+    c = api.as_worker().post(f"/jobs/{l1['job_id']}/complete", lease_body(l1, completion_id="a1",
+                             outcome="retryable_failure", result={"proposal_ids": []}), "CompletionReceipt",
+                             private=True)["data"]
+    assert c["next_job_id"] == l1["job_id"]
+    st = api.c.app.state.store
+    st.write("ws_demo", "MATCH (j:Job {id: $id}) SET j.due_epoch = 0.0", {"id": l1["job_id"]})  # skip backoff
+    l2 = api.claim(["investigate"])
+    assert l2["job_id"] == l1["job_id"] and l2["attempt"] == l1["attempt"] + 1 and l2["fencing_token"] > l1["fencing_token"]
+    api.as_worker().post(f"/jobs/{l2['job_id']}/complete", lease_body(l2, completion_id="a2", outcome="succeeded",
+                         result={"proposal_ids": []}), "CompletionReceipt", private=True)
+    assert api.get(f"/runs/{run['id']}", "Run")["data"]["status"] == "succeeded"

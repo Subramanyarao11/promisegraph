@@ -120,10 +120,13 @@ def create_run(ctx: Ctx, uow: UnitOfWork, request_id: str, cmd: dict[str, Any]) 
             raise policy("authorization_id does not reference a stored authorization for this request",
                          {"authorization_id": cmd["authorization_id"]})
     active = has_active_run(ctx, request_id)
-    if active:
+    if active and active["status"] != "awaiting_review":
         raise conflict("INVALID_TRANSITION", f"request already has an active run {active['id']}",
                        {"run_id": active["id"], "run_status": active["status"]})
     run = start_run(ctx, uow, reqp["doc"], cmd["mode"], cmd["instruction"], cmd.get("authorization_id"))
+    if active:  # rev 5 #34: a new run supersedes a run waiting for review; its proposals stay as history
+        _cancel_run_effects(ctx, uow, active, f"superseded by run {run['id']}", reqp["doc"]["status"],
+                            superseded_by=run["id"])
     return 202, run
 
 
@@ -136,8 +139,8 @@ def cancel_run(ctx: Ctx, uow: UnitOfWork, run_id: str, cmd: dict[str, Any]) -> t
     return 200, run
 
 
-def _cancel_run_effects(ctx: Ctx, uow: UnitOfWork, runp: dict[str, Any], reason: str, request_status: str
-                        ) -> dict[str, Any]:
+def _cancel_run_effects(ctx: Ctx, uow: UnitOfWork, runp: dict[str, Any], reason: str, request_status: str,
+                        superseded_by: str | None = None) -> dict[str, Any]:
     """Cooperative cancellation shared by run cancel and request close (PROTOCOL #25)."""
     run = runp["doc"]
     run_id = run["id"]
@@ -150,8 +153,10 @@ def _cancel_run_effects(ctx: Ctx, uow: UnitOfWork, runp: dict[str, Any], reason:
             if ap and ap["doc"]["status"] == "accepted":
                 put_action(uow, bump(ap["doc"], ctx.now, status="cancelled"))
     run = bump(run, ctx.now, status="cancelled", error=err_obj("CANCELLED", f"Cancelled by operator: {reason}"))
-    _ev, run = append_event(ctx, uow, run, "run_finished",
-                            {"run_status": "cancelled", "request_status": request_status, "action_id": None})
+    payload = {"run_status": "cancelled", "request_status": request_status, "action_id": None}
+    if superseded_by:
+        payload["superseded_by"] = superseded_by
+    _ev, run = append_event(ctx, uow, run, "run_finished", payload)
     uow.guard_version(run_id, runp["doc"]["version"])
     put_run(uow, run)
     return run
@@ -397,8 +402,6 @@ def commit_proposal(ctx: Ctx, uow: UnitOfWork, proposal_id: str, cmd: dict[str, 
     reqp = load(ctx, "Request", prop["request_id"], "request")
     run = runp["doc"]
     worker_job_for(ctx, run_id=run["id"])
-    if run["status"] in TERMINAL_RUN:
-        raise conflict("INVALID_TRANSITION", f"run is {run['status']}", {"run_status": run["status"]})
     if prop["validity"] == "invalid":
         if any(r.startswith("EVIDENCE_INVALID") for r in prop["validation_reasons"]):
             raise evidence_invalid("proposal cites invalid evidence", {"validation_reasons": prop["validation_reasons"][:10]})
@@ -420,6 +423,8 @@ def commit_proposal(ctx: Ctx, uow: UnitOfWork, proposal_id: str, cmd: dict[str, 
         if validity == "stale":
             return 409, conflict("REVISION_CONFLICT", "proposal is stale", {"validation_reasons": reasons[:10]})
         return 422, policy("proposal no longer passes validation", {"validation_reasons": reasons[:10]})
+    if run["status"] in TERMINAL_RUN:
+        raise conflict("INVALID_TRANSITION", f"run is {run['status']}", {"run_status": run["status"]})
     auth_id = cmd.get("authorization_id")
     auth = None
     if auth_id:
