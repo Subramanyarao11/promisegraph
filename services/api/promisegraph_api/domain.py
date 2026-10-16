@@ -132,6 +132,15 @@ def cancel_run(ctx: Ctx, uow: UnitOfWork, run_id: str, cmd: dict[str, Any]) -> t
     run = runp["doc"]
     if run["status"] in TERMINAL_RUN:
         raise conflict("INVALID_TRANSITION", f"run is {run['status']}", {"run_status": run["status"]})
+    run = _cancel_run_effects(ctx, uow, runp, cmd["reason"], _req_status(ctx, run["request_id"]))
+    return 200, run
+
+
+def _cancel_run_effects(ctx: Ctx, uow: UnitOfWork, runp: dict[str, Any], reason: str, request_status: str
+                        ) -> dict[str, Any]:
+    """Cooperative cancellation shared by run cancel and request close (PROTOCOL #25)."""
+    run = runp["doc"]
+    run_id = run["id"]
     for job in active_jobs(ctx, run_id):
         # queued/blocked work stops; an in-flight effect (leased dispatch/reconcile) may still record its receipt
         if job["status"] in ("queued", "blocked") or job["kind"] == "investigate":
@@ -140,14 +149,12 @@ def cancel_run(ctx: Ctx, uow: UnitOfWork, run_id: str, cmd: dict[str, Any]) -> t
             ap = ctx.store.get(ctx.ws, job["action_id"], "Action")
             if ap and ap["doc"]["status"] == "accepted":
                 put_action(uow, bump(ap["doc"], ctx.now, status="cancelled"))
-    run = bump(run, ctx.now, status="cancelled",
-               error=err_obj("CANCELLED", f"Cancelled by operator: {cmd['reason']}"))
+    run = bump(run, ctx.now, status="cancelled", error=err_obj("CANCELLED", f"Cancelled by operator: {reason}"))
     _ev, run = append_event(ctx, uow, run, "run_finished",
-                            {"run_status": "cancelled", "request_status": _req_status(ctx, run["request_id"]),
-                             "action_id": None})
+                            {"run_status": "cancelled", "request_status": request_status, "action_id": None})
     uow.guard_version(run_id, runp["doc"]["version"])
     put_run(uow, run)
-    return 200, run
+    return run
 
 
 def _req_status(ctx: Ctx, request_id: str) -> str:
@@ -751,6 +758,9 @@ def close_request(ctx: Ctx, uow: UnitOfWork, request_id: str, cmd: dict[str, Any
     if req["status"] == "closed":
         raise conflict("INVALID_TRANSITION", "request is already closed", {"request_status": "closed"})
     new_req = bump(req, ctx.now, status="closed")
+    for runp in ctx.store.find(ctx.ws, "Run", {"request_id": request_id,
+                                               "status": ["queued", "running", "waiting_for_input", "awaiting_review"]}):
+        _cancel_run_effects(ctx, uow, runp, f"request closed: {cmd['reason']}"[:2000], "closed")
     uow.guard_version(request_id, req["version"])
     put_request(uow, new_req, external_ref=reqp.get("external_ref") or "", close_reason=cmd["reason"][:2000],
                 closed_by=ctx.actor_id)

@@ -184,10 +184,11 @@ def operator_reconcile(ws: Workspace, action: dict, body: dict) -> dict:
         if action["connector"] == "local":
             eff = ws.local_effects.get(action["id"])
             if not eff:
-                raise ApiError(409, "INVALID_TRANSITION", "no local effect exists for this action; it cannot have succeeded")
+                raise ApiError(422, "POLICY_VIOLATION", "receipt target does not exist: no local effect was recorded for this "
+                               "action (PROTOCOL.md #26)", {"action_id": action["id"], "target_id": rc["target_id"]})
             if rc["target_id"] != eff["target_id"]:
-                raise ApiError(422, "INVALID_INPUT", "receipt target does not match the recorded local effect",
-                               {"fields": {"receipt/target_id": f"expected {eff['target_id']}"}})
+                raise ApiError(422, "POLICY_VIOLATION", "receipt target does not exist for this action (PROTOCOL.md #26)",
+                               {"action_id": action["id"], "target_id": rc["target_id"]})
             finalize_local(ws, action, eff)
         else:
             apply_effect(ws, action, external_receipt=rc)

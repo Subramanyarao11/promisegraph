@@ -675,3 +675,18 @@ def test_operator_reconcile_succeeded_linear(app_factory):
     assert api.get(f"/requests/{req['id']}", "Request")["data"]["status"] == "awaiting_work"
     cont = api.claim(["investigate"])
     assert cont["checkpoint"]["resume_stage"] == "observe" and cont["checkpoint"]["action_id"] == act["id"]
+
+
+def test_close_cancels_active_runs_25(seeded: Api):
+    api = seeded
+    req, run = intake(api)
+    lease = api.claim(["investigate"])
+    rq = api.get(f"/requests/{req['id']}", "Request")["data"]
+    api.post(f"/requests/{req['id']}/close", {"reason": "withdrawn", "expected_request_version": rq["version"]},
+             "Request", 200)
+    r = api.get(f"/runs/{run['id']}", "Run")["data"]
+    assert r["status"] == "cancelled" and r["error"]["code"] == "CANCELLED"
+    evs = api.get(f"/runs/{run['id']}/events", "EventsPage")["data"]
+    assert evs[-1]["type"] == "run_finished" and evs[-1]["payload"]["request_status"] == "closed"
+    api.as_worker().post(f"/jobs/{lease['job_id']}/heartbeat", lease_body(lease), expect=409, private=True, key=None)
+    assert api.claim() is None

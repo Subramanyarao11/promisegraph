@@ -64,7 +64,7 @@ def test_operator_reconcile_succeeded_item_20(api, worker):
     r = api.post(path, {**base, "expected_action_version": a["version"] + 1})
     assert r.status_code == 409 and r.json()["error"]["code"] == "REVISION_CONFLICT"
     r = api.post(path, {**base, "receipt": {**receipt, "target_id": "draft_wrong"}})
-    assert r.status_code == 422
+    assert r.status_code == 422 and r.json()["error"]["code"] == "POLICY_VIOLATION"
     r = api.post(path, base, key="op-reconcile-1")
     assert r.status_code == 200
     done = r.json()["data"]
@@ -125,3 +125,23 @@ def test_items_22_to_24(api, worker):
     api.fault({"database_unavailable": True})
     r = api.get("/info")
     assert r.status_code == 503 and r.json()["meta"]["knowledge_revision"] == 0
+
+
+def test_reconcile_without_local_effect_item_26(api, worker):
+    req = new_request(api)
+    rid, run_id = req["request"]["id"], req["run"]["id"]
+    lease, p = investigate_to_proposal(api, worker, rid, "answer", {"draft_text": "Draft", "resolution_criteria": []})
+    action = worker.commit(lease, p)["action"]
+    worker.complete(lease, "succeeded", {"proposal_ids": [p["id"]]})
+    lease = worker.claim(["dispatch"])  # report unknown without ever executing -> no local effect exists
+    worker.complete(lease, "unknown", {"action_id": action["id"], "execution_state": "unknown", "receipt": None, "error": None})
+    rl = worker.claim(["reconcile"])
+    worker.complete(rl, "succeeded", {"action_id": action["id"], "lookup_evidence": {}, "established": False, "receipt": None})
+    a = api.get(f"/actions/{action['id']}").json()["data"]
+    receipt = {"id": "receipt_x", "connector": "local", "target_id": "draft_ghost", "target_url": None,
+               "observed_at": "2026-10-16T05:00:00Z", "result_hash": "c" * 64}
+    r = api.post(f"/actions/{a['id']}/reconcile", {"outcome": "succeeded", "receipt": receipt, "evidence_ids": [],
+                                                    "expected_action_version": a["version"]})
+    assert r.status_code == 422 and r.json()["error"]["code"] == "POLICY_VIOLATION"
+    assert api.get(f"/actions/{a['id']}").json()["data"]["status"] == "unknown"
+    assert api.get(f"/runs/{run_id}").json()["data"]["status"] == "awaiting_review"

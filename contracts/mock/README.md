@@ -120,9 +120,10 @@ On startup and on each reset:
   `GET /observations?request_id=` and `GET /attempts?request_id=` return lists, newest first.
 - **Operator reconciliation (#20).** `POST /actions/{id}/reconcile` is operator only, and its body is validated
   against `ActionReconcile`. It works only on `unknown` actions; anything else returns 409 `INVALID_TRANSITION`, and
-  so does a reconcile job leased by a worker. A version mismatch returns 409 `REVISION_CONFLICT`.
+  so does a reconcile job leased by a worker. Closing a request cancels its active runs (#25). A version mismatch returns 409 `REVISION_CONFLICT`.
   - `succeeded` needs a receipt whose connector matches the action. For local actions the receipt's `target_id`
-    must match the effect the mock recorded; the mock keeps its own receipt. After that, the normal continuation is
+    must match the effect the mock recorded; the mock keeps its own receipt. If there is no recorded effect, or the
+    target doesn't match it, the call returns 422 `POLICY_VIOLATION` (#26). After that, the normal continuation is
     queued.
   - `failed` marks the action failed and queues a replan.
   - Any queued reconcile job is cancelled, and the operator's `evidence_ids` are kept on the action.
