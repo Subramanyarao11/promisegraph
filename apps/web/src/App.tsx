@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet, useLocation } from "react-router";
+import { Link, NavLink, Outlet, useLocation } from "react-router";
 import { Icon, type IconName } from "./components/Icon";
 import { AnnouncerProvider, Badge } from "./components/ui";
 import { useHealth, useInfo } from "./api/hooks";
@@ -10,8 +10,8 @@ import { formatTs, viewerZone } from "./lib/format";
 const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: "/requests", label: "Requests", icon: "inbox" },
   { to: "/work", label: "Work", icon: "work" },
-  { to: "/memory", label: "Memory", icon: "memory" },
-  { to: "/sources", label: "Sources", icon: "source" },
+  { to: "/memory", label: "Company rules & history", icon: "memory" },
+  { to: "/sources", label: "Knowledge base", icon: "source" },
   { to: "/settings", label: "Settings", icon: "settings" },
 ];
 
@@ -30,19 +30,28 @@ function useTheme(): [Theme, () => void] {
   return [theme, next];
 }
 
-/** Planner mode labels come from /info; nothing is assumed when it cannot be read. */
+/** Planner mode from /info, in plain words. Nothing is assumed when it cannot be read. */
 export function ModeBadges() {
   const info = useInfo();
   if (info.isLoading) return null;
-  if (info.error || !info.data) return <Badge s={{ label: "Planner status unknown", tone: "neutral", icon: "question" }} />;
+  if (info.error || !info.data) return <Badge s={{ label: "Mode unknown (couldn't reach the server)", tone: "neutral", icon: "question" }} />;
   const p = info.data.data.planners;
-  const scripted = spec(CONNECTOR_STATE, p.scripted);
   const model = spec(CONNECTOR_STATE, p.model);
   const modelUsable = p.model === "enabled" || p.model === "verified" || p.model === "unverified";
   return (
     <span className="row" data-testid="mode-badges">
-      <Badge s={{ label: "Scripted mode", tone: "mode", icon: "doc" }} title={`Scripted planner: ${scripted.label}`} />
-      <Badge s={{ label: modelUsable ? `Live model: ${model.label}` : `Live model unavailable (${model.label.toLowerCase()})`, tone: modelUsable ? model.tone : "neutral", icon: modelUsable ? model.icon : "ban" }} testId="model-state" />
+      {modelUsable ? (
+        <>
+          <Badge s={{ label: "Rule-based mode available", tone: "mode", icon: "doc" }} />
+          <Badge s={{ label: `AI model connected (${model.label.toLowerCase()})`, tone: model.tone, icon: model.icon }} testId="model-state" />
+        </>
+      ) : (
+        <Badge
+          s={{ label: "Rule-based mode (no AI model connected)", tone: "mode", icon: "doc" }}
+          title="PromiseGraph follows fixed rules over your real data. No AI model is used."
+          testId="model-state"
+        />
+      )}
     </span>
   );
 }
@@ -58,8 +67,8 @@ function HealthBanner() {
     <div className="banner tone-danger" role="alert" data-testid="banner-unavailable">
       <Icon name="alert" />
       {unreachable
-        ? "API unreachable. Nothing below is live until it reconnects; no sample data is substituted."
-        : "Database unavailable. Reads and actions are paused; no cached or sample data is shown as live."}
+        ? "Can't reach the PromiseGraph server. Nothing on this page is live until it reconnects. We never show sample data instead."
+        : "Database unavailable. Reading and approving are paused until it's back. We never show old or sample data as if it were live."}
     </div>
   );
 }
@@ -83,16 +92,20 @@ export function Shell() {
             PromiseGraph
           </div>
           <div className="ws" title="Workspace">
-            Workspace <code className="mono">{d?.workspace_id ?? WORKSPACE_ID}</code>
-            {d?.name ? <div>{d.name}</div> : null}
+            {d?.name ?? "Workspace"}
+            <div className="small muted" title="Workspace ID">{d?.workspace_id ?? WORKSPACE_ID}</div>
           </div>
           <nav className="nav" aria-label="Sections">
             {NAV.map((n) => (
-              <NavLink key={n.to} to={n.to}>
+              <NavLink key={n.to} to={n.to} end={n.to === "/requests"}>
                 <Icon name={n.icon} />
                 {n.label}
               </NavLink>
             ))}
+            <Link to="/requests?help=1" data-testid="nav-how-it-works">
+              <Icon name="info" />
+              How it works
+            </Link>
           </nav>
           <div className="sidebar-foot">
             <button type="button" className="btn btn-ghost btn-sm" onClick={nextTheme} aria-label={`Theme: ${theme}. Change theme`}>
@@ -107,7 +120,7 @@ export function Shell() {
             <span className="spacer" />
             {d && (
               <span className="small muted" data-testid="clock">
-                {d.clock_mode === "scenario" ? "Scenario clock" : "Live clock"} · reference {formatTs(d.reference_time)} · times shown in {viewerZone()}
+                {d.clock_mode === "scenario" ? <>Demo clock: it is {formatTs(d.reference_time)} for this demo data</> : "Live clock"} · times shown in {viewerZone()}
               </span>
             )}
           </div>

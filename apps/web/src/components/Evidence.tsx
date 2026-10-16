@@ -20,7 +20,7 @@ export function SourceDrawerProvider({ children }: { children: ReactNode }) {
   return (
     <DrawerCtx.Provider value={setTarget}>
       {children}
-      <Dialog open={Boolean(target)} onClose={() => setTarget(null)} title={target ? (target.source_id ? `Source ${target.source_id}` : `Evidence ${target.evidence_id}`) : "Source"} wide testId="source-drawer">
+      <Dialog open={Boolean(target)} onClose={() => setTarget(null)} title="Source" wide testId="source-drawer">
         {target && <SourceView target={target} />}
       </Dialog>
     </DrawerCtx.Provider>
@@ -46,28 +46,27 @@ function SourceView({ target }: { target: SourceTarget }) {
   const q = useSource(target.source_id ?? ref?.source_id ?? null, target.revision ?? ref?.source_revision ?? null);
   return (
     <div className="stack-lg">
-      {evq.isLoading && <Loading label="Resolving evidence" />}
+      {evq.isLoading && <Loading label="Finding the source" />}
       {evq.error ? <ErrorPanel error={evq.error} onRetry={() => evq.refetch()} what="evidence" /> : null}
       {ref && (
         <div className="stack">
-          <span className="label">Exact excerpt cited</span>
+          <span className="label">The exact words we relied on</span>
           <blockquote className="quote" data-testid="drawer-excerpt">{ref.excerpt}</blockquote>
           <dl className="kv">
-            <dt>Evidence</dt><dd><Mono>{ref.id}</Mono></dd>
-            <dt>Location</dt><dd><Mono>{ref.location}</Mono></dd>
-            <dt>Revision</dt><dd data-testid="drawer-revision">rev {ref.source_revision}</dd>
-            <dt>Origin</dt><dd>{ref.origin.replace("_", " ")}</dd>
-            <dt>Observed</dt><dd><Ts iso={ref.observed_at} /></dd>
-            <dt>Ingested</dt><dd><Ts iso={ref.ingested_at} /></dd>
-            <dt>Freshness</dt>
+            <dt>Where in the source</dt><dd><Mono>{ref.location}</Mono></dd>
+            <dt>Version</dt><dd data-testid="drawer-revision">version {ref.source_revision}</dd>
+            <dt>Kind of data</dt><dd>{ORIGIN[ref.origin] ?? ref.origin}</dd>
+            <dt>True as of</dt><dd><Ts iso={ref.observed_at} /></dd>
+            <dt>Added to PromiseGraph</dt><dd><Ts iso={ref.ingested_at} /></dd>
+            <dt>Still current?</dt>
             <dd data-testid="drawer-freshness">
-              {ref.stale ? <Tag tone="warn" icon="alert">Stale — observed too long ago to rely on</Tag> : <Tag tone="success" icon="check">Fresh</Tag>}
+              {ref.stale ? <Tag tone="warn" icon="alert">May be out of date: last checked a while ago</Tag> : <Tag tone="success" icon="check">Up to date</Tag>}
             </dd>
           </dl>
         </div>
       )}
       {!ref && !target.source_id ? null : q.isLoading ? (
-        <Loading label="Loading source revision" />
+        <Loading label="Loading the source" />
       ) : q.error ? (
         <ErrorPanel error={q.error} onRetry={() => q.refetch()} what="source" />
       ) : q.data ? (
@@ -75,20 +74,20 @@ function SourceView({ target }: { target: SourceTarget }) {
           <div className="row">
             <strong>{q.data.data.title}</strong>
             <Tag>{q.data.data.kind}</Tag>
-            <Tag>rev {q.data.data.revision}</Tag>
-            {q.data.data.supersedes_revision !== null && <Tag tone="info">supersedes rev {q.data.data.supersedes_revision}</Tag>}
+            <Tag>version {q.data.data.revision}</Tag>
+            {q.data.data.supersedes_revision !== null && <Tag tone="info">replaces version {q.data.data.supersedes_revision}</Tag>}
           </div>
           {ref && q.data.data.revision !== ref.source_revision && (
-            <Callout tone="warn" icon="alert" title="Showing a different revision than the one cited">
-              <p>The evidence cites rev {ref.source_revision}; the server returned rev {q.data.data.revision}.</p>
+            <Callout tone="warn" icon="alert" title="This is a different version from the one we relied on">
+              <p>We relied on version {ref.source_revision}; this is version {q.data.data.revision}.</p>
             </Callout>
           )}
           {ref && !q.data.data.body.includes(ref.excerpt) && (
-            <p className="muted small">The excerpt is a normalized quotation of this record and is not highlighted verbatim.</p>
+            <p className="muted small">The quote above is a tidied-up version of this record, so it isn't highlighted word for word.</p>
           )}
           <pre className="source-body" tabIndex={0} aria-label="Source body">{highlight(q.data.data.body, ref?.excerpt)}</pre>
           <p className="small muted">
-            sha256 <Mono>{q.data.data.sha256.slice(0, 16)}…</Mono> · observed <Ts iso={q.data.data.observed_at} /> · ingested <Ts iso={q.data.data.ingested_at} />
+            true as of <Ts iso={q.data.data.observed_at} /> · added <Ts iso={q.data.data.ingested_at} /> · content check <Mono>{q.data.data.sha256.slice(0, 12)}…</Mono>
           </p>
         </div>
       ) : null}
@@ -107,8 +106,8 @@ export function EvidenceChip({ id, refs }: { id: string; refs: Map<string, Evide
     );
   return (
     <button type="button" className="btn btn-sm" onClick={() => open({ source_id: ref.source_id, revision: ref.source_revision, ref })} title={ref.excerpt}>
-      <Icon name="doc" /> {ref.source_id} · rev {ref.source_revision}
-      {ref.stale && <span className="sr-only"> (stale)</span>}
+      <Icon name="doc" /> “{ref.excerpt.length > 40 ? `${ref.excerpt.slice(0, 40)}…` : ref.excerpt}”
+      {ref.stale && <span className="sr-only"> (may be out of date)</span>}
       {ref.stale && <Icon name="alert" />}
     </button>
   );
@@ -137,7 +136,7 @@ export function PathText({ path, refs, index }: { path: EvidencePath; refs: Map<
   return (
     <div className="stack" data-testid="evidence-path">
       <div className="row small muted">
-        <span>Path {index + 1} · {nodes.length} nodes · {Math.max(nodes.length - 1, 0)} hops ·</span> <Mono>{path.id}</Mono>
+        <span>Connection {index + 1} · {Math.max(nodes.length - 1, 0)} steps ·</span> <Mono>{path.id}</Mono>
         <ClaimTag kind={path.claim_kind} />
         {path.evidence_ids.map((id) => <EvidenceChip key={id} id={id} refs={refs} />)}
       </div>
@@ -159,11 +158,11 @@ export function PathText({ path, refs, index }: { path: EvidencePath; refs: Map<
                         <span>{e.from_id === n.id ? "↓" : "↑"}</span>
                         <span className="rel">{e.type}</span>
                         <span className="sr-only">{e.from_id === n.id ? "points to next node" : "points from next node to this one"}</span>
-                        {e.confirmed ? <Tag tone="success" icon="check">confirmed</Tag> : <Tag tone="warn" icon="question">candidate · unconfirmed</Tag>}
+                        {e.confirmed ? <Tag tone="success" icon="check">confirmed</Tag> : <Tag tone="warn" icon="question">possible link, not confirmed</Tag>}
                         {e.evidence_ids.map((id) => <EvidenceChip key={id} id={id} refs={refs} />)}
                       </>
                     ) : (
-                      <Tag tone="danger" icon="alert">no edge returned between these nodes</Tag>
+                      <Tag tone="danger" icon="alert">no link found between these two</Tag>
                     )}
                   </div>
                 )}
@@ -174,7 +173,7 @@ export function PathText({ path, refs, index }: { path: EvidencePath; refs: Map<
       </ol>
       <div>
         <button type="button" className="btn btn-ghost btn-sm" aria-expanded={showVisual} onClick={() => setShowVisual((v) => !v)}>
-          <Icon name="graph" /> {showVisual ? "Hide diagram" : "Show diagram"}
+          <Icon name="graph" /> {showVisual ? "Hide picture" : "Show as a picture"}
         </button>
       </div>
       {showVisual && <PathVisual path={path} />}
@@ -212,11 +211,12 @@ function PathVisual({ path }: { path: EvidencePath }) {
   );
 }
 
+const ORIGIN: Record<string, string> = { synthetic: "Demo data (made up)", public: "Public information", owned_permitted: "Our own data" };
 const CLAIM: Record<string, { label: string; tone: string }> = {
   source_assertion: { label: "Supported by source", tone: "success" },
   derived: { label: "Derived from sources", tone: "info" },
-  inference: { label: "Inference · not directly stated", tone: "warn" },
-  unknown: { label: "Support unknown", tone: "neutral" },
+  inference: { label: "Our inference, not stated in a source", tone: "warn" },
+  unknown: { label: "Not sure how well supported", tone: "neutral" },
 };
 export function ClaimTag({ kind }: { kind: string }) {
   const c = CLAIM[kind] ?? { label: kind, tone: "neutral" };

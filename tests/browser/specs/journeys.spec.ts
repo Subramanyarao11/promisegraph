@@ -44,8 +44,8 @@ test("T25 keyboard + 390px journey: intake → evidence → reviewed action → 
   await page.goto("/requests");
 
   // Honest mode labelling from /info (T22 visible part).
-  await expect(page.getByTestId("mode-badges")).toContainText("Scripted mode");
-  await expect(page.getByTestId("model-state")).toContainText(/Live model unavailable/);
+  await expect(page.getByTestId("mode-badges")).toContainText("Rule-based mode");
+  await expect(page.getByTestId("model-state")).toContainText(/no AI model connected/);
 
   // Intake, keyboard only.
   await page.getByTestId("new-request").focus();
@@ -60,7 +60,7 @@ test("T25 keyboard + 390px journey: intake → evidence → reviewed action → 
   await page.keyboard.type(subject);
   await dlg.getByLabel("Request body").focus();
   await page.keyboard.type("We need scheduled exports delivered to a SharePoint folder every Monday.");
-  await expect(dlg.getByLabel("Scripted mode")).toBeChecked();
+  await expect(dlg.getByLabel("Rule-based mode")).toBeChecked();
   await dlg.getByTestId("submit-request").focus();
   await page.keyboard.press("Enter");
 
@@ -69,15 +69,15 @@ test("T25 keyboard + 390px journey: intake → evidence → reviewed action → 
   await noHorizontalScroll(page);
 
   // Evidence: proposal with finding + alternatives, sources, path text.
-  await expect(page.getByTestId("proposal-kind")).toHaveText("Create new work", { timeout: 20_000 });
-  await expect(page.getByTestId("request-status")).toContainText("Waiting for review");
-  await expect(page.getByTestId("run-status")).toContainText("Waiting for authorization");
+  await expect(page.getByTestId("proposal-kind")).toHaveText("Create a new task", { timeout: 20_000 });
+  await expect(page.getByTestId("request-status")).toContainText("Waiting for your approval");
+  await expect(page.getByTestId("run-status")).toContainText("Paused: waiting for your approval");
   await expect(page.getByTestId("finding-text")).toContainText("create_work");
-  await expect(page.getByTestId("alternatives")).toContainText("Link existing work");
+  await expect(page.getByTestId("alternatives")).toContainText("Attach to existing work");
   await expect(page.getByTestId("acceptance-criteria")).toContainText("Customer can complete the workflow");
-  await expect(page.getByTestId("proposal-owner")).toContainText("Missing owner");
-  await expect(page.getByTestId("execution-target")).toContainText("Local task");
-  await expect(page.getByTestId("timeline").first()).toContainText("Scripted mode");
+  await expect(page.getByTestId("proposal-owner")).toContainText("No owner yet");
+  await expect(page.getByTestId("execution-target")).toContainText("PromiseGraph's task list");
+  await expect(page.getByTestId("timeline").first()).toContainText("Rule-based mode");
 
   // Source drawer by keyboard: exact excerpt + revision + freshness; Escape closes.
   const openSource = page.getByTestId("open-source").first();
@@ -85,8 +85,8 @@ test("T25 keyboard + 390px journey: intake → evidence → reviewed action → 
   await page.keyboard.press("Enter");
   const drawer = page.getByTestId("source-drawer");
   await expect(drawer.getByTestId("drawer-excerpt")).not.toBeEmpty();
-  await expect(drawer.getByTestId("drawer-revision")).toContainText("rev ");
-  await expect(drawer.getByTestId("drawer-freshness")).toContainText(/Fresh|Stale/);
+  await expect(drawer.getByTestId("drawer-revision")).toContainText("version ");
+  await expect(drawer.getByTestId("drawer-freshness")).toContainText(/Up to date|May be out of date/);
   await page.keyboard.press("Escape");
   await expect(drawer).not.toBeVisible();
 
@@ -95,28 +95,28 @@ test("T25 keyboard + 390px journey: intake → evidence → reviewed action → 
   await page.keyboard.press("Enter");
   await page.getByTestId("confirm-authorize").focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("live-polite")).toContainText(/Authorized/);
-  await expect(page.getByTestId("action-status")).toContainText("Executed", { timeout: 20_000 });
-  await expect(page.getByTestId("receipt-connector")).toHaveText("Local task");
-  await expect(page.getByTestId("request-status")).toContainText("Waiting on work");
-  await expect(page.getByTestId("next-step")).toContainText("does not resolve the request");
+  await expect(page.getByTestId("live-polite")).toContainText(/Approved/);
+  await expect(page.getByTestId("action-status")).toContainText("Done", { timeout: 20_000 });
+  await expect(page.getByTestId("receipt-connector")).toHaveText("PromiseGraph task list");
+  await expect(page.getByTestId("request-status")).toContainText("Waiting on engineering");
+  await expect(page.getByTestId("next-step")).toContainText(/doesn.t mean the customer.s problem is solved/);
   await noHorizontalScroll(page);
 
   // Persisted refresh: everything is re-read from the API.
   const receiptText = await page.getByTestId("receipt").innerText();
   await page.reload();
   await expect(page.getByTestId("receipt")).toContainText(receiptText.split("\n")[0]);
-  await expect(page.getByTestId("receipt-connector")).toHaveText("Local task");
-  await expect(page.getByTestId("request-status")).toContainText("Waiting on work");
+  await expect(page.getByTestId("receipt-connector")).toHaveText("PromiseGraph task list");
+  await expect(page.getByTestId("request-status")).toContainText("Waiting on engineering");
 
   // Outcome verification by keyboard.
   const form = page.getByTestId("observation-form");
-  await form.getByLabel("Observation kind").focus();
-  await form.getByLabel("What was observed").focus();
+  await form.getByLabel("How do you know?").focus();
+  await form.getByLabel("What happened").focus();
   await page.keyboard.type("Customer confirmed the Monday export arrived in SharePoint.");
   await form.getByTestId("submit-observation").focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("request-status")).toContainText("Resolved · verified", { timeout: 15_000 });
+  await expect(page.getByTestId("request-status")).toContainText("Solved (confirmed)", { timeout: 15_000 });
   await expect(page.getByTestId("resolved-evidence")).toBeVisible();
   await noHorizontalScroll(page);
 });
@@ -125,23 +125,23 @@ test("clarification continuation resumes the same run with history retained", as
   driver.plan("We need provisioning", [{ kind: "clarify" }, { kind: "answer" }]);
   const id = await intake(page.request, `We need provisioning ${Date.now()}`, "We need provisioning for our team.");
   await page.goto(`/requests/${id}`);
-  await expect(page.getByTestId("request-status")).toContainText("Waiting for input", { timeout: 20_000 });
-  await expect(page.getByTestId("run-status")).toContainText("Waiting for input");
+  await expect(page.getByTestId("request-status")).toContainText("Waiting for customer reply", { timeout: 20_000 });
+  await expect(page.getByTestId("run-status")).toContainText("Paused: waiting for customer reply");
   await expect(page.getByTestId("draft-question")).toContainText("account creation or group synchronization");
-  await expect(page.getByText("Draft clarification question — not sent")).toBeVisible();
-  const runHeading = await page.getByTestId("timeline-section").locator("h3").first().innerText();
+  await expect(page.getByText("Draft question for the customer: not sent")).toBeVisible();
+  const runHeading = await page.getByTestId("run-heading").first().textContent();
 
   const reply = page.getByTestId("reply-form");
   await reply.getByLabel("Customer reply").fill("We mean SCIM group synchronization.");
   await reply.getByTestId("submit-reply").click();
   await expect(page.getByTestId("live-polite")).toContainText(/Reply recorded/);
 
-  await expect(page.getByTestId("proposal-kind")).toHaveText("Answer (draft)", { timeout: 20_000 });
-  await expect(page.getByTestId("request-status")).toContainText("Awaiting verification", { timeout: 20_000 });
+  await expect(page.getByTestId("proposal-kind")).toHaveText("Reply with an answer", { timeout: 20_000 });
+  await expect(page.getByTestId("request-status")).toContainText("Waiting for you to confirm it's solved", { timeout: 20_000 });
   // Same logical run: one run heading, and it still holds the earlier waiting_for_input event.
-  const headings = page.getByTestId("timeline-section").locator("h3");
+  const headings = page.getByTestId("run-heading");
   await expect(headings).toHaveCount(1);
-  await expect(headings.first()).toHaveText(runHeading);
+  await expect(headings.first()).toHaveText(runHeading!);
   await expect(page.locator('[data-testid="timeline-event"][data-type="waiting_for_input"]')).toHaveCount(1);
   await expect(page.getByTestId("draft-text")).toBeVisible();
 });
@@ -150,8 +150,8 @@ test("stale proposal has no enabled commit control", async ({ page }) => {
   driver.plan("Stale plan check", [{ kind: "create_work", stale: true }]);
   const id = await intake(page.request, `Stale plan check ${Date.now()}`, "Need a new export destination for audit evidence.");
   await page.goto(`/requests/${id}`);
-  await expect(page.getByTestId("proposal-validity")).toContainText("Stale", { timeout: 20_000 });
-  await expect(page.getByTestId("commit-blocked")).toContainText("Stale proposal — execution blocked");
+  await expect(page.getByTestId("proposal-validity")).toContainText("Out of date", { timeout: 20_000 });
+  await expect(page.getByTestId("commit-blocked")).toContainText("Out of date: facts changed since this was suggested");
   await expect(page.getByTestId("authorize")).toBeDisabled();
   await expect(page.getByTestId("validation-reasons")).toContainText("based_on_revision");
 });
@@ -163,25 +163,25 @@ test("dispatch timeout after effect shows outcome unknown, not a new create", as
   await expect(page.getByTestId("authorize")).toBeEnabled({ timeout: 20_000 });
   await page.getByTestId("authorize").click();
   await page.getByTestId("confirm-authorize").click();
-  await expect(page.getByTestId("action-status")).toContainText("Dispatch outcome unknown", { timeout: 20_000 });
+  await expect(page.getByTestId("action-status")).toContainText("Unclear if it went through", { timeout: 20_000 });
   await expect(page.getByTestId("dispatch-unknown")).toContainText("nothing is created again automatically");
   await expect(page.getByTestId("authorize")).toHaveCount(0); // no second create offered
 
   // Operator reconciliation (Rev 3 #20/#26). A target that does not exist is refused by the server…
-  await expect(page.getByTestId("run-status")).toContainText("Waiting for authorization", { timeout: 15_000 }); // auto-reconcile gave up
+  await expect(page.getByTestId("run-status")).toContainText("Paused: waiting for your approval", { timeout: 15_000 }); // auto-check gave up
   const rec = page.getByTestId("reconcile-form");
-  await rec.getByLabel("Created — I found it").check();
-  await rec.getByLabel(/Target ID found/).fill("work_that_does_not_exist");
-  await rec.getByRole("button", { name: "Record reconciliation" }).click();
-  await expect(rec.getByTestId("state-error")).toContainText("Blocked by policy");
-  await expect(page.getByTestId("action-status")).toContainText("Dispatch outcome unknown");
+  await rec.getByLabel("Yes, I found it").check();
+  await rec.getByLabel(/Its ID in/).fill("work_that_does_not_exist");
+  await rec.getByRole("button", { name: "Save what I found" }).click();
+  await expect(rec.getByTestId("state-error")).toContainText("Not allowed by company rules");
+  await expect(page.getByTestId("action-status")).toContainText("Unclear if it went through");
   // …while the task the timed-out effect really created (found on /work) reconciles the action.
   const work = await (await page.request.get(`${WS}/work-items?limit=100`)).json();
   const created = work.data.find((w: { title: string }) => w.title.includes("Unknown write check"));
   expect(created, "the local effect was applied before the timeout").toBeTruthy();
-  await rec.getByLabel(/Target ID found/).fill(created.id);
-  await rec.getByRole("button", { name: "Record reconciliation" }).click();
-  await expect(page.getByTestId("action-status")).toContainText("Executed", { timeout: 15_000 });
+  await rec.getByLabel(/Its ID in/).fill(created.id);
+  await rec.getByRole("button", { name: "Save what I found" }).click();
+  await expect(page.getByTestId("action-status")).toContainText("Done", { timeout: 15_000 });
   await expect(page.getByTestId("receipt")).toContainText(created.id);
 });
 
@@ -189,7 +189,7 @@ test("explicit closure is distinct from verified resolution", async ({ page }) =
   driver.plan("Closure check", [{ kind: "escalate" }]);
   const id = await intake(page.request, `Closure check ${Date.now()}`, "Please close this out; handled elsewhere.");
   await page.goto(`/requests/${id}`);
-  await expect(page.getByTestId("request-status")).toContainText("Waiting for review", { timeout: 20_000 });
+  await expect(page.getByTestId("request-status")).toContainText("Waiting for your approval", { timeout: 20_000 });
   await page.getByTestId("close-request").click();
   await page.getByLabel("Reason").fill("Handled by account team outside PromiseGraph.");
   await page.getByRole("dialog").getByRole("button", { name: "Close request" }).click();

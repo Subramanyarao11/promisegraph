@@ -305,3 +305,29 @@ mark { background: var(--warn-bg); color: var(--text); outline: 1px solid var(--
 .table td { overflow-wrap: normal; }
 .table td .mono, .table td code { overflow-wrap: anywhere; }
 @media (max-width: 760px) { .nav { flex-wrap: wrap; overflow-x: visible; } }
+
+/* How it works */
+.how { margin-bottom: 14px; }
+.how .panel-head h2 { text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--text); }
+.how-lead { font-size: 14px; margin-bottom: 12px; }
+.how-steps { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; counter-reset: step; }
+.how-steps li { display: flex; gap: 10px; align-items: flex-start; }
+.how-icon { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.how-title { font-weight: 600; }
+@media (max-width: 900px) { .how-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .how-steps { grid-template-columns: minmax(0, 1fr); } }
+
+/* Request page as a story */
+.story { max-width: 920px; display: flex; flex-direction: column; gap: 14px; }
+.story > .detail-head { margin-bottom: 0; }
+.story .panel-head h2 { text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--text); }
+h3.sub { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-3); font-weight: 600; margin-bottom: 4px; }
+.recommend { display: flex; align-items: center; gap: 8px; font-size: 17px; color: var(--accent); }
+.recommend strong { color: var(--text); }
+.subsection { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.btn-lg { height: 38px; padding: 0 16px; font-size: 14px; }
+.done-title { display: flex; gap: 6px; align-items: center; font-weight: 600; color: var(--success-fg); }
+details.tech > summary { cursor: pointer; padding: 11px 14px; font-weight: 600; list-style-position: inside; }
+details.tech[open] > summary { border-bottom: 1px solid var(--border); }
+details > summary { cursor: pointer; }
+details > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }

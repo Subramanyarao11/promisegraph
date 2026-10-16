@@ -4,7 +4,7 @@ import { useCommand, keys, rememberRun, useInfo } from "../api/hooks";
 import { ApiError } from "../api/client";
 import { Icon } from "./Icon";
 import { Dialog, ErrorPanel, Field, useAnnounce } from "./ui";
-import { REQUEST_STATUS, RUN_STATUS, spec } from "../lib/status";
+import { ACTION_STATUS, KIND_LABEL, REQUEST_STATUS, RUN_STATUS, spec } from "../lib/status";
 
 /* ---------------- clarification reply ---------------- */
 export function ReplyForm({ request, question }: { request: Request; question: string | null }) {
@@ -15,13 +15,13 @@ export function ReplyForm({ request, question }: { request: Request; question: s
   const reply = useCommand<ReplyCreate, ReplyResult>("post", () => `/requests/${encodeURIComponent(request.id)}/replies`, () => [keys.request(request.id), keys.context(request.id), ["run"], ["actions"]]);
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!body.trim()) { setErr("Enter the customer's reply."); return; }
+    if (!body.trim()) { setErr("Paste the customer's reply first."); return; }
     setErr(undefined);
     reply.mutate({ body: body.trim(), external_ref: ext.trim() || null, expected_request_version: request.version }, {
       onSuccess: (r) => {
         rememberRun(request.id, r.data.run.id);
         setBody(""); setExt("");
-        announce(`Reply recorded as source ${r.data.source_id} rev ${r.data.source_revision}. Run ${r.data.run.id} is ${spec(RUN_STATUS, r.data.run.status).label.toLowerCase()}.`);
+        announce(`Reply recorded. PromiseGraph is continuing (${spec(RUN_STATUS, r.data.run.status).label.toLowerCase()}).`);
       },
       onError: (e) => announce(`Reply not recorded: ${(e as Error).message}`, true),
     });
@@ -29,16 +29,16 @@ export function ReplyForm({ request, question }: { request: Request; question: s
   const fe = reply.error instanceof ApiError ? reply.error.fieldErrors : {};
   return (
     <form onSubmit={submit} className="stack" noValidate data-testid="reply-form">
-      {question && <p className="small">Question drafted for the customer: <em>“{question}”</em></p>}
+      {question && <p className="small">We asked (as a draft for you to send): <em>“{question}”</em></p>}
       {reply.error && !(reply.error instanceof ApiError && reply.error.code === "INVALID_INPUT") && <ErrorPanel error={reply.error} />}
-      <Field label="Customer reply" hint="Recorded as a new immutable source; the waiting run resumes with refreshed context." error={err ?? fe.body}>
+      <Field label="Customer reply" hint="Paste what they said. PromiseGraph continues the same investigation with it." error={err ?? fe.body}>
         {(p) => <textarea {...p} rows={4} value={body} onChange={(e) => setBody(e.target.value)} maxLength={20000} />}
       </Field>
-      <Field label="External reference (optional)" error={fe.external_ref}>
+      <Field label="Ticket or email reference (optional)" error={fe.external_ref}>
         {(p) => <input {...p} type="text" value={ext} onChange={(e) => setExt(e.target.value)} />}
       </Field>
       <div className="form-actions">
-        <button type="submit" className="btn btn-primary" disabled={reply.isPending} data-testid="submit-reply">{reply.isPending ? "Recording…" : "Record reply and resume"}</button>
+        <button type="submit" className="btn btn-primary" disabled={reply.isPending} data-testid="submit-reply">{reply.isPending ? "Saving…" : "Save reply and continue"}</button>
       </div>
     </form>
   );
@@ -46,10 +46,10 @@ export function ReplyForm({ request, question }: { request: Request; question: s
 
 /* ---------------- outcome verification ---------------- */
 const OBS_KINDS: { value: ObservationCreate["kind"]; label: string; hint: string }[] = [
-  { value: "customer_confirmation", label: "Customer confirmation", hint: "The customer confirmed the outcome." },
-  { value: "operator_confirmation", label: "Operator confirmation", hint: "You checked the outcome yourself." },
-  { value: "acceptance_check", label: "Acceptance check", hint: "The stated criteria were tested." },
-  { value: "connector_status", label: "Connector status", hint: "External work status only — never resolves a request." },
+  { value: "customer_confirmation", label: "The customer told us", hint: "The customer confirmed whether it works." },
+  { value: "operator_confirmation", label: "I checked it myself", hint: "You tested it yourself." },
+  { value: "acceptance_check", label: "We tested it against the criteria", hint: "Someone ran the agreed checks." },
+  { value: "connector_status", label: "Status update from a tool (e.g. Linear)", hint: "Only a status update. This never marks a request solved." },
 ];
 
 export function ObservationForm({ request, actions, refs }: { request: Request; actions: Action[]; refs: EvidenceRef[] }) {
@@ -63,12 +63,12 @@ export function ObservationForm({ request, actions, refs }: { request: Request; 
   const obs = useCommand<ObservationCreate, ObservationResult>("post", () => `/requests/${encodeURIComponent(request.id)}/observations`, () => [keys.request(request.id), keys.context(request.id), ["actions"], ["run"], ["requests"]]);
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!body.trim()) { setErr("Describe what was observed (who confirmed what, against which criteria)."); return; }
+    if (!body.trim()) { setErr("Say what happened, e.g. who confirmed it and what they checked."); return; }
     setErr(undefined);
     obs.mutate({ action_id: actionId || null, kind, verification, body: body.trim(), evidence_ids: evidence, expected_request_version: request.version }, {
       onSuccess: (r) => {
         setBody(""); setEvidence([]);
-        announce(`Observation ${r.data.observation.id} recorded (${r.data.observation.verification}). Request is now ${spec(REQUEST_STATUS, r.data.request.status).label}.`);
+        announce(`Saved. This request is now: ${spec(REQUEST_STATUS, r.data.request.status).label}.`);
       },
       onError: (e) => announce(`Observation not recorded: ${(e as Error).message}`, true),
     });
@@ -78,55 +78,58 @@ export function ObservationForm({ request, actions, refs }: { request: Request; 
     <form onSubmit={submit} className="stack" noValidate data-testid="observation-form">
       {obs.error && !(obs.error instanceof ApiError && obs.error.code === "INVALID_INPUT") && <ErrorPanel error={obs.error} />}
       <div className="form-grid">
-        <Field label="Observation kind" hint={OBS_KINDS.find((k) => k.value === kind)?.hint} error={fe.kind}>
+        <Field label="How do you know?" hint={OBS_KINDS.find((k) => k.value === kind)?.hint} error={fe.kind}>
           {(p) => (
             <select {...p} value={kind} onChange={(e) => setKind(e.target.value as ObservationCreate["kind"])}>
               {OBS_KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
             </select>
           )}
         </Field>
-        <Field label="Verification result" error={fe.verification}>
+        <Field label="Is it solved?" error={fe.verification}>
           {(p) => (
             <select {...p} value={verification} onChange={(e) => setVerification(e.target.value as ObservationCreate["verification"])}>
-              <option value="passed">Passed</option>
-              <option value="failed">Failed — reopen investigation</option>
-              <option value="inconclusive">Inconclusive</option>
-              <option value="pending">Pending</option>
+              <option value="passed">Yes, it's solved</option>
+              <option value="failed">No, still a problem (look into it again)</option>
+              <option value="inconclusive">Not sure yet</option>
+              <option value="pending">Still waiting to hear</option>
             </select>
           )}
         </Field>
         <div className="span-2">
-          <Field label="Related action" error={fe.action_id}>
+          <Field label="Which action does this confirm?" error={fe.action_id}>
             {(p) => (
               <select {...p} value={actionId} onChange={(e) => setActionId(e.target.value)}>
-                <option value="">None</option>
-                {actions.map((a) => <option key={a.id} value={a.id}>{a.id} · {a.kind} · {a.status}</option>)}
+                <option value="">Not about a specific action</option>
+                {actions.map((a) => <option key={a.id} value={a.id}>{KIND_LABEL[a.kind] ?? a.kind} ({spec(ACTION_STATUS, a.status).label.toLowerCase()})</option>)}
               </select>
             )}
           </Field>
         </div>
         <div className="span-2">
-          <Field label="What was observed" error={err ?? fe.body}>
+          <Field label="What happened" error={err ?? fe.body}>
             {(p) => <textarea {...p} rows={3} value={body} onChange={(e) => setBody(e.target.value)} maxLength={4000} />}
           </Field>
         </div>
         {refs.length > 0 && (
-          <fieldset className="span-2">
-            <legend>Supporting evidence (optional)</legend>
+          <details className="span-2 small">
+            <summary>Attach supporting sources (optional)</summary>
+          <fieldset>
+            <legend className="sr-only">Supporting sources</legend>
             <div className="stack" style={{ maxHeight: 120, overflowY: "auto", gap: 4 }}>
               {refs.map((r) => (
                 <label key={r.id} className="check small">
                   <input type="checkbox" checked={evidence.includes(r.id)} onChange={(e) => setEvidence(e.target.checked ? [...evidence, r.id] : evidence.filter((x) => x !== r.id))} />
-                  {r.source_id} rev {r.source_revision} — {r.excerpt.slice(0, 70)}
+                  “{r.excerpt.slice(0, 80)}{r.excerpt.length > 80 ? "…" : ""}”
                 </label>
               ))}
             </div>
           </fieldset>
+          </details>
         )}
       </div>
-      {kind === "connector_status" && verification === "passed" && <p className="small muted"><Icon name="info" size={12} /> A connector status cannot resolve the request; it is stored as external evidence.</p>}
+      {kind === "connector_status" && verification === "passed" && <p className="small muted"><Icon name="info" size={12} /> A tool’s status update can’t mark the request solved. It’s saved as background information.</p>}
       <div className="form-actions">
-        <button type="submit" className="btn btn-primary" disabled={obs.isPending} data-testid="submit-observation">{obs.isPending ? "Recording…" : "Record observation"}</button>
+        <button type="submit" className="btn btn-primary" disabled={obs.isPending} data-testid="submit-observation">{obs.isPending ? "Saving…" : "Save"}</button>
       </div>
     </form>
   );
@@ -150,60 +153,60 @@ export function RunControls({ request, run, onStarted }: { request: Request; run
 
   const doStart = () =>
     start.mutate({ mode, instruction: instruction.trim(), authorization_id: null }, {
-      onSuccess: (r) => { rememberRun(request.id, r.data.id); onStarted?.(r.data); announce(`Run ${r.data.id} ${r.data.status} (${r.data.mode === "scripted" ? "Scripted mode" : "live model"}).`); close(); },
-      onError: (e) => announce(`Run not started: ${(e as Error).message}`, true),
+      onSuccess: (r) => { rememberRun(request.id, r.data.id); onStarted?.(r.data); announce(`PromiseGraph is looking into it (${r.data.mode === "scripted" ? "rule-based mode" : "AI model"}).`); close(); },
+      onError: (e) => announce(`Couldn't start: ${(e as Error).message}`, true),
     });
   const doCancel = () => run &&
     cancel.mutate({ _id: run.id, reason: reason.trim() || "Cancelled by operator" }, {
-      onSuccess: () => { announce(`Run ${run.id} cancellation recorded. In-flight external operations are still observed.`); close(); },
-      onError: (e) => announce(`Cancel refused: ${(e as Error).message}`, true),
+      onSuccess: () => { announce("Stopped. Anything already under way is still tracked."); close(); },
+      onError: (e) => announce(`Couldn't stop: ${(e as Error).message}`, true),
     });
   const doResume = () => run &&
     resume.mutate({ _id: run.id, expected_run_version: run.version, reason: reason.trim() || "Operator resume", additional_tool_calls: 6, additional_active_seconds: 45 }, {
-      onSuccess: () => { announce(`Run ${run.id} resumed from its checkpoint.`); close(); },
-      onError: (e) => announce(`Resume refused: ${(e as Error).message}`, true),
+      onSuccess: () => { announce("Continuing from where it stopped."); close(); },
+      onError: (e) => announce(`Couldn't continue: ${(e as Error).message}`, true),
     });
 
   return (
-    <div className="row" role="group" aria-label="Run controls">
-      <button type="button" className="btn btn-sm" onClick={() => setDialog("start")} disabled={Boolean(active)} data-testid="start-run" title={active ? "A run is already active" : undefined}>
-        <Icon name="play" /> {run ? "New run" : "Start run"}
+    <div className="row" role="group" aria-label="Investigation controls">
+      <button type="button" className="btn btn-sm" onClick={() => setDialog("start")} disabled={Boolean(active)} data-testid="start-run" title={active ? "Already looking into it" : undefined}>
+        <Icon name="play" /> {run ? "Look into it again" : "Look into it"}
       </button>
       {active && (
-        <button type="button" className="btn btn-sm btn-danger" onClick={() => setDialog("cancel")} data-testid="cancel-run"><Icon name="stop" /> Cancel run</button>
+        <button type="button" className="btn btn-sm btn-danger" onClick={() => setDialog("cancel")} data-testid="cancel-run"><Icon name="stop" /> Stop</button>
       )}
       {run?.status === "failed" && (
-        <button type="button" className="btn btn-sm" onClick={() => setDialog("resume")} data-testid="resume-run"><Icon name="refresh" /> Resume from checkpoint</button>
+        <button type="button" className="btn btn-sm" onClick={() => setDialog("resume")} data-testid="resume-run"><Icon name="refresh" /> Continue where it stopped</button>
       )}
-      <Dialog open={dialog === "start"} onClose={close} title="Start an investigation run">
+      <Dialog open={dialog === "start"} onClose={close} title="Look into this request">
         <fieldset>
-          <legend>Planner</legend>
+          <legend>How should PromiseGraph think it through?</legend>
           <div className="radio-row">
-            <label><input type="radio" name="run-mode" checked={mode === "scripted"} onChange={() => setMode("scripted")} /> Scripted mode</label>
-            <label><input type="radio" name="run-mode" checked={mode === "model"} disabled={!modelUsable} onChange={() => setMode("model")} /> Live model{modelUsable ? "" : ` (unavailable: ${modelState ?? "status unknown"})`}</label>
+            <label><input type="radio" name="run-mode" checked={mode === "scripted"} onChange={() => setMode("scripted")} /> Rule-based mode</label>
+            <label><input type="radio" name="run-mode" checked={mode === "model"} disabled={!modelUsable} onChange={() => setMode("model")} /> AI model{modelUsable ? "" : " (not connected)"}</label>
           </div>
         </fieldset>
-        <p className="small">The run uses the real tools and re-reads current knowledge.</p>
+        <p className="small">It re-reads the latest docs, work and rules before suggesting anything.</p>
         {start.error && <ErrorPanel error={start.error} />}
-        <Field label="Instruction (optional)" hint="Up to 4,000 characters, e.g. what changed.">
+        <Field label="Anything it should know? (optional)" hint="For example, what changed since last time.">
           {(p) => <textarea {...p} rows={3} value={instruction} onChange={(e) => setInstruction(e.target.value)} maxLength={4000} />}
         </Field>
         <div className="form-actions">
           <button type="button" className="btn" onClick={close}>Cancel</button>
-          <button type="button" className="btn btn-primary" onClick={doStart} disabled={start.isPending} data-testid="confirm-start-run">{start.isPending ? "Starting…" : "Start run"}</button>
+          <button type="button" className="btn btn-primary" onClick={doStart} disabled={start.isPending} data-testid="confirm-start-run">{start.isPending ? "Starting…" : "Look into it"}</button>
         </div>
       </Dialog>
-      <Dialog open={dialog === "cancel"} onClose={close} title="Cancel this run?">
-        <p className="small">Cancelling stops future planning. It does not cancel an external operation already in flight; receipts and reconciliation are still recorded.</p>
+      <Dialog open={dialog === "cancel"} onClose={close} title="Stop looking into this?">
+        <p className="small">PromiseGraph stops here. Anything already under way (like a task being created) still finishes and is recorded.</p>
         {cancel.error && <ErrorPanel error={cancel.error} />}
         <Field label="Reason">{(p) => <input {...p} type="text" value={reason} onChange={(e) => setReason(e.target.value)} />}</Field>
         <div className="form-actions">
-          <button type="button" className="btn" onClick={close}>Keep running</button>
-          <button type="button" className="btn btn-danger" onClick={doCancel} disabled={cancel.isPending} data-testid="confirm-cancel-run">Cancel run</button>
+          <button type="button" className="btn" onClick={close}>Keep going</button>
+          <button type="button" className="btn btn-danger" onClick={doCancel} disabled={cancel.isPending} data-testid="confirm-cancel-run">Stop</button>
         </div>
       </Dialog>
-      <Dialog open={dialog === "resume"} onClose={close} title="Resume failed run">
-        <p className="small">Resumes from the stored checkpoint with one budget extension (+6 tool calls, +45 s). Usage so far is preserved.</p>
+      <Dialog open={dialog === "resume"} onClose={close} title="Continue where it stopped?">
+        <p className="small">Gives PromiseGraph a little more time and a few more checks (+6 checks, +45 seconds), keeping everything it already did.</p>
         {run?.error && <p className="small"><strong>{run.error.code}</strong>: {run.error.message}</p>}
         {resume.error && <ErrorPanel error={resume.error} />}
         <Field label="Reason">{(p) => <input {...p} type="text" value={reason} onChange={(e) => setReason(e.target.value)} />}</Field>
@@ -228,34 +231,34 @@ export function ReconcileForm({ action }: { action: Action }) {
   const rec = useCommand<ReconcileBody, Action>("post", (b) => `/actions/${encodeURIComponent(b._id)}/reconcile`, () => [["actions"], ["run"], ["request"]]);
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (outcome === "succeeded" && !targetId.trim()) { setErr("Enter the target ID you found (e.g. the task or issue identifier)."); return; }
+    if (outcome === "succeeded" && !targetId.trim()) { setErr("Enter the ID of the task or issue you found."); return; }
     const target = outcome === "succeeded" ? { target_id: targetId.trim(), target_url: targetUrl.trim() || null } : null;
     setErr(undefined);
     rec.mutate({ _id: action.id, outcome, target, evidence_ids: [], expected_action_version: action.version }, {
-      onSuccess: (r) => announce(`Action ${r.data.id} reconciled as ${r.data.status}.`),
-      onError: (e2) => announce(`Reconciliation refused: ${(e2 as Error).message}`, true),
+      onSuccess: (r) => announce(`Thanks. Recorded as: ${spec(ACTION_STATUS, r.data.status).label}.`),
+      onError: (e2) => announce(`Couldn't record that: ${(e2 as Error).message}`, true),
     });
   };
   return (
     <form onSubmit={submit} className="stack" noValidate data-testid="reconcile-form">
       <fieldset>
-        <legend>Operator reconciliation — what did you find at the target?</legend>
+        <legend>Please check: was it actually created?</legend>
         <div className="radio-row">
-          <label><input type="radio" name={`rec-${action.id}`} checked={outcome === "failed"} onChange={() => setOutcome("failed")} /> Not created (confirmed failure)</label>
-          <label><input type="radio" name={`rec-${action.id}`} checked={outcome === "succeeded"} onChange={() => setOutcome("succeeded")} /> Created — I found it</label>
+          <label><input type="radio" name={`rec-${action.id}`} checked={outcome === "failed"} onChange={() => setOutcome("failed")} /> No, it wasn’t created</label>
+          <label><input type="radio" name={`rec-${action.id}`} checked={outcome === "succeeded"} onChange={() => setOutcome("succeeded")} /> Yes, I found it</label>
         </div>
       </fieldset>
       {outcome === "succeeded" && (
         <>
-          <Field label={`Target ID found on ${action.connector === "linear" ? "Linear" : "the local task list"}`} error={err}>
+          <Field label={`Its ID in ${action.connector === "linear" ? "Linear" : "the PromiseGraph task list"}`} error={err}>
             {(p) => <input {...p} type="text" value={targetId} onChange={(e) => setTargetId(e.target.value)} />}
           </Field>
-          <Field label="Target URL (optional)">{(p) => <input {...p} type="text" value={targetUrl} onChange={(e) => setTargetUrl(e.target.value)} />}</Field>
+          <Field label="Link (optional)">{(p) => <input {...p} type="text" value={targetUrl} onChange={(e) => setTargetUrl(e.target.value)} />}</Field>
         </>
       )}
       {rec.error && <ErrorPanel error={rec.error} />}
       <div className="form-actions">
-        <button type="submit" className="btn btn-primary btn-sm" disabled={rec.isPending}>Record reconciliation</button>
+        <button type="submit" className="btn btn-primary btn-sm" disabled={rec.isPending}>Save what I found</button>
       </div>
     </form>
   );
@@ -273,16 +276,16 @@ export function CloseRequest({ request }: { request: Request }) {
     e.preventDefault();
     if (!reason.trim()) { setErr("A reason is required."); return; }
     close.mutate({ _id: request.id, reason: reason.trim(), expected_request_version: request.version }, {
-      onSuccess: () => { announce(`Request ${request.id} closed.`); setOpen(false); },
+      onSuccess: () => { announce("Request closed."); setOpen(false); },
       onError: (e2) => announce(`Close refused: ${(e2 as Error).message}`, true),
     });
   };
   return (
     <>
       <button type="button" className="btn btn-sm" onClick={() => setOpen(true)} data-testid="close-request"><Icon name="x" /> Close request</button>
-      <Dialog open={open} onClose={() => setOpen(false)} title="Close this request">
+      <Dialog open={open} onClose={() => setOpen(false)} title="Close this request?">
         <form onSubmit={submit} className="stack" noValidate>
-          <p className="small">Closing is an explicit operator decision. It is not a verified resolution and history is kept.</p>
+          <p className="small">Use this when the request no longer needs work, for example if it was handled elsewhere. Closed isn't the same as solved, and the history is kept.</p>
           {close.error && <ErrorPanel error={close.error} />}
           <Field label="Reason" error={err}>{(p) => <textarea {...p} rows={3} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={2000} />}</Field>
           <div className="form-actions">

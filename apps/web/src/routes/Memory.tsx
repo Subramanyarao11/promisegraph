@@ -2,20 +2,20 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { Attempt, ContextBundle, Decision, DecisionCommand, Request } from "@contracts";
-import { useAttempts, useCommand, useDecisions } from "../api/hooks";
+import { useAttempts, useCommand, useCustomerName, useDecisions } from "../api/hooks";
 import { api, ApiError, getLastMeta, qs } from "../api/client";
 import { Icon } from "../components/Icon";
-import { Dialog, Empty, ErrorPanel, Field, Loading, Mono, Section, StatusBadge, Tag, Ts, useAnnounce } from "../components/ui";
-import { ATTEMPT_OUTCOME, DECISION_STATUS, VERIFICATION } from "../lib/status";
+import { Dialog, Empty, ErrorPanel, Field, Loading, Mono, Owner, Section, StatusBadge, Tag, Ts, useAnnounce } from "../components/ui";
+import { ATTEMPT_OUTCOME, DECISION_STATUS, RULE_LABEL, VERIFICATION } from "../lib/status";
 import { humanize } from "../lib/format";
 
 const RULES: DecisionCommand["rule_type"][] = ["forbidden_workaround", "scope_reduction_allowed", "date_extension_allowed", "allowed_action_types", "routing_owner"];
 const RULE_HINT: Record<string, string> = {
-  forbidden_workaround: "Text: the procedure key that must not be repeated.",
-  scope_reduction_allowed: "Yes/no.",
-  date_extension_allowed: "Yes/no.",
-  allowed_action_types: "Comma-separated action kinds, e.g. clarify, escalate.",
-  routing_owner: "Text: the person or team ID to route to.",
+  forbidden_workaround: "The name of the workaround not to suggest, e.g. recreate_schedule_in_utc.",
+  scope_reduction_allowed: "Yes or no.",
+  date_extension_allowed: "Yes or no.",
+  allowed_action_types: "Comma-separated: answer, clarify, link_work, create_work, escalate.",
+  routing_owner: "The person ID to send these requests to.",
 };
 
 export function MemoryPage() {
@@ -24,13 +24,13 @@ export function MemoryPage() {
     <>
       <div className="page-head">
         <div className="grow">
-          <h1>Memory</h1>
-          <p>Scoped decisions and observed outcomes the agent consults. History is retained: superseding or revoking never deletes a record.</p>
+          <h1>Company rules &amp; history</h1>
+          <p>The rules PromiseGraph follows for certain customers or products, and what was tried before. Changing a rule never erases the old one.</p>
         </div>
       </div>
-      <div className="tabs" role="tablist" aria-label="Memory">
-        <button type="button" role="tab" id="tab-decisions" aria-selected={tab === "decisions"} aria-controls="panel-decisions" onClick={() => setTab("decisions")}>Decisions</button>
-        <button type="button" role="tab" id="tab-attempts" aria-selected={tab === "attempts"} aria-controls="panel-attempts" onClick={() => setTab("attempts")}>Attempts &amp; outcomes</button>
+      <div className="tabs" role="tablist" aria-label="Company rules and history">
+        <button type="button" role="tab" id="tab-decisions" aria-selected={tab === "decisions"} aria-controls="panel-decisions" onClick={() => setTab("decisions")}>Company rules</button>
+        <button type="button" role="tab" id="tab-attempts" aria-selected={tab === "attempts"} aria-controls="panel-attempts" onClick={() => setTab("attempts")}>What was tried before</button>
       </div>
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
         {tab === "decisions" ? <Decisions /> : <Attempts />}
@@ -40,6 +40,7 @@ export function MemoryPage() {
 }
 
 function Decisions() {
+  const customerName = useCustomerName();
   const [activeOnly, setActiveOnly] = useState(false);
   const q = useDecisions(activeOnly ? { active: "true" } : {});
   const [dialog, setDialog] = useState<{ op: DecisionCommand["operation"]; target: Decision | null } | null>(null);
@@ -50,13 +51,13 @@ function Decisions() {
   return (
     <div className="stack-lg">
       <div className="row">
-        <label className="check"><input type="checkbox" checked={activeOnly} onChange={(e) => setActiveOnly(e.target.checked)} /> Active only</label>
+        <label className="check"><input type="checkbox" checked={activeOnly} onChange={(e) => setActiveOnly(e.target.checked)} /> Only rules in effect now</label>
         <span style={{ flex: 1 }} />
-        <button type="button" className="btn btn-primary" onClick={() => setDialog({ op: "record", target: null })}><Icon name="plus" /> Record decision</button>
+        <button type="button" className="btn btn-primary" onClick={() => setDialog({ op: "record", target: null })}><Icon name="plus" /> Add a rule</button>
       </div>
-      <Section title="Decisions" count={items.length} testId="decision-list">
+      <Section title="Company rules" count={items.length} testId="decision-list">
         {q.isLoading ? <Loading label="Loading decisions" /> : q.error ? <ErrorPanel error={q.error} onRetry={() => q.refetch()} what="decisions" /> : items.length === 0 ? (
-          <Empty title="No decisions recorded" icon="memory" />
+          <Empty title="No company rules yet" icon="memory"><p>Rules tell PromiseGraph things like “don't suggest this workaround for this customer”.</p></Empty>
         ) : (
           <ul className="list">
             {sorted.map((d) => {
@@ -64,27 +65,27 @@ function Decisions() {
               return (
                 <li key={d.id} className="stack" style={{ gap: 4 }} data-testid="decision">
                   <div className="row">
-                    <strong>{humanize(d.rule_type)}</strong>
+                    <strong>{RULE_LABEL[d.rule_type] ?? humanize(d.rule_type)}</strong>
                     <StatusBadge map={DECISION_STATUS} value={d.status} />
                     <Mono>{d.id}</Mono>
                     <span style={{ flex: 1 }} />
                     {d.status === "active" && (
                       <>
-                        <button type="button" className="btn btn-sm" onClick={() => setDialog({ op: "supersede", target: d })} aria-label={`Supersede ${d.id}`}>Supersede</button>
-                        <button type="button" className="btn btn-sm btn-danger" onClick={() => setDialog({ op: "revoke", target: d })} aria-label={`Revoke ${d.id}`}>Revoke</button>
+                        <button type="button" className="btn btn-sm" onClick={() => setDialog({ op: "supersede", target: d })} aria-label={`Replace rule ${d.id}`}>Replace</button>
+                        <button type="button" className="btn btn-sm btn-danger" onClick={() => setDialog({ op: "revoke", target: d })} aria-label={`Withdraw rule ${d.id}`}>Withdraw</button>
                       </>
                     )}
                   </div>
-                  <div className="small">value <Mono>{JSON.stringify(d.value)}</Mono> · scope {d.scope.entity_type} <Mono>{d.scope.entity_id}</Mono></div>
+                  <div className="small">Setting: <strong>{typeof d.value === "boolean" ? (d.value ? "yes" : "no") : Array.isArray(d.value) ? (d.value as string[]).join(", ") : String(d.value)}</strong> · applies to {d.scope.entity_type === "customer" ? customerName(d.scope.entity_id) : `${humanize(d.scope.entity_type)} ${d.scope.entity_id}`}</div>
                   <div className="small">{d.rationale}</div>
                   <div className="small muted">
-                    effective <Ts iso={d.effective_at} /> · {d.expires_at ? <>expires <Ts iso={d.expires_at} /></> : "no expiry"} · by <Mono>{d.author_id}</Mono> · v{d.version}
+                    from <Ts iso={d.effective_at} /> · {d.expires_at ? <>until <Ts iso={d.expires_at} /></> : "no end date"} · added by <Owner id={d.author_id} />
                   </div>
                   {(d.supersedes_id || successor) && (
                     <div className="small row">
                       <Icon name="refresh" size={12} />
-                      {d.supersedes_id && <span>supersedes <Mono>{d.supersedes_id}</Mono>{byId.get(d.supersedes_id) ? ` (${byId.get(d.supersedes_id)!.status})` : ""}</span>}
-                      {successor && <span>superseded by <Mono>{successor.id}</Mono></span>}
+                      {d.supersedes_id && <span>replaces an earlier rule <Mono>{d.supersedes_id}</Mono>{byId.get(d.supersedes_id) ? ` (${byId.get(d.supersedes_id)!.status})` : ""}</span>}
+                      {successor && <span>replaced by <Mono>{successor.id}</Mono></span>}
                     </div>
                   )}
                 </li>
@@ -93,7 +94,7 @@ function Decisions() {
           </ul>
         )}
       </Section>
-      <Dialog open={Boolean(dialog)} onClose={() => setDialog(null)} title={dialog?.op === "record" ? "Record decision" : dialog?.op === "supersede" ? `Supersede ${dialog.target?.id}` : `Revoke ${dialog?.target?.id ?? ""}`}>
+      <Dialog open={Boolean(dialog)} onClose={() => setDialog(null)} title={dialog?.op === "record" ? "Add a rule" : dialog?.op === "supersede" ? "Replace this rule" : "Withdraw this rule"}>
         {dialog && <DecisionForm op={dialog.op} target={dialog.target} revision={q.data ? (getLastMeta()?.knowledge_revision ?? 0) : 0} onDone={() => setDialog(null)} />}
       </Dialog>
     </div>
@@ -131,9 +132,9 @@ function DecisionForm({ op, target, revision, onDone }: { op: DecisionCommand["o
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const ce: Record<string, string> = {};
-    if (!rationale.trim()) ce.rationale = "Explain why; the rationale is kept with the history.";
+    if (!rationale.trim()) ce.rationale = "Say why; this is kept with the rule.";
     if (op !== "revoke" && !isBool && !value.trim()) ce.value = "A value is required.";
-    if (!scopeId.trim()) ce.scope = "Scope entity ID is required.";
+    if (!scopeId.trim()) ce.scope = "Say which customer, request, product area or task it applies to.";
     setErrs(ce);
     if (Object.keys(ce).length) return;
     cmd.mutate({
@@ -148,47 +149,47 @@ function DecisionForm({ op, target, revision, onDone }: { op: DecisionCommand["o
       evidence_ids: [],
       expected_revision: revision,
     }, {
-      onSuccess: (r) => { announce(`Decision ${r.data.id} ${op === "record" ? "recorded" : op === "supersede" ? "recorded; previous one superseded" : "revoked"}. Prior records are kept.`); onDone(); },
-      onError: (e) => announce(`Decision not saved: ${(e as Error).message}`, true),
+      onSuccess: () => { announce(op === "record" ? "Rule added." : op === "supersede" ? "Rule replaced. The old one is kept in the history." : "Rule withdrawn. It stays in the history."); onDone(); },
+      onError: (e) => announce(`Rule not saved: ${(e as Error).message}`, true),
     });
   };
   const locked = op === "revoke";
   return (
     <form onSubmit={submit} className="stack" noValidate>
       {cmd.error && !(cmd.error instanceof ApiError && cmd.error.code === "INVALID_INPUT") && <ErrorPanel error={cmd.error} />}
-      {op === "revoke" && <p className="small">Revoking keeps the record and its history; it stops applying to future plans.</p>}
+      {op === "revoke" && <p className="small">The rule stops applying to new suggestions. It stays in the history.</p>}
       <div className="form-grid">
-        <Field label="Rule type" error={fe.rule_type}>
-          {(p) => <select {...p} value={rule} disabled={locked || op === "supersede"} onChange={(e) => { setRule(e.target.value as DecisionCommand["rule_type"]); setValue(""); }}>{RULES.map((r) => <option key={r} value={r}>{humanize(r)}</option>)}</select>}
+        <Field label="Kind of rule" error={fe.rule_type}>
+          {(p) => <select {...p} value={rule} disabled={locked || op === "supersede"} onChange={(e) => { setRule(e.target.value as DecisionCommand["rule_type"]); setValue(""); }}>{RULES.map((r) => <option key={r} value={r}>{RULE_LABEL[r]}</option>)}</select>}
         </Field>
-        <Field label="Value" hint={RULE_HINT[rule]} error={errs.value ?? fe.value}>
+        <Field label="Setting" hint={RULE_HINT[rule]} error={errs.value ?? fe.value}>
           {(p) => isBool ? (
             <select {...p} value={value || "false"} disabled={locked} onChange={(e) => setValue(e.target.value)}><option value="true">Yes</option><option value="false">No</option></select>
           ) : (
             <input {...p} type="text" value={value} disabled={locked} onChange={(e) => setValue(e.target.value)} />
           )}
         </Field>
-        <Field label="Scope type" error={fe["scope/entity_type"]}>
+        <Field label="Applies to a" error={fe["scope/entity_type"]}>
           {(p) => <select {...p} value={scopeType} disabled={locked} onChange={(e) => setScopeType(e.target.value as DecisionCommand["scope"]["entity_type"])}>{["customer", "request", "capability", "work_item"].map((s) => <option key={s} value={s}>{humanize(s)}</option>)}</select>}
         </Field>
-        <Field label="Scope entity ID" error={errs.scope ?? fe["scope/entity_id"]}>
+        <Field label="Which one (ID)" error={errs.scope ?? fe["scope/entity_id"]}>
           {(p) => <input {...p} type="text" value={scopeId} disabled={locked} onChange={(e) => setScopeId(e.target.value)} />}
         </Field>
-        <Field label="Effective (your local time)" error={fe.effective_at}>
+        <Field label="Starts (your local time)" error={fe.effective_at}>
           {(p) => <input {...p} type="datetime-local" value={effective} onChange={(e) => setEffective(e.target.value)} />}
         </Field>
-        <Field label="Expires (optional)" error={fe.expires_at}>
+        <Field label="Ends (optional)" error={fe.expires_at}>
           {(p) => <input {...p} type="datetime-local" value={expires} disabled={locked} onChange={(e) => setExpires(e.target.value)} />}
         </Field>
         <div className="span-2">
-          <Field label="Rationale" error={errs.rationale ?? fe.rationale}>
+          <Field label="Why?" error={errs.rationale ?? fe.rationale}>
             {(p) => <textarea {...p} rows={3} value={rationale} onChange={(e) => setRationale(e.target.value)} />}
           </Field>
         </div>
       </div>
       <div className="form-actions">
         <button type="button" className="btn" onClick={onDone}>Cancel</button>
-        <button type="submit" className={`btn ${op === "revoke" ? "btn-danger" : "btn-primary"}`} disabled={cmd.isPending}>{op === "record" ? "Record" : op === "supersede" ? "Supersede" : "Revoke"}</button>
+        <button type="submit" className={`btn ${op === "revoke" ? "btn-danger" : "btn-primary"}`} disabled={cmd.isPending}>{op === "record" ? "Add rule" : op === "supersede" ? "Replace rule" : "Withdraw rule"}</button>
       </div>
     </form>
   );
@@ -222,18 +223,19 @@ function Attempts() {
 }
 
 function AttemptList({ attempts, note }: { attempts: Attempt[]; note: string | null }) {
+  const customerName = useCustomerName();
   const d = { attempts };
   return (
-    <Section title="Attempts & observed outcomes" count={d.attempts.length} testId="attempt-list">
-      <p className="small muted" style={{ marginBottom: 8 }}>{note ? `${note} ` : ""}Only verified outcomes are evidence of resolution.</p>
-      {d.attempts.length === 0 ? <Empty title="No attempts recorded" icon="memory" /> : (
+    <Section title="What was tried before" count={d.attempts.length} testId="attempt-list">
+      <p className="small muted" style={{ marginBottom: 8 }}>{note ? `${note} ` : ""}Only results someone confirmed count as proof that something worked.</p>
+      {d.attempts.length === 0 ? <Empty title="Nothing recorded yet" icon="memory"><p>When a fix or workaround is tried and someone confirms whether it worked, it shows up here.</p></Empty> : (
         <ul className="list">
           {d.attempts.map((a) => (
             <li key={a.id} className="stack" style={{ gap: 3 }}>
-              <span className="row"><Mono>{a.procedure_key}</Mono> <StatusBadge map={ATTEMPT_OUTCOME} value={a.outcome} /> <StatusBadge map={VERIFICATION} value={a.verification} /></span>
+              <span className="row"><strong>{a.procedure_key.replace(/_/g, " ")}</strong> <StatusBadge map={ATTEMPT_OUTCOME} value={a.outcome} /> <StatusBadge map={VERIFICATION} value={a.verification} /></span>
               <span>{a.summary}</span>
-              <span className="small muted">request <Link to={`/requests/${encodeURIComponent(a.request_id)}`}>{a.request_id}</Link> · scope {a.scope.entity_type} <Mono>{a.scope.entity_id}</Mono> · context <Mono>{a.context_signature}</Mono> · <Ts iso={a.observed_at} /></span>
-              {a.verification === "passed" && <span><Tag tone="success" icon="shield">Verified outcome</Tag></span>}
+              <span className="small muted"><Link to={`/requests/${encodeURIComponent(a.request_id)}`}>Open the request</Link> · for {a.scope.entity_type === "customer" ? customerName(a.scope.entity_id) : `${humanize(a.scope.entity_type)} ${a.scope.entity_id}`} · <Ts iso={a.observed_at} /></span>
+              {a.verification === "passed" && <span><Tag tone="success" icon="shield">Confirmed result</Tag></span>}
             </li>
           ))}
         </ul>

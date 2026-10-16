@@ -23,15 +23,16 @@ interface Props {
 
 /** What the server says the destination is; never guessed for kinds the server routes itself. */
 function targetOf(p: Proposal, action: Action | null, work: WorkItem[]): { label: string; connector: string | null; note?: string } {
-  if (action) return { label: CONNECTOR_LABEL[action.connector] ?? action.connector, connector: action.connector };
-  if (p.kind === "create_work") return { label: CONNECTOR_LABEL[p.payload.connector] ?? p.payload.connector, connector: p.payload.connector };
+  if (p.kind === "create_work" || (action && action.kind === "create_work")) {
+    const c = action?.connector ?? (p.kind === "create_work" ? p.payload.connector : "local");
+    return { label: c === "linear" ? "A new issue in Linear" : "A new task in PromiseGraph's task list", connector: c };
+  }
   if (p.kind === "link_work") {
     const w = work.find((x) => x.id === p.payload.work_item_id);
-    if (w) return { label: `Link record on ${CONNECTOR_LABEL[w.connector] ?? w.connector} work item`, connector: w.connector, note: "Connector comments stay drafts in this release." };
-    return { label: "Determined by the server at commit", connector: null };
+    return { label: "A link between this request and the existing work, saved in PromiseGraph", connector: action?.connector ?? "local", note: w?.connector === "linear" ? "Nothing is posted to Linear; comments stay drafts." : undefined };
   }
-  if (p.kind === "answer" || p.kind === "clarify") return { label: "Internal draft record (nothing is sent)", connector: null };
-  return { label: "Determined by the server at commit", connector: null };
+  if (p.kind === "answer" || p.kind === "clarify") return { label: "A saved draft in PromiseGraph. Nothing is sent to the customer", connector: action?.connector ?? null };
+  return { label: "A hand-off record in PromiseGraph", connector: action?.connector ?? null };
 }
 
 function Payload({ p, work }: { p: Proposal; work: WorkItem[] }) {
@@ -40,21 +41,21 @@ function Payload({ p, work }: { p: Proposal; work: WorkItem[] }) {
       return (
         <div className="stack">
           <div>
-            <div className="draft-label"><Icon name="doc" size={12} /> Draft answer — not sent to the customer</div>
+            <div className="draft-label"><Icon name="doc" size={12} /> Draft reply: not sent. Copy it into your helpdesk when you’re ready</div>
             <div className="draft" data-testid="draft-text">{p.payload.draft_text}</div>
           </div>
-          <Criteria title="Resolution criteria" items={p.payload.resolution_criteria as string[]} />
+          <Criteria title="It’s solved when" items={p.payload.resolution_criteria as string[]} />
         </div>
       );
     case "clarify":
       return (
         <div className="stack">
           <div>
-            <div className="draft-label"><Icon name="question" size={12} /> Draft clarification question — not sent</div>
+            <div className="draft-label"><Icon name="question" size={12} /> Draft question for the customer: not sent</div>
             <div className="draft" data-testid="draft-question">{p.payload.question}</div>
           </div>
           {p.payload.missing_fields.length > 0 && (
-            <div className="row"><span className="label">Missing:</span>{(p.payload.missing_fields as string[]).map((f) => <Tag key={f} tone="warn">{f}</Tag>)}</div>
+            <div className="row"><span className="label">We need to know:</span>{(p.payload.missing_fields as string[]).map((f) => <Tag key={f} tone="warn">{f}</Tag>)}</div>
           )}
         </div>
       );
@@ -65,21 +66,21 @@ function Payload({ p, work }: { p: Proposal; work: WorkItem[] }) {
       return (
         <div className="stack">
           <dl className="kv">
-            <dt>Title</dt><dd><strong>{p.payload.title}</strong></dd>
-            <dt>Owner</dt><dd data-testid="proposal-owner">{p.payload.owner_id ? <Owner id={p.payload.owner_id} /> : <Tag tone="warn" icon="alert">Missing owner — assign before or after creation</Tag>}</dd>
-            <dt>Capability</dt><dd>{p.payload.capability_id ? <Mono>{p.payload.capability_id}</Mono> : <span className="muted">None linked</span>}</dd>
-            <dt>Depends on</dt><dd>{p.payload.dependency_ids.length ? p.payload.dependency_ids.map((d) => <Mono key={d}>{d}</Mono>) : <span className="muted">None</span>}</dd>
+            <dt>Task</dt><dd><strong>{p.payload.title}</strong></dd>
+            <dt>Owner</dt><dd data-testid="proposal-owner">{p.payload.owner_id ? <Owner id={p.payload.owner_id} /> : <Tag tone="warn" icon="alert">No owner yet: someone will need to pick this up</Tag>}</dd>
+            <dt>Product area</dt><dd>{p.payload.capability_id ? <span>{p.payload.capability_id.replace(/^cap_/, "").replace(/_/g, " ")}</span> : <span className="muted">Not specified</span>}</dd>
+            <dt>Depends on</dt><dd>{p.payload.dependency_ids.length ? p.payload.dependency_ids.map((d) => <Mono key={d}>{d}</Mono>) : <span className="muted">Nothing else</span>}</dd>
           </dl>
           <p className="small" style={{ whiteSpace: "pre-wrap" }}>{p.payload.description}</p>
-          <Criteria title="Acceptance criteria" items={p.payload.acceptance_criteria} testId="acceptance-criteria" />
+          <Criteria title="Done when" items={p.payload.acceptance_criteria} testId="acceptance-criteria" />
         </div>
       );
     case "escalate":
       return (
         <dl className="kv">
-          <dt>Reason</dt><dd>{p.payload.reason}</dd>
-          <dt>Owner</dt><dd>{p.payload.owner_id ? <Mono>{p.payload.owner_id}</Mono> : <Tag tone="warn" icon="alert">Missing owner</Tag>}</dd>
-          <dt>Team</dt><dd>{p.payload.team_id ? <Mono>{p.payload.team_id}</Mono> : <span className="muted">None</span>}</dd>
+          <dt>Why</dt><dd>{p.payload.reason}</dd>
+          <dt>Handed to</dt><dd><Owner id={p.payload.owner_id} /></dd>
+          <dt>Team</dt><dd>{p.payload.team_id ? <span>{p.payload.team_id.replace(/^team_/, "").replace(/_/g, " ")}</span> : <span className="muted">Not specified</span>}</dd>
         </dl>
       );
   }
@@ -92,17 +93,17 @@ function LinkWorkPayload({ p, work }: { p: Extract<Proposal, { kind: "link_work"
   return (
     <div className="stack">
       <dl className="kv">
-        <dt>Work item</dt>
+        <dt>Existing work</dt>
         <dd>
-          {w ? <strong>{w.title}</strong> : null} <Mono>{p.payload.work_item_id}</Mono>{" "}
+          {w ? <strong>{w.title}</strong> : <Mono>{p.payload.work_item_id}</Mono>}{" "}
           {w && <StatusBadge map={WORK_STATUS} value={w.status} />}
         </dd>
-        {w && <><dt>Owner</dt><dd>{w.owner_id ? <Mono>{w.owner_id}</Mono> : <Tag tone="warn" icon="alert">Missing owner</Tag>}</dd></>}
-        {w && <><dt>Forecast</dt><dd>{w.forecast_at ? <Ts iso={w.forecast_at} /> : <span className="muted">No supported forecast</span>}</dd></>}
+        {w && <><dt>Owner</dt><dd><Owner id={w.owner_id} /></dd></>}
+        {w && <><dt>Expected</dt><dd>{w.forecast_at ? <Ts iso={w.forecast_at} /> : <span className="muted">No date we can stand behind, so don’t promise one</span>}</dd></>}
       </dl>
       {p.payload.comment_text && (
         <div>
-          <div className="draft-label"><Icon name="doc" size={12} /> Draft comment — not posted</div>
+          <div className="draft-label"><Icon name="doc" size={12} /> Draft comment: not posted</div>
           <div className="draft">{p.payload.comment_text}</div>
         </div>
       )}
@@ -111,7 +112,7 @@ function LinkWorkPayload({ p, work }: { p: Extract<Proposal, { kind: "link_work"
 }
 
 function Criteria({ title, items, testId }: { title: string; items: string[]; testId?: string }) {
-  if (!items.length) return <p className="small muted">{title}: none stated.</p>;
+  if (!items.length) return <p className="small muted">{title}: not stated.</p>;
   return (
     <div data-testid={testId}>
       <span className="label">{title}</span>
@@ -126,16 +127,17 @@ function Criteria({ title, items, testId }: { title: string; items: string[]; te
 
 export function nextStep(request: Request, action: Action | null, proposal: Proposal | null): string {
   switch (request.status) {
-    case "resolved": return "Resolved with an attributable passed verification. Record a new observation if the customer reports a regression.";
-    case "awaiting_input": return "Waiting for the customer's reply. Record it below to resume the same run.";
-    case "awaiting_review": if (!proposal) return "Marked as waiting for review, but no proposal is recorded for it. Start a run to prepare one.";
-      return proposal.validity === "valid" ? "Review the proposal and authorize it, or start a new run to replan." : "The proposal cannot be committed. Start a new run to replan with current knowledge.";
-    case "awaiting_work": return "Waiting on linked or created work. Creating or linking work does not resolve the request — once the work is done, record a verification against the resolution criteria.";
-    case "awaiting_verification": return "Verify the outcome with the customer or an acceptance check, then record it below. A drafted answer alone is not a resolution.";
-    case "investigating": return action?.status === "unknown" ? "Dispatch outcome unknown — wait for reconciliation; do not create the work again." : "Investigation in progress. The timeline updates as durable events arrive.";
-    case "escalated": return "Escalated for internal review. Record the reviewer's outcome as an observation.";
-    case "closed": return "Closed by an operator. Reopening requires a new observation or explicit action.";
-    default: return "Start an investigation run.";
+    case "resolved": return "Solved and confirmed. If the customer says it’s back, record that below and PromiseGraph will look into it again.";
+    case "awaiting_input": return "We’re waiting for the customer to answer the question. When they reply, paste their answer below and PromiseGraph picks up where it left off.";
+    case "awaiting_review":
+      if (!proposal) return "This is waiting for your approval, but there’s no suggestion to approve yet. Click “Look into it again” to get one.";
+      return proposal.validity === "valid" ? "Review the suggestion above. If it looks right, click “Approve and do it”." : "The suggestion can’t be used any more. Click “Look into it again” for a fresh one.";
+    case "awaiting_work": return "Engineering has the work. Creating or attaching a task doesn’t mean the customer’s problem is solved: once the work is done, check with the customer and confirm it below.";
+    case "awaiting_verification": return "Check with the customer (or test it yourself), then confirm below whether it’s solved. A drafted reply on its own doesn’t count.";
+    case "investigating": return action?.status === "unknown" ? "We’re not sure the last step went through. PromiseGraph is checking, and won’t do it twice." : "PromiseGraph is looking into it. This page updates by itself.";
+    case "escalated": return "A person now owns this. Record what they decide below.";
+    case "closed": return "This request was closed. It’s not marked as solved.";
+    default: return "Click “Look into it” to have PromiseGraph investigate.";
   }
 }
 
@@ -151,8 +153,7 @@ export function ActionArea({ request, proposal, action, refs, work, info, knowle
   if (!proposal) {
     return (
       <div className="stack" data-testid="no-proposal">
-        <p className="muted">No proposal has been prepared for this request yet.</p>
-        <div className="next-step"><Icon name="info" /><p>{nextStep(request, action, null)}</p></div>
+        <p className="muted">Nothing to approve yet. When PromiseGraph has a suggestion, it appears here.</p>
       </div>
     );
   }
@@ -165,20 +166,20 @@ export function ActionArea({ request, proposal, action, refs, work, info, knowle
   const canCommit = proposal.validity === "valid" && !committed && !linearUnavailable && runStatus !== "cancelled";
   let blockedReason: string | null = null;
   if (committed) blockedReason = null;
-  else if (proposal.validity === "stale") blockedReason = "Stale: knowledge used by this proposal changed. It cannot be executed; replan to get a revised proposal.";
-  else if (proposal.validity === "invalid") blockedReason = "Invalid: the server rejected this proposal. It cannot be executed.";
-  else if (linearUnavailable) blockedReason = `Linear connector is ${spec(CONNECTOR_STATE, linearState).label.toLowerCase()}; this cannot be dispatched to Linear.`;
-  else if (runStatus === "cancelled") blockedReason = "The run was cancelled. Start a new run to continue.";
+  else if (proposal.validity === "stale") blockedReason = "Some facts changed after this was suggested (for example an owner or a task’s status), so it’s no longer safe to do. Get a fresh suggestion.";
+  else if (proposal.validity === "invalid") blockedReason = "This suggestion breaks a company rule or points at something that no longer exists, so it can’t be done.";
+  else if (linearUnavailable) blockedReason = `Linear isn’t connected (${spec(CONNECTOR_STATE, linearState).label.toLowerCase()}), so this can’t be created there.`;
+  else if (runStatus === "cancelled") blockedReason = "The investigation was stopped. Look into it again to continue.";
 
   const doCommit = () => {
     const body = { _pid: proposal.id, expected_revision: knowledgeRevision ?? proposal.based_on_revision, authorization_id: proposal.authorization_id };
     commit.mutate(body, {
       onSuccess: (r) => {
         setConfirm(false);
-        announce(`Authorized. Action ${r.data.action.id} is ${spec(ACTION_STATUS, r.data.action.status).label.toLowerCase()}.`);
+        announce(`Approved. ${spec(ACTION_STATUS, r.data.action.status).label}.`);
       },
       onError: (e) => {
-        announce(`Commit refused: ${e instanceof ApiError ? e.code : ""} ${(e as Error).message}`, true);
+        announce(`Couldn’t do it: ${(e as Error).message}${e instanceof ApiError ? ` (${e.code})` : ""}`, true);
       },
     });
   };
@@ -190,22 +191,22 @@ export function ActionArea({ request, proposal, action, refs, work, info, knowle
           <strong style={{ fontSize: 14 }} data-testid="proposal-kind">{KIND_LABEL[proposal.kind]}</strong>
           <StatusBadge map={VALIDITY} value={proposal.validity} testId="proposal-validity" />
         </div>
-        <p className="small muted">
-          Proposal <Mono>{proposal.id}</Mono> · based on knowledge rev {proposal.based_on_revision}
-          {knowledgeRevision !== null && <> · current rev {knowledgeRevision}</>} · <Ts iso={proposal.created_at} />
-        </p>
+        <p className="small muted">Suggested <Ts iso={proposal.created_at} /></p>
         {revisionMoved && proposal.validity === "valid" && !committed && (
-          <p className="small" style={{ color: "var(--warn-fg)" }}><Icon name="info" size={12} /> Knowledge has changed since this was prepared. The server revalidates at commit and again before dispatch.</p>
+          <p className="small" style={{ color: "var(--warn-fg)" }}><Icon name="info" size={12} /> Some information changed since this was suggested. PromiseGraph re-checks everything before doing it.</p>
         )}
         {proposal.validation_reasons.length > 0 && (
-          <ul className="small" data-testid="validation-reasons">{proposal.validation_reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
+          <details className="small" data-testid="validation-details" open={proposal.validity !== "valid"}>
+            <summary>Why it was flagged</summary>
+            <ul data-testid="validation-reasons">{proposal.validation_reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
+          </details>
         )}
       </div>
 
       <Payload p={proposal} work={work} />
 
       <dl className="kv">
-        <dt>Execution target</dt>
+        <dt>What it will do</dt>
         <dd data-testid="execution-target">
           <span className="row">
             <Tag icon={target.connector === "linear" ? "external" : "work"} tone={target.connector === "linear" ? "info" : "neutral"}>{target.label}</Tag>
@@ -213,46 +214,44 @@ export function ActionArea({ request, proposal, action, refs, work, info, knowle
           </span>
           {target.note && <span className="small muted">{target.note}</span>}
         </dd>
-        <dt>Evidence</dt>
-        <dd className="row">{proposal.evidence_ids.length ? proposal.evidence_ids.map((id) => <EvidenceChip key={id} id={id} refs={refs} />) : <Tag tone="warn" icon="alert">No evidence cited</Tag>}</dd>
-        <dt>Authorization</dt>
-        <dd>{proposal.authorization_id ? <span className="row"><Tag tone="success" icon="lock">Authorized</Tag><Mono>{proposal.authorization_id}</Mono></span> : committed ? <Tag tone="success" icon="lock">Authorized by commit</Tag> : <span className="muted">Not yet authorized</span>}</dd>
+        <dt>Based on</dt>
+        <dd className="row">{proposal.evidence_ids.length ? proposal.evidence_ids.map((id) => <EvidenceChip key={id} id={id} refs={refs} />) : <Tag tone="warn" icon="alert">No sources cited</Tag>}</dd>
+        <dt>Approval</dt>
+        <dd>{proposal.authorization_id || committed ? <Tag tone="success" icon="lock">Approved</Tag> : <span className="muted">Not approved yet</span>}</dd>
       </dl>
 
       {blockedReason && (
-        <Callout tone={proposal.validity === "stale" ? "warn" : "danger"} icon={proposal.validity === "stale" ? "alert" : "ban"} title={proposal.validity === "stale" ? "Stale proposal — execution blocked" : "Execution blocked"} testId="commit-blocked">
+        <Callout tone={proposal.validity === "stale" ? "warn" : "danger"} icon={proposal.validity === "stale" ? "alert" : "ban"} title={proposal.validity === "stale" ? "Out of date: facts changed since this was suggested" : "This can’t be done"} testId="commit-blocked">
           <p>{blockedReason}</p>
-          <button type="button" className="btn btn-sm" onClick={onReplan} disabled={replanPending}><Icon name="refresh" /> Replan with a new run</button>
+          <button type="button" className="btn btn-sm" onClick={onReplan} disabled={replanPending}><Icon name="refresh" /> Get a fresh suggestion</button>
         </Callout>
       )}
 
       {!committed && (
         <div className="row">
-          <button type="button" className="btn btn-primary" disabled={!canCommit} aria-disabled={!canCommit} onClick={() => setConfirm(true)} data-testid="authorize">
-            <Icon name="lock" /> Review &amp; authorize
+          <button type="button" className="btn btn-primary btn-lg" disabled={!canCommit} aria-disabled={!canCommit} onClick={() => setConfirm(true)} data-testid="authorize">
+            <Icon name="check" /> Approve and do it
           </button>
-          {!canCommit && <span className="small muted">Commit unavailable</span>}
+          {!canCommit && <span className="small muted">Not available. See the note above.</span>}
         </div>
       )}
 
       {action && <Receipt action={action} runStatus={runStatus} />}
 
-      <div className="next-step" data-testid="next-step"><Icon name="info" /><p><strong>Next: </strong>{nextStep(request, action, proposal)}</p></div>
-
-      <Dialog open={confirm} onClose={() => setConfirm(false)} title="Authorize this action" testId="authorize-dialog">
+      <Dialog open={confirm} onClose={() => setConfirm(false)} title="Approve this action?" testId="authorize-dialog">
         <p>
-          You are authorizing <strong>{KIND_LABEL[proposal.kind]}</strong> for request <Mono>{request.id}</Mono>, targeting <strong>{target.label}</strong>.
+          PromiseGraph will <strong>{KIND_LABEL[proposal.kind].toLowerCase()}</strong>. Result: <strong>{target.label}</strong>.
         </p>
         <ul className="small">
-          <li>The server revalidates against current knowledge before dispatch; stale intent is never executed.</li>
-          {(proposal.kind === "answer" || proposal.kind === "clarify") && <li>This persists a draft. Nothing is sent to the customer.</li>}
-          {(proposal.kind === "create_work" || proposal.kind === "link_work") && <li>Creating or linking work does not resolve the request; verification is a separate step.</li>}
+          <li>It double-checks the facts first. If anything changed, it stops instead of doing something out of date.</li>
+          {(proposal.kind === "answer" || proposal.kind === "clarify") && <li>This only saves a draft. Nothing is sent to the customer.</li>}
+          {(proposal.kind === "create_work" || proposal.kind === "link_work") && <li>This doesn’t solve the customer’s problem by itself. You’ll confirm that separately once it’s done.</li>}
         </ul>
         {commit.error && <ErrorPanel error={commit.error} />}
         <div className="form-actions">
           <button type="button" className="btn" onClick={() => setConfirm(false)}>Cancel</button>
           <button type="button" className="btn btn-primary" onClick={doCommit} disabled={commit.isPending || !canCommit} data-testid="confirm-authorize">
-            {commit.isPending ? "Authorizing…" : "Authorize and commit"}
+            {commit.isPending ? "Approving…" : "Approve and do it"}
           </button>
         </div>
       </Dialog>
@@ -260,46 +259,60 @@ export function ActionArea({ request, proposal, action, refs, work, info, knowle
   );
 }
 
+const RESULT_LABEL: Record<string, string> = {
+  answer: "Draft reply saved (not sent)",
+  clarify: "Draft question saved (not sent)",
+  link_work: "Request attached to the existing work",
+  create_work: "New task created",
+  escalate: "Handed off",
+};
+
 export function Receipt({ action, runStatus = null }: { action: Action; runStatus?: string | null }) {
   const autoReconciling = runStatus === "queued" || runStatus === "running";
   const r = action.receipt;
   return (
     <div className="card" data-testid="receipt">
       <div className="row">
-        <strong>Action</strong> <Mono>{action.id}</Mono>
         <StatusBadge map={ACTION_STATUS} value={action.status} testId="action-status" />
         <StatusBadge map={VERIFICATION} value={action.verification} />
       </div>
       {action.status === "unknown" && (
-        <Callout tone="danger" icon="question" title="Dispatch outcome unknown" testId="dispatch-unknown">
-          <p>The connector may or may not have created the target. Reconciliation looks it up; nothing is created again automatically. If it cannot be established, operator reconciliation is required.</p>
+        <Callout tone="danger" icon="question" title="We’re not sure this went through" testId="dispatch-unknown">
+          <p>The connection timed out, so the task may or may not have been created. PromiseGraph checks before doing anything, and nothing is created again automatically. If it can’t tell, it asks you.</p>
         </Callout>
       )}
       {action.status === "unknown" && autoReconciling && (
-        <p className="small muted" data-testid="auto-reconciling"><Icon name="progress" size={12} /> Automatic reconciliation is in progress. Operator reconciliation opens if it cannot establish the outcome.</p>
+        <p className="small muted" data-testid="auto-reconciling"><Icon name="progress" size={12} /> Checking whether it went through…</p>
       )}
-      {action.status === "unknown" && !autoReconciling && (
-        <ReconcileForm action={action} />
-      )}
+      {action.status === "unknown" && !autoReconciling && <ReconcileForm action={action} />}
       {action.error && (
-        <p className="small" style={{ color: "var(--danger-fg)" }}><Icon name="alert" size={12} /> {action.error.code}: {action.error.message}</p>
+        <p className="small" style={{ color: "var(--danger-fg)" }}><Icon name="alert" size={12} /> {action.error.message} <span className="muted">({action.error.code})</span></p>
       )}
       {r ? (
-        <dl className="kv small">
-          <dt>Receipt</dt><dd><Mono>{r.id}</Mono></dd>
-          <dt>Target</dt>
-          <dd className="row">
-            <Badge s={{ label: CONNECTOR_LABEL[r.connector] ?? r.connector, tone: r.connector === "linear" ? "info" : "neutral", icon: r.connector === "linear" ? "external" : "work" }} testId="receipt-connector" />
-            <Mono>{r.target_id}</Mono>
-            {r.target_url && <a href={r.target_url} target="_blank" rel="noreferrer">Open <Icon name="external" size={12} /><span className="sr-only">(opens in new tab)</span></a>}
-          </dd>
-          <dt>Observed</dt><dd><Ts iso={r.observed_at} /></dd>
-          <dt>Result hash</dt><dd><Mono>{r.result_hash.slice(0, 16)}…</Mono></dd>
-        </dl>
+        <div className="stack">
+          <p className="done-title"><Icon name="check" /> Done. Here’s the record</p>
+          <dl className="kv small">
+            <dt>Result</dt><dd>{RESULT_LABEL[action.kind] ?? action.kind}</dd>
+            <dt>Saved in</dt>
+            <dd className="row">
+              <Badge s={{ label: CONNECTOR_LABEL[r.connector] ?? r.connector, tone: r.connector === "linear" ? "info" : "neutral", icon: r.connector === "linear" ? "external" : "work" }} testId="receipt-connector" />
+              <span className="muted">record <Mono>{r.target_id}</Mono></span>
+              {r.target_url && <a href={r.target_url} target="_blank" rel="noreferrer">Open <Icon name="external" size={12} /><span className="sr-only">(opens in new tab)</span></a>}
+            </dd>
+            <dt>When</dt><dd><Ts iso={r.observed_at} /></dd>
+          </dl>
+          <details className="small">
+            <summary>Technical record</summary>
+            <dl className="kv small">
+              <dt>Action</dt><dd><Mono>{action.id}</Mono> · version {action.version}</dd>
+              <dt>Receipt</dt><dd><Mono>{r.id}</Mono></dd>
+              <dt>Content check</dt><dd><Mono>{r.result_hash.slice(0, 16)}…</Mono></dd>
+            </dl>
+          </details>
+        </div>
       ) : (
-        <p className="small muted">No receipt yet{action.status === "accepted" || action.status === "dispatching" ? " — dispatch in progress." : "."}</p>
+        <p className="small muted">{action.status === "accepted" || action.status === "dispatching" ? "Working on it…" : "No record yet."}</p>
       )}
-      <p className="small muted">Updated <Ts iso={action.updated_at} /> · v{action.version}</p>
     </div>
   );
 }

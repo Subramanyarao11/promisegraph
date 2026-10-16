@@ -44,7 +44,7 @@ test("T25 real: keyboard + 390px intake → evidence → reviewed action → out
   const subject = `Stream audit events to our SIEM ${Date.now()}`;
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/requests");
-  await expect(page.getByTestId("mode-badges")).toContainText("Scripted mode");
+  await expect(page.getByTestId("mode-badges")).toContainText("Rule-based mode");
 
   await page.getByTestId("new-request").focus();
   await page.keyboard.press("Enter");
@@ -63,14 +63,14 @@ test("T25 real: keyboard + 390px intake → evidence → reviewed action → out
   await waitForSettledRun(page);
   await expect(page.getByTestId("proposal-kind")).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId("finding-text")).not.toBeEmpty();
-  await expect(page.getByTestId("timeline").first()).toContainText("Scripted mode");
+  await expect(page.getByTestId("timeline").first()).toContainText("Rule-based mode");
   await noHorizontalScroll(page);
 
   // Evidence by keyboard (real source revision from FalkorDB).
   await page.getByTestId("open-source").first().focus();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("drawer-excerpt")).not.toBeEmpty();
-  await expect(page.getByTestId("drawer-revision")).toContainText("rev ");
+  await expect(page.getByTestId("drawer-revision")).toContainText("version ");
   await page.keyboard.press("Escape");
 
   // Reviewed action: authorize when the policy requires it (create/link/escalate); answer/clarify drafts auto-commit.
@@ -81,24 +81,24 @@ test("T25 real: keyboard + 390px intake → evidence → reviewed action → out
     await page.keyboard.press("Enter");
     await page.getByTestId("confirm-authorize").focus();
     await page.keyboard.press("Enter");
-    await expect(page.getByTestId("live-polite")).toContainText(/Authorized/);
+    await expect(page.getByTestId("live-polite")).toContainText(/Approved/);
   }
-  await expect(page.getByTestId("action-status")).toContainText("Executed", { timeout: 60_000 });
-  await expect(page.getByTestId("receipt-connector")).toHaveText("Local task"); // Linear is unconfigured: never labelled Linear
-  await expect(page.getByTestId("request-status")).not.toContainText("Resolved");
+  await expect(page.getByTestId("action-status")).toContainText("Done", { timeout: 60_000 });
+  await expect(page.getByTestId("receipt-connector")).toHaveText("PromiseGraph task list"); // Linear is unconfigured: never labelled Linear
+  await expect(page.getByTestId("request-status")).not.toContainText("Solved");
   await expect(page.getByTestId("next-step")).toBeVisible();
 
   const receiptHead = (await page.getByTestId("receipt").innerText()).split("\n")[0];
   await page.reload();
   await expect(page.getByTestId("receipt")).toContainText(receiptHead);
-  await expect(page.getByTestId("request-status")).not.toContainText("Resolved");
+  await expect(page.getByTestId("request-status")).not.toContainText("Solved");
 
   const form = page.getByTestId("observation-form");
-  await form.getByLabel("What was observed").focus();
+  await form.getByLabel("What happened").focus();
   await page.keyboard.type("Customer confirmed audit events now arrive in their SIEM.");
   await form.getByTestId("submit-observation").focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("request-status")).toContainText("Resolved · verified", { timeout: 20_000 });
+  await expect(page.getByTestId("request-status")).toContainText("Solved (confirmed)", { timeout: 20_000 });
   await expect(page.getByTestId("resolved-evidence")).toBeVisible();
   await noHorizontalScroll(page);
 });
@@ -106,10 +106,10 @@ test("T25 real: keyboard + 390px intake → evidence → reviewed action → out
 test("real: clarification reply resumes the same run with history retained (T02/T03)", async ({ page }) => {
   const id = await intake(page.request, "tamarind", `Provisioning for store managers ${Date.now()}`, "We need provisioning for our identity provider before 200 store managers join next month. Can you turn it on?");
   await page.goto(`/requests/${id}`);
-  await expect(page.getByTestId("request-status")).toContainText("Waiting for input", { timeout: 60_000 });
+  await expect(page.getByTestId("request-status")).toContainText("Waiting for customer reply", { timeout: 60_000 });
   await expect(page.getByTestId("draft-question")).not.toBeEmpty();
-  await expect(page.getByText("Draft clarification question — not sent")).toBeVisible();
-  const runHeading = await page.getByTestId("timeline-section").locator("h3").first().innerText();
+  await expect(page.getByText("Draft question for the customer: not sent")).toBeVisible();
+  const runHeading = await page.getByTestId("run-heading").first().textContent();
 
   const reply = page.getByTestId("reply-form");
   await reply.getByLabel("Customer reply").fill("We mean group sync: our IdP groups 'Store Managers' and 'Regional Leads' should map to the Viewer and Editor roles. Accounts are already created at first login.");
@@ -117,12 +117,13 @@ test("real: clarification reply resumes the same run with history retained (T02/
   await expect(page.getByTestId("live-polite")).toContainText(/Reply recorded/);
 
   // Any valid follow-up disposition; the run is the same logical run with its earlier events.
-  await expect(page.getByTestId("request-status")).not.toContainText(/Waiting for input|Investigating|Open/, { timeout: 60_000 });
-  const headings = page.getByTestId("timeline-section").locator("h3");
+  await expect(page.getByTestId("request-status")).not.toContainText(/Waiting for customer reply|Being looked into|^New$/, { timeout: 60_000 });
+  const headings = page.getByTestId("run-heading");
   await expect(headings).toHaveCount(1);
-  await expect(headings.first()).toHaveText(runHeading);
+  await expect(headings.first()).toHaveText(runHeading!);
+  await page.getByTestId("technical-details").locator("summary").click();
   await expect(page.locator('[data-testid="timeline-event"][data-type="waiting_for_input"]').first()).toBeVisible();
-  await expect(page.getByTestId("proposal-kind")).not.toHaveText("Clarify (draft question)");
+  await expect(page.getByTestId("proposal-kind")).not.toHaveText("Ask the customer a question");
 });
 
 test("real: a knowledge change makes the waiting proposal stale and removes the commit control (T12)", async ({ page }) => {
@@ -150,7 +151,7 @@ test("real: a knowledge change makes the waiting proposal stale and removes the 
   });
   expect(r.status(), await r.text()).toBe(200);
 
-  await expect(page.getByTestId("proposal-validity")).toContainText(/Stale|Invalid/, { timeout: 20_000 });
+  await expect(page.getByTestId("proposal-validity")).toContainText(/Out of date|Can't be done/, { timeout: 20_000 });
   await expect(page.getByTestId("authorize")).toBeDisabled();
   await expect(page.getByTestId("commit-blocked")).toBeVisible();
 });

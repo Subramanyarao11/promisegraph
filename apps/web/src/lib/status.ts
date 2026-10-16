@@ -9,60 +9,62 @@ export interface StatusSpec {
 
 const S = (label: string, tone: Tone, icon: IconName): StatusSpec => ({ label, tone, icon });
 
+// Plain-language labels for a non-engineer support lead. Enum values (keys) are the contract's and never change.
 export const REQUEST_STATUS: Record<string, StatusSpec> = {
-  open: S("Open", "neutral", "circle"),
-  investigating: S("Investigating", "progress", "progress"),
-  awaiting_input: S("Waiting for input", "warn", "question"),
-  awaiting_review: S("Waiting for review", "warn", "eye"),
-  awaiting_work: S("Waiting on work", "info", "clock"),
-  awaiting_verification: S("Awaiting verification", "info", "shield"),
-  resolved: S("Resolved · verified", "success", "check"),
-  escalated: S("Escalated", "warn", "up"),
+  open: S("New", "neutral", "circle"),
+  investigating: S("Being looked into", "progress", "progress"),
+  awaiting_input: S("Waiting for customer reply", "warn", "question"),
+  awaiting_review: S("Waiting for your approval", "warn", "eye"),
+  awaiting_work: S("Waiting on engineering", "info", "clock"),
+  awaiting_verification: S("Waiting for you to confirm it's solved", "info", "shield"),
+  resolved: S("Solved (confirmed)", "success", "check"),
+  escalated: S("Handed off to a person", "warn", "up"),
   closed: S("Closed", "neutral", "x"),
 };
 
+/** An investigation is one pass of PromiseGraph looking into a request (a "run" in the API). */
 export const RUN_STATUS: Record<string, StatusSpec> = {
-  queued: S("Queued", "neutral", "clock"),
-  running: S("Running", "progress", "progress"),
-  waiting_for_input: S("Waiting for input", "warn", "question"),
-  awaiting_review: S("Waiting for authorization", "warn", "eye"),
-  succeeded: S("Run finished", "success", "check"),
-  failed: S("Run failed", "danger", "alert"),
-  cancelled: S("Cancelled", "neutral", "ban"),
+  queued: S("Starting", "neutral", "clock"),
+  running: S("Looking into it", "progress", "progress"),
+  waiting_for_input: S("Paused: waiting for customer reply", "warn", "question"),
+  awaiting_review: S("Paused: waiting for your approval", "warn", "eye"),
+  succeeded: S("Finished", "success", "check"),
+  failed: S("Stopped with a problem", "danger", "alert"),
+  cancelled: S("Stopped", "neutral", "ban"),
 };
 
 export const ACTION_STATUS: Record<string, StatusSpec> = {
-  proposed: S("Proposed", "neutral", "circle"),
-  accepted: S("Authorized · queued", "info", "clock"),
-  dispatching: S("Dispatching", "progress", "progress"),
-  succeeded: S("Executed", "success", "check"),
-  failed: S("Execution failed", "danger", "alert"),
-  unknown: S("Dispatch outcome unknown", "danger", "question"),
+  proposed: S("Suggested", "neutral", "circle"),
+  accepted: S("Approved, in progress", "info", "clock"),
+  dispatching: S("Doing it now", "progress", "progress"),
+  succeeded: S("Done", "success", "check"),
+  failed: S("Couldn't be done", "danger", "alert"),
+  unknown: S("Unclear if it went through", "danger", "question"),
   cancelled: S("Cancelled", "neutral", "ban"),
 };
 
 export const VERIFICATION: Record<string, StatusSpec> = {
-  pending: S("Verification pending", "neutral", "clock"),
-  passed: S("Verification passed", "success", "check"),
-  failed: S("Verification failed", "danger", "x"),
-  inconclusive: S("Inconclusive", "warn", "question"),
+  pending: S("Not confirmed solved yet", "neutral", "clock"),
+  passed: S("Confirmed solved", "success", "check"),
+  failed: S("Not solved", "danger", "x"),
+  inconclusive: S("Unclear", "warn", "question"),
 };
 
 export const VALIDITY: Record<string, StatusSpec> = {
-  valid: S("Valid", "success", "check"),
-  invalid: S("Invalid", "danger", "ban"),
-  stale: S("Stale", "warn", "alert"),
+  valid: S("Up to date", "success", "check"),
+  invalid: S("Can't be done", "danger", "ban"),
+  stale: S("Out of date", "warn", "alert"),
 };
 
 export const DECISION_STATUS: Record<string, StatusSpec> = {
-  active: S("Active", "success", "check"),
-  superseded: S("Superseded", "neutral", "refresh"),
-  revoked: S("Revoked", "danger", "ban"),
+  active: S("In effect", "success", "check"),
+  superseded: S("Replaced", "neutral", "refresh"),
+  revoked: S("Withdrawn", "danger", "ban"),
   expired: S("Expired", "neutral", "clock"),
 };
 
 export const WORK_STATUS: Record<string, StatusSpec> = {
-  open: S("Open", "neutral", "circle"),
+  open: S("Not started", "neutral", "circle"),
   in_progress: S("In progress", "progress", "progress"),
   blocked: S("Blocked", "danger", "ban"),
   done: S("Done", "success", "check"),
@@ -70,29 +72,47 @@ export const WORK_STATUS: Record<string, StatusSpec> = {
 };
 
 export const CONNECTOR_STATE: Record<string, StatusSpec> = {
-  enabled: S("Enabled", "success", "check"),
-  verified: S("Verified", "success", "shield"),
-  unverified: S("Enabled · unverified", "warn", "question"),
-  disabled: S("Disabled", "neutral", "ban"),
-  unconfigured: S("Not configured", "neutral", "circle"),
-  unavailable: S("Unavailable", "danger", "alert"),
+  enabled: S("On", "success", "check"),
+  verified: S("Connected and checked", "success", "shield"),
+  unverified: S("On, not yet checked", "warn", "question"),
+  disabled: S("Off", "neutral", "ban"),
+  unconfigured: S("Not set up", "neutral", "circle"),
+  unavailable: S("Not working", "danger", "alert"),
 };
 
 export const ATTEMPT_OUTCOME: Record<string, StatusSpec> = {
-  succeeded: S("Succeeded", "success", "check"),
-  failed: S("Failed", "danger", "x"),
-  unknown: S("Unknown", "warn", "question"),
+  succeeded: S("Worked", "success", "check"),
+  failed: S("Didn't work", "danger", "x"),
+  unknown: S("Unclear", "warn", "question"),
 };
 
+/** Recommended next steps (ActionKind). */
 export const KIND_LABEL: Record<string, string> = {
-  answer: "Answer (draft)",
-  clarify: "Clarify (draft question)",
-  link_work: "Link existing work",
-  create_work: "Create new work",
-  escalate: "Escalate",
+  answer: "Reply with an answer",
+  clarify: "Ask the customer a question",
+  link_work: "Attach to existing work",
+  create_work: "Create a new task",
+  escalate: "Hand off to a person",
+};
+export const KIND_EXPLAIN: Record<string, string> = {
+  answer: "PromiseGraph drafts a reply for you to send. Nothing is sent automatically.",
+  clarify: "The request is unclear, so PromiseGraph drafts one question for the customer. Nothing is sent automatically.",
+  link_work: "Engineering is already working on this, so the request is attached to that work instead of creating a duplicate.",
+  create_work: "Nothing existing covers this, so PromiseGraph prepares a new task with clear acceptance criteria.",
+  escalate: "This needs a person's judgement, so it is handed to an owner.",
 };
 
-export const CONNECTOR_LABEL: Record<string, string> = { local: "Local task", linear: "Linear" };
+export const CONNECTOR_LABEL: Record<string, string> = { local: "PromiseGraph task list", linear: "Linear" };
+
+export const RULE_LABEL: Record<string, string> = {
+  forbidden_workaround: "Don't use this workaround",
+  scope_reduction_allowed: "Smaller scope is allowed",
+  date_extension_allowed: "Deadline extension is allowed",
+  allowed_action_types: "Only these next steps are allowed",
+  routing_owner: "Send requests to this person",
+};
+
+export const MODE_LABEL: Record<string, string> = { scripted: "Rule-based mode", model: "AI model" };
 
 export const ACTIVE_RUN = new Set(["queued", "running"]);
 

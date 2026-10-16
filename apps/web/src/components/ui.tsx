@@ -152,19 +152,19 @@ export function Empty({ title, children, icon = "inbox" }: { title: string; chil
 
 export function errorTitle(e: unknown): string {
   if (!(e instanceof ApiError)) return "Something went wrong";
-  if (isUnavailable(e)) return e.code === "NETWORK" ? "API unreachable" : "Database unavailable";
+  if (isUnavailable(e)) return e.code === "NETWORK" ? "Can't reach the server" : "Database unavailable";
   switch (e.code) {
     case "NOT_FOUND": return "Not found";
     case "UNAUTHORIZED":
-    case "WORKSPACE_FORBIDDEN": return "Access denied for this workspace";
-    case "REVISION_CONFLICT": return "Knowledge changed — refresh and replan";
-    case "IDEMPOTENCY_CONFLICT": return "Conflicting duplicate command";
-    case "INVALID_TRANSITION": return "Not allowed in the current state";
-    case "EVIDENCE_INVALID": return "Evidence invalid";
-    case "POLICY_VIOLATION": return "Blocked by policy";
-    case "RATE_LIMITED": return "Rate limited";
-    case "CAPABILITY_DISABLED": return "Capability disabled";
-    case "INVALID_INPUT": return "Check the highlighted fields";
+    case "WORKSPACE_FORBIDDEN": return "You don't have access to this workspace";
+    case "REVISION_CONFLICT": return "Something changed in the meantime. Refresh and try again";
+    case "IDEMPOTENCY_CONFLICT": return "This looks like a duplicate of an earlier action";
+    case "INVALID_TRANSITION": return "That isn't possible right now";
+    case "EVIDENCE_INVALID": return "The supporting sources aren't valid";
+    case "POLICY_VIOLATION": return "Not allowed by company rules";
+    case "RATE_LIMITED": return "Too many requests, please wait a moment";
+    case "CAPABILITY_DISABLED": return "That feature is turned off";
+    case "INVALID_INPUT": return "Please check the highlighted fields";
     default: return e.code;
   }
 }
@@ -178,8 +178,8 @@ export function ErrorPanel({ error, onRetry, what }: { error: unknown; onRetry?:
       <div>
         <p className="callout-title">{errorTitle(error)}{what ? ` · ${what}` : ""}</p>
         <p>{e?.message ?? String((error as Error)?.message ?? error)}</p>
-        {unavailable && <p className="muted">No cached or sample data is shown in place of live results. Retry when the service recovers.</p>}
-        {e?.correlationId && <p className="muted small">Correlation ID <Mono>{e.correlationId}</Mono></p>}
+        {unavailable && <p className="muted">We don't show old or sample data in its place. Try again once it's back.</p>}
+        {e?.correlationId && <p className="muted small">Reference for support: <Mono>{e.correlationId}</Mono></p>}
         {onRetry && (
           <button type="button" className="btn btn-sm" onClick={onRetry}>
             <Icon name="refresh" /> Retry
@@ -228,13 +228,12 @@ export function Owner({ id }: { id: string | null }) {
     staleTime: 60_000,
     retry: false,
   });
-  if (!id) return <Tag tone="warn" icon="alert">Missing owner</Tag>;
+  if (!id) return <Tag tone="warn" icon="alert">No owner assigned</Tag>;
   const p = q.data?.data;
   return (
-    <span className="row" style={{ display: "inline-flex" }} data-testid="owner">
-      <Mono>{id}</Mono>
-      {p && <span>{p.name}</span>}
-      {p && !p.active && <Tag tone="warn" icon="alert">Inactive owner</Tag>}
+    <span className="row" style={{ display: "inline-flex" }} data-testid="owner" title={id}>
+      {p ? <span>{p.name}{p.role ? <span className="muted"> · {p.role}</span> : null}</span> : <Mono>{id}</Mono>}
+      {p && !p.active && <Tag tone="warn" icon="alert">Inactive owner: no longer here</Tag>}
     </span>
   );
 }

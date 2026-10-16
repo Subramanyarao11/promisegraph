@@ -11,8 +11,8 @@ export function SourcesPage() {
     <SourceDrawerProvider>
       <div className="page-head">
         <div className="grow">
-          <h1>Sources</h1>
-          <p>Import permitted documentation, requests and work through preview → commit. Each record is an immutable revision; identical content is a no-op.</p>
+          <h1>Knowledge base</h1>
+          <p>The docs, requests and engineering work PromiseGraph checks. Add more by importing a file: you'll see a preview before anything is saved.</p>
         </div>
       </div>
       <div className="stack-lg">
@@ -44,13 +44,13 @@ function ImportPanel() {
   const doPreview = (e: React.FormEvent) => {
     e.preventDefault();
     const ce: Record<string, string> = {};
-    if (!form.source_key.trim()) ce.source_key = "A source key is required (1–200 characters).";
+    if (!form.source_key.trim()) ce.source_key = "Give it a name (up to 200 characters).";
     if (!form.content.trim()) ce.content = "Paste content or choose a file.";
     setErrs(ce);
     if (Object.keys(ce).length) return;
     setResult(null);
     prev.mutate({ ...form, source_key: form.source_key.trim() }, {
-      onSuccess: (r) => { setPreview(r.data); announce(`Preview ready: ${r.data.valid_count} valid, ${r.data.rejected_count} rejected.`); },
+      onSuccess: (r) => { setPreview(r.data); announce(`Preview ready: ${r.data.valid_count} ready to add, ${r.data.rejected_count} with problems.`); },
       onError: (e) => announce(`Preview failed: ${(e as Error).message}`, true),
     });
   };
@@ -59,24 +59,24 @@ function ImportPanel() {
     commit.mutate({ _id: preview.preview_id, expected_revision: preview.based_on_revision }, {
       onSuccess: (r) => {
         setResult(r.data); setPreview(null);
-        announce(`Imported ${r.data.imported_count}, ${r.data.noop_count} unchanged, ${r.data.rejected_count} rejected. ${r.data.invalidated_proposal_count} proposals invalidated.`);
+        announce(`Saved: ${r.data.imported_count} added, ${r.data.noop_count} unchanged.`);
       },
-      onError: (e) => announce(`Commit refused: ${(e as Error).message}`, true),
+      onError: (e) => announce(`Not saved: ${(e as Error).message}`, true),
     });
   };
 
   return (
-    <Section title="Import" testId="import-panel">
+    <Section title="Add to the knowledge base" testId="import-panel">
       <form onSubmit={doPreview} className="stack" noValidate>
         {prev.error && !(prev.error instanceof ApiError && prev.error.code === "INVALID_INPUT") && <ErrorPanel error={prev.error} />}
         <div className="form-grid">
           <Field label="Format" error={fe.format}>
-            {(p) => <select {...p} value={form.format} onChange={(e) => setForm({ ...form, format: e.target.value as ImportPreview["format"] })}><option value="markdown">Markdown (one document)</option><option value="json">JSON import document</option><option value="csv">CSV (work items)</option></select>}
+            {(p) => <select {...p} value={form.format} onChange={(e) => setForm({ ...form, format: e.target.value as ImportPreview["format"] })}><option value="markdown">A document (Markdown)</option><option value="json">Structured data (JSON)</option><option value="csv">Engineering tasks (CSV)</option></select>}
           </Field>
-          <Field label="Origin" hint="Only synthetic, public, or owned/permitted data." error={fe.origin}>
-            {(p) => <select {...p} value={form.origin} onChange={(e) => setForm({ ...form, origin: e.target.value as ImportPreview["origin"] })}><option value="synthetic">Synthetic</option><option value="public">Public</option><option value="owned_permitted">Owned / permitted</option></select>}
+          <Field label="Where it comes from" hint="Only use demo, public, or data you're allowed to use." error={fe.origin}>
+            {(p) => <select {...p} value={form.origin} onChange={(e) => setForm({ ...form, origin: e.target.value as ImportPreview["origin"] })}><option value="synthetic">Demo data (made up)</option><option value="public">Public information</option><option value="owned_permitted">Our own data</option></select>}
           </Field>
-          <Field label="Source key" hint="Stable ID for this source; re-importing the same key creates a new revision." error={errs.source_key ?? fe.source_key}>
+          <Field label="Name" hint="Re-importing with the same name saves a new version and keeps the old one." error={errs.source_key ?? fe.source_key}>
             {(p) => <input {...p} type="text" value={form.source_key} onChange={(e) => setForm({ ...form, source_key: e.target.value })} maxLength={200} />}
           </Field>
           <Field label="File (optional)" hint=".md, .json or .csv up to 1 MB">
@@ -89,7 +89,7 @@ function ImportPanel() {
           </div>
         </div>
         <div className="form-actions">
-          <button type="submit" className="btn" disabled={prev.isPending} data-testid="preview-import">{prev.isPending ? "Previewing…" : "Preview import"}</button>
+          <button type="submit" className="btn" disabled={prev.isPending} data-testid="preview-import">{prev.isPending ? "Checking…" : "Preview"}</button>
         </div>
       </form>
 
@@ -97,36 +97,34 @@ function ImportPanel() {
         <div className="stack" style={{ marginTop: 12 }} data-testid="import-preview">
           <hr className="divider" />
           <div className="row">
-            <strong>Preview</strong> <Mono>{preview.preview_id}</Mono>
-            <Tag tone="success" icon="check">{preview.valid_count} valid</Tag>
-            <Tag tone={preview.rejected_count ? "danger" : "neutral"} icon={preview.rejected_count ? "alert" : "check"}>{preview.rejected_count} rejected</Tag>
-            <span className="small muted">against knowledge rev {preview.based_on_revision}</span>
+            <strong>Preview: nothing saved yet</strong>
+            <Tag tone="success" icon="check">{preview.valid_count} ready to add</Tag>
+            <Tag tone={preview.rejected_count ? "danger" : "neutral"} icon={preview.rejected_count ? "alert" : "check"}>{preview.rejected_count} with problems</Tag>
           </div>
           {preview.changes.length > 0 && (
             <div className="table-wrap">
               <table className="table">
-                <thead><tr><th scope="col">Entity</th><th scope="col">ID</th><th scope="col">Change</th></tr></thead>
-                <tbody>{preview.changes.map((c, i) => <tr key={i}><td>{c.entity_type}</td><td><Mono>{c.entity_id}</Mono></td><td><Tag tone={c.change === "noop" ? "neutral" : c.change === "create" ? "success" : "info"}>{c.change === "noop" ? "unchanged" : c.change}</Tag></td></tr>)}</tbody>
+                <thead><tr><th scope="col">What</th><th scope="col">ID</th><th scope="col">Change</th></tr></thead>
+                <tbody>{preview.changes.map((c, i) => <tr key={i}><td>{c.entity_type}</td><td><Mono>{c.entity_id}</Mono></td><td><Tag tone={c.change === "noop" ? "neutral" : c.change === "create" ? "success" : "info"}>{c.change === "noop" ? "no change" : c.change === "create" ? "new" : "updated"}</Tag></td></tr>)}</tbody>
               </table>
             </div>
           )}
           {preview.rejected.length > 0 && (
-            <Callout tone="danger" icon="alert" title="Rejected records">
+            <Callout tone="danger" icon="alert" title="These records have problems and won't be added">
               <ul className="small">{preview.rejected.map((r, i) => <li key={i}><Mono>{r.location}</Mono>: {r.reason}</li>)}</ul>
             </Callout>
           )}
           {commit.error && <ErrorPanel error={commit.error} />}
           <div className="form-actions">
-            <button type="button" className="btn" onClick={() => setPreview(null)}>Discard preview</button>
-            <button type="button" className="btn btn-primary" onClick={doCommit} disabled={commit.isPending || preview.valid_count === 0} data-testid="commit-import">{commit.isPending ? "Committing…" : `Commit ${preview.valid_count} records`}</button>
+            <button type="button" className="btn" onClick={() => setPreview(null)}>Cancel</button>
+            <button type="button" className="btn btn-primary" onClick={doCommit} disabled={commit.isPending || preview.valid_count === 0} data-testid="commit-import">{commit.isPending ? "Saving…" : `Save ${preview.valid_count} to the knowledge base`}</button>
           </div>
         </div>
       )}
       {result && (
-        <Callout tone="success" icon="check" title="Import committed" testId="import-result">
-          <p>{result.imported_count} imported · {result.noop_count} unchanged (no-op) · {result.rejected_count} rejected · knowledge rev {result.knowledge_revision}</p>
-          {result.invalidated_proposal_count > 0 && <p><Icon name="alert" size={12} /> {result.invalidated_proposal_count} prepared proposals were invalidated by changed facts and must be replanned.</p>}
-          {result.source_revisions.length > 0 && <p className="small">Revisions: {result.source_revisions.map((s) => `${s.source_id}@${s.revision}`).join(", ")}</p>}
+        <Callout tone="success" icon="check" title="Saved to the knowledge base" testId="import-result">
+          <p>{result.imported_count} added · {result.noop_count} already there, unchanged · {result.rejected_count} skipped</p>
+          {result.invalidated_proposal_count > 0 && <p><Icon name="alert" size={12} /> {result.invalidated_proposal_count} pending suggestions relied on facts that just changed. They're now out of date and need a fresh look.</p>}
         </Callout>
       )}
     </Section>
@@ -140,17 +138,17 @@ function SourceList() {
   const open = useOpenSource();
   const items = q.data?.items ?? [];
   return (
-    <Section title="Source records" count={items.length} testId="source-list">
+    <Section title="What's in the knowledge base" count={items.length} testId="source-list">
       <div className="filters" role="search" aria-label="Filter sources">
-        <Field label="Kind">{(p) => <select {...p} value={kind} onChange={(e) => setKind(e.target.value)}><option value="">All kinds</option>{["documentation", "request", "work", "decision", "observation"].map((k) => <option key={k} value={k}>{k}</option>)}</select>}</Field>
-        <Field label="Origin">{(p) => <select {...p} value={origin} onChange={(e) => setOrigin(e.target.value)}><option value="">All origins</option><option value="synthetic">Synthetic</option><option value="public">Public</option><option value="owned_permitted">Owned / permitted</option></select>}</Field>
+        <Field label="Type">{(p) => <select {...p} value={kind} onChange={(e) => setKind(e.target.value)}><option value="">All types</option>{["documentation", "request", "work", "decision", "observation"].map((k) => <option key={k} value={k}>{k}</option>)}</select>}</Field>
+        <Field label="Where it comes from">{(p) => <select {...p} value={origin} onChange={(e) => setOrigin(e.target.value)}><option value="">Anywhere</option><option value="synthetic">Demo data (made up)</option><option value="public">Public information</option><option value="owned_permitted">Our own data</option></select>}</Field>
       </div>
       {q.isLoading ? <Loading label="Loading sources" /> : q.error ? <ErrorPanel error={q.error} onRetry={() => q.refetch()} what="sources" /> : items.length === 0 ? (
-        <Empty title="No sources imported" icon="source"><p>Use the import form above, or run the seed script against the API.</p></Empty>
+        <Empty title="The knowledge base is empty" icon="source"><p>Add a document or a task list above to get started.</p></Empty>
       ) : (
         <div className="table-wrap">
           <table className="table responsive">
-            <thead><tr><th scope="col">Source</th><th scope="col">Kind</th><th scope="col">Revision</th><th scope="col">Freshness</th><th scope="col">Observed</th><th scope="col">Ingested</th></tr></thead>
+            <thead><tr><th scope="col">Source</th><th scope="col">Type</th><th scope="col">Version</th><th scope="col">Up to date?</th><th scope="col">True as of</th><th scope="col">Added</th></tr></thead>
             <tbody>
               {items.map((s: SourceSummary) => (
                 <tr key={`${s.id}@${s.revision}`}>
@@ -158,22 +156,22 @@ function SourceList() {
                     <button type="button" className="btn btn-ghost btn-sm" onClick={() => open({ source_id: s.id, revision: s.revision })} style={{ padding: 0, height: "auto" }}>
                       <span className="cell-title">{s.title}</span>
                     </button>
-                    <div className="cell-sub"><Mono>{s.id}</Mono> · {s.origin.replace("_", " ")}</div>
+                    <div className="cell-sub">{s.origin === "synthetic" ? "Demo data" : s.origin === "public" ? "Public" : "Our own data"}</div>
                   </td>
-                  <td data-label="Kind">{s.kind}</td>
-                  <td data-label="Revision">
-                    <span className="row">rev {s.revision}
+                  <td data-label="Type">{s.kind === "work" ? "engineering task" : s.kind}</td>
+                  <td data-label="Version">
+                    <span className="row">version {s.revision}
                       {s.revision > 1 && (
                         <select aria-label={`Open an earlier revision of ${s.title}`} className="btn-sm" style={{ width: "auto", minHeight: 24, padding: "0 4px" }} value="" onChange={(e) => e.target.value && open({ source_id: s.id, revision: Number(e.target.value) })}>
-                          <option value="">History…</option>
-                          {Array.from({ length: s.revision }, (_, i) => s.revision - i).map((r) => <option key={r} value={r}>rev {r}</option>)}
+                          <option value="">Older versions…</option>
+                          {Array.from({ length: s.revision }, (_, i) => s.revision - i).map((r) => <option key={r} value={r}>version {r}</option>)}
                         </select>
                       )}
                     </span>
                   </td>
-                  <td data-label="Freshness">{s.stale ? <Tag tone="warn" icon="alert">Stale</Tag> : <Tag tone="success" icon="check">Fresh</Tag>}</td>
-                  <td data-label="Observed"><Ts iso={s.observed_at} /></td>
-                  <td data-label="Ingested"><Ts iso={s.ingested_at} /></td>
+                  <td data-label="Up to date?">{s.stale ? <Tag tone="warn" icon="alert">May be out of date</Tag> : <Tag tone="success" icon="check">Up to date</Tag>}</td>
+                  <td data-label="True as of"><Ts iso={s.observed_at} /></td>
+                  <td data-label="Added"><Ts iso={s.ingested_at} /></td>
                 </tr>
               ))}
             </tbody>

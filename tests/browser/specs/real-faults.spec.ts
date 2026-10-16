@@ -30,16 +30,16 @@ test("T15 real: create times out after the effect → no blind duplicate; outcom
   const before = new Set(((await (await page.request.get(`${WS}/work-items?limit=100`)).json()).data as { id: string }[]).map((w) => w.id));
 
   await page.goto(`/requests/${id}`);
-  await expect(page.getByTestId("proposal-kind")).toHaveText("Create new work", { timeout: 60_000 });
+  await expect(page.getByTestId("proposal-kind")).toHaveText("Create a new task", { timeout: 60_000 });
   await page.getByTestId("authorize").click();
   await page.getByTestId("confirm-authorize").click();
 
   // Either the worker/reconciler establishes the outcome (Executed with a receipt), or the UI hands it to the operator.
-  const executed = page.getByTestId("action-status").filter({ hasText: "Executed" });
+  const executed = page.getByTestId("action-status").filter({ hasText: "Done" });
   const operator = page.getByTestId("reconcile-form");
   await expect(executed.or(operator)).toBeVisible({ timeout: 90_000 });
   const path = (await executed.count()) ? "established automatically" : "operator reconciliation offered";
-  const sawUnknown = await page.locator('[data-testid="timeline-event"][data-type="action_updated"]').filter({ hasText: "Dispatch outcome unknown" }).count();
+  const sawUnknown = await page.locator('[data-testid="timeline-event"][data-type="action_updated"]').filter({ hasText: "Unclear if it went through" }).count();
   test.info().annotations.push({ type: "t15-path", description: `${path}; unknown state in timeline: ${sawUnknown > 0}` });
 
   // Invariant: exactly one new work item for this request — the timed-out create was not repeated.
@@ -47,8 +47,8 @@ test("T15 real: create times out after the effect → no blind duplicate; outcom
     const after = ((await (await page.request.get(`${WS}/work-items?limit=100`)).json()).data as { id: string }[]).filter((w) => !before.has(w.id));
     return after.length;
   }, { timeout: 30_000 }).toBe(1);
-  if (path === "established automatically") await expect(page.getByTestId("receipt-connector")).toHaveText("Local task");
-  await expect(page.getByTestId("request-status")).not.toContainText("Resolved");
+  if (path === "established automatically") await expect(page.getByTestId("receipt-connector")).toHaveText("PromiseGraph task list");
+  await expect(page.getByTestId("request-status")).not.toContainText("Solved");
 });
 
 test("T21 real: database becomes unreachable mid-session → honest unavailable state, no stale data shown as live; recovers", async ({ page }) => {
