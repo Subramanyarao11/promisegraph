@@ -41,6 +41,10 @@ class Operator:
         return r.json()["data"]
 
     def latest_proposal(self, run_id: str, request_id: str) -> dict[str, Any] | None:
+        """Latest by the run's ordered events (list order can tie within one created_at second)."""
+        ready = [e["payload"]["proposal_id"] for e in self.events(run_id) if e["type"] == "proposal_ready"]
+        if ready:
+            return self.get(f"/proposals/{ready[-1]}")
         props = self.get("/proposals", run_id=run_id, request_id=request_id)
         return props[0] if props else None
 

@@ -77,7 +77,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "properties": {
                 "scopes": {
                     "type": "array",
-                    "maxItems": 6,
+                    "maxItems": 8,
                     "items": {
                         "type": "object",
                         "properties": {"entity_type": {"enum": ["customer", "request", "capability", "work_item"]}, "entity_id": {"type": "string"}},
@@ -87,6 +87,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 },
                 "depth": {"type": "integer", "minimum": 1, "maximum": 6},
                 "work_item_ids": {"type": "array", "items": {"type": "string"}, "maxItems": 5, "description": "Refresh current state of these work items"},
+                "person_ids": {"type": "array", "items": {"type": "string"}, "maxItems": 5, "description": "Owner activity (active/inactive)"},
             },
             "required": [],
             "additionalProperties": False,
@@ -367,7 +368,7 @@ class ToolClient:
         context, envelope = self.api.call("GET", self._p(f"/requests/{request_id}/context"), params=params)
         scopes = args.get("scopes") or [{"entity_type": "customer", "entity_id": self.request["customer_id"]}]
         decisions: dict[str, dict[str, Any]] = {}
-        for scope in scopes[:6]:
+        for scope in scopes[:8]:
             data, _ = self.api.call(
                 "GET",
                 self._p("/decisions"),
@@ -385,6 +386,30 @@ class ToolClient:
             except ApiError as err:  # unknown item or route not offered: refresh unavailable, not a tool failure
                 refresh_errors.append({"work_item_id": wid, "code": err.code})
         out = {"context": context, "decisions": list(decisions.values())}
+        # Rev 5 #31: scope-filtered attempts (capability-scoped outcomes before an ABOUT link exists).
+        attempts: dict[str, dict[str, Any]] = {}
+        for scope in scopes[:8]:
+            if scope["entity_type"] not in ("customer", "capability", "request"):
+                continue
+            try:
+                data, _ = self.api.call("GET", self._p("/attempts"), params={"scope_entity_type": scope["entity_type"], "scope_entity_id": scope["entity_id"], "limit": 100})
+            except ApiError:
+                break  # route/filter not offered by this server: the context bundle is the fallback
+            for a in data or []:
+                if (a.get("scope") or {}).get("entity_id") == scope["entity_id"]:  # ignore servers that drop the filter
+                    attempts.setdefault(a["id"], a)
+        if attempts:
+            out["attempts"] = list(attempts.values())
+        if args.get("person_ids"):
+            people, missing = [], []
+            for pid in args["person_ids"][:5]:
+                try:
+                    person, _ = self.api.call("GET", self._p(f"/people/{pid}"))
+                    people.append(person)
+                except ApiError as err:
+                    missing.append({"person_id": pid, "code": err.code})
+            out["people"] = people
+            out["people_unavailable"] = missing
         if args.get("work_item_ids"):
             out["work_items"] = work_items
             out["work_refresh_errors"] = refresh_errors

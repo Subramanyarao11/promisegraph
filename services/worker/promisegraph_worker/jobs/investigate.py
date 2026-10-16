@@ -90,7 +90,8 @@ class InvestigateRunner:
             pending_action_id=pending_action,
             clarifications=clarifications,
             seen_evidence_ids=list(session.state.seen_evidence_ids),
-            extra={"reply_source_id": cp.get("reply_source_id"), "clarify_question": clarify_question, "knowledge_revision": run.get("based_on_revision")},
+            extra={"reply_source_id": cp.get("reply_source_id"), "clarify_question": clarify_question, "knowledge_revision": run.get("based_on_revision"),
+                   "budget_left": lambda: session.budget.max_tool_calls - session.job_tool_calls},
         )
         try:
             session.emit(f"run_started:a{keeper.attempt}", "run_started", {"mode": mode, "stage": stage, "label": SCRIPTED_LABEL if mode == "scripted" else "Model mode", "attempt": keeper.attempt, "resume_reason": cp.get("resume_reason"), "reply_source_id": cp.get("reply_source_id")})

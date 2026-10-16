@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable
 
 OPEN_WORK = {"open", "in_progress", "blocked"}
+ACTION_KINDS = {"answer", "clarify", "link_work", "create_work", "escalate"}
 STALE_AFTER = timedelta(days=7)
 DIRECT_TIE = 0.9  # request words match two capabilities about equally ...
 AGGREGATE_TIE = 0.8  # ... and no other evidence separates them
@@ -29,6 +30,8 @@ _NEG_WHOLE = ("not enough", "not sufficient", "isn't enough", "is not enough", "
               "unsupported", "does not work", "doesn't work", "won't work", "not an option", "not available", "does not support",
               "doesn't support", "is not possible", "not possible")
 _NEG_AFTER = ("instead of", "rather than", "other than")
+_CAPABILITY_GAP_CUES = ("not supported", "unsupported", "not available", "does not support", "doesn't support", "no support",
+                        "isn't supported", "not yet supported")
 _GAP_CUES = ("not supported", "unsupported", "not available", "does not support", "doesn't support", "is not possible",
              "not possible", "cannot", "can't", "no support", "not yet supported", "isn't supported")
 
@@ -109,7 +112,10 @@ class Facts:
     prior_requests: dict[str, dict[str, Any]] = field(default_factory=dict)
     unrefreshed: list[str] = field(default_factory=list)
     complete_neighbourhood: dict[str, bool] = field(default_factory=dict)
+    rejected_evidence: set[str] = field(default_factory=set)
     expanded_targets: set[str] = field(default_factory=set)
+    edges_complete: bool = False
+    people: dict[str, dict[str, Any]] = field(default_factory=dict)
     rejections: list[str] = field(default_factory=list)  # validation reasons from refused proposals (replan input)
 
     # -- ingestion ---------------------------------------------------------------------------------
@@ -190,6 +196,11 @@ class Facts:
             for d in list(ctx.get("decisions") or []) + list((data or {}).get("decisions") or []):
                 self.decisions[d["id"]] = d
                 self._ev(d.get("evidence_ids"))
+            for a in (data or {}).get("attempts") or []:
+                self.attempts[a["id"]] = a
+                self._ev(a.get("evidence_ids"))
+            for person in (data or {}).get("people") or []:
+                self.people[person["id"]] = person
             for err in (data or {}).get("work_refresh_errors") or []:
                 self.unrefreshed.append(err["work_item_id"])
             for w in (data or {}).get("work_items") or []:
@@ -213,6 +224,13 @@ class Facts:
             for n in (data or {}).get("nodes") or []:
                 self.nodes[n["id"]] = n
             self._paths((data or {}).get("paths") or [])
+            if isinstance((data or {}).get("edges"), list):  # Rev 5 #30: every allowlisted edge among visited nodes
+                self.edges_complete = True
+                for e in data["edges"]:
+                    self.edges[e["id"]] = e
+                    self._ev(e.get("evidence_ids"))
+            if (data or {}).get("truncation") == "limit":
+                self.truncated["expand_limit"] = True
         elif name == "read_evidence":
             if isinstance(data, dict) and data.get("id"):
                 self.sources[data["id"]] = data
@@ -281,6 +299,20 @@ class Facts:
         return bool(re.search(r"\b(fail\w*|stopped|broken|break\w*|error\w*|skipp?\w*|missing|lost|garbl\w*|not (working|arriving|running)|"
                               r"did not run|didn't run|doesn't work|does not work|outage|again|still)\b", text))
 
+    def near_duplicates(self) -> set[str]:
+        """Candidates whose text is (almost) this request's own text: earlier copies of the same request."""
+        mine = tokens(f"{self.request.get('subject', '')} {self.request.get('body', '')}")
+        if len(mine) < 3:
+            return set()
+        out = set()
+        for c in self.candidates:
+            if c["entity_type"] not in ("request", "source"):
+                continue
+            text = c.get("title", "") + " " + " ".join(ev.get("excerpt", "") for ev in c.get("evidence") or [])
+            if len(mine & tokens(text)) >= 0.9 * len(mine):
+                out.add(c["id"])
+        return out
+
     def request_is_question(self) -> bool:
         text = f"{self.request.get('subject', '')} {self.request.get('body', '')} {self.reply_text}".lower()
         return "?" in text or bool(re.search(r"\b(how (do|can|should|to)|what (is|are|should)|can (we|i|you)|is (it|there|this))\b", text))
@@ -325,7 +357,8 @@ class Facts:
         sigs = self.capability_signals()
         ruled_out = negated_tokens(self.request_text())
         sigs = {c: s for c, s in sigs.items() if not (tokens(self.title_of(c)) & ruled_out)}
-        return sorted(((c, self.aggregate(s), s) for c, s in sigs.items()), key=lambda t: (-t[1], t[0]))
+        # Ties break on the request's own words (direct match), never on id spelling.
+        return sorted(((c, self.aggregate(s), s) for c, s in sigs.items()), key=lambda t: (-round(t[1], 2), -t[2]["direct"], -t[1], t[0]))
 
     def resolve_capabilities(self) -> tuple[list[str], bool, list[dict[str, Any]]]:
         """Returns (capability_ids, ambiguous, competing_candidates).
@@ -439,6 +472,13 @@ class Facts:
     def attempt_applies(self, a: dict[str, Any], caps: list[str], work_ids: Iterable[str] = ()) -> bool:
         if not self.scope_applies(a.get("scope") or {}, caps, work_ids):
             return False
+        if a.get("procedure_key") in ACTION_KINDS:
+            # Outcome of verifying an earlier *action* (not a reusable procedure): it bears on this request only if
+            # it was this request or a similar prior request, never on every request of the same customer.
+            rid = a.get("request_id")
+            if rid == self.request["id"] or rid in self.near_duplicates():
+                return True
+            return any(c["id"] == rid and c["entity_type"] == "request" and float(c.get("score", 0)) >= 0.5 for c in self.candidates)
         # Context signature `<capability>:<context>`: a different capability context does not carry over.
         sig = str(a.get("context_signature") or "")
         head = sig.split(":", 1)[0]
@@ -462,11 +502,13 @@ class Facts:
 
     # -- people ------------------------------------------------------------------------------------
     def inactive_people(self) -> set[str]:
-        out: set[str] = set()
+        out: set[str] = {pid for pid, p in self.people.items() if p.get("active") is False}  # Rev 5 #33, authoritative
         for text in self.missing_information + self.rejections:
             if "inactive" in text.lower() or "no longer" in text.lower() or "left" in text.lower().split():
                 out.update(re.findall(r"\b(?:person|team)_[A-Za-z0-9_\-]+", text))
         for n in self.nodes.values():
+            if n["id"] in self.people:
+                continue
             if _label(n) == "person" and re.search(r"\binactive\b|\bformer\b|\bdeparted\b", str(n.get("title", "")), re.I):
                 out.add(n["id"])
         return out
@@ -536,6 +578,27 @@ class Facts:
         boost, _ = self.similar_request_boost(work_id)
         return max(self.score_of(work_id), boost) + 0.03 * min(len(self.distinctive_overlap(work_id, caps)), 5)
 
+    def gap_need(self, caps: list[str]) -> set[str]:
+        """Request words that documentation explicitly says are unsupported (e.g. 'chat'): the unmet need."""
+        want = tokens(self.request_text()) - self.generic_tokens(caps)
+        need: set[str] = set()
+        for _sid, clause in self.doc_gaps(caps):
+            if any(cue in clause for cue in _CAPABILITY_GAP_CUES):  # "not available/supported", not procedural "cannot"
+                need |= tokens(clause) & want
+        return need
+
+    def forbidden_phrase_hit(self, text: str, forbidden: Iterable[str]) -> bool:
+        """True when text advocates a forbidden workaround: it carries at least half (min 2) of the value's words."""
+        words = tokens(text)
+        labelled_workaround = "workaround" in text.lower()
+        for value in forbidden:
+            vt = tokens(str(value).replace("_", " "))
+            if vt and len(vt & words) >= max(2, (len(vt) + 1) // 2):
+                return True
+            if vt and labelled_workaround and vt & words:  # "temporary workaround: create a share link"
+                return True
+        return False
+
     def work_for(self, caps: list[str]) -> tuple[list[str], list[str]]:
         """(compatible work ids ranked by relevance, similar-but-incompatible work ids).
 
@@ -559,7 +622,10 @@ class Facts:
             implements = any(cap in caps for cap in self.neighbors(wid, "IMPLEMENTED_BY"))
             boost, _ = self.similar_request_boost(wid)
             matched = bool(self.distinctive_overlap(wid, caps, title_only=True)) or boost > 0
-            if implements and matched and not self.excluded_by_request(wid, caps):
+            # When documentation states the requested thing is unsupported, only work that addresses that gap counts.
+            need = self.gap_need(caps)
+            addresses_gap = not need or bool(tokens(self.title_of(wid)) & need)
+            if implements and matched and addresses_gap and not self.excluded_by_request(wid, caps):
                 compatible.append(wid)
             elif self.score_of(wid) > 0 or boost > 0:
                 similar.append(wid)
@@ -571,6 +637,14 @@ class Facts:
         return [c for c in self.neighbors(work_id, "IMPLEMENTED_BY") if self.label_of(c) == "capability"]
 
     # -- documentation -------------------------------------------------------------------------------
+    def is_record_source(self, source_id: str) -> bool:
+        """Structured import records (`$.collection[i]` locations) are not documentation (PROTOCOL import rules)."""
+        rec = self.sources.get(source_id)
+        if rec is not None:
+            return rec.get("kind") != "documentation"
+        locs = [str(r.get("location") or "") for r in self.evidence.values() if r.get("source_id") == source_id]
+        return bool(locs) and all(loc.startswith("$.") for loc in locs)
+
     def doc_sources(self, caps: list[str]) -> list[tuple[str, float]]:
         """Documentation sources supporting a resolved capability, ranked by match score (source id, score)."""
         out: dict[str, float] = {}
@@ -589,6 +663,7 @@ class Facts:
                     rec = self.sources.get(nid)
                     if rec is None or rec.get("kind") == "documentation":
                         out[nid] = self.score_of(nid)
+        out = {sid: sc for sid, sc in out.items() if not self.is_record_source(sid)}
         return sorted(out.items(), key=lambda kv: (-kv[1], kv[0]))
 
     def doc_relevance(self, source_id: str, score: float, caps: list[str]) -> float:
@@ -621,11 +696,19 @@ class Facts:
     def doc_source_ids(self, caps: list[str]) -> list[str]:
         return [sid for sid, _ in self.doc_sources(caps)]
 
+    def note_rejection(self, reasons: Iterable[str]) -> None:
+        """Validation reasons that name evidence ids: never cite those again in a replan."""
+        for reason in reasons:
+            self.rejections.append(reason)
+            for eid in self.known_evidence_ids:
+                if eid in reason:
+                    self.rejected_evidence.add(eid)
+
     def valid_evidence(self, ids: Iterable[str]) -> list[str]:
-        """Only ids that a tool actually returned (the API validates them again)."""
+        """Only ids that a tool actually returned (the API validates them again), minus ids a validation rejected."""
         out: list[str] = []
         for i in ids:
-            if i in self.known_evidence_ids and i not in out:
+            if i in self.known_evidence_ids and i not in out and i not in self.rejected_evidence:
                 out.append(i)
         return out[:100]
 
@@ -633,6 +716,8 @@ class Facts:
         notes = []
         if self.truncated.get("context"):
             notes.append("request context was truncated")
+        if self.truncated.get("expand_limit"):
+            notes.append("graph expansion hit its result limit")
         if any(k.endswith(":worker") for k in self.truncated if self.truncated[k]):
             notes.append("a tool result exceeded the 24 KB context bound and was trimmed")
         for err in self.errors:

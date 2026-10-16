@@ -60,6 +60,7 @@ class World:
         self.edges.append(edge("IMPLEMENTED_BY", cap, wid))
         if owner:
             self.edges.append(edge("OWNED_BY", wid, owner))
+            self.nodes.setdefault(owner, node(owner, "Person", owner))
         for d in depends or []:
             self.edges.append(edge("DEPENDS_ON", wid, d))
 
@@ -306,3 +307,70 @@ def test_continuation_after_clarify_reports_waiting(w: World):
     w.action = {"id": "ac_c", "kind": "clarify", "status": "succeeded", "receipt": {"target_id": "draft"}, "connector": "local"}
     out, _ = run(w, resume_stage="observe", pending_action_id="ac_c")
     assert out.run_status_hint == "waiting_for_input" and [c["name"] for c in w.calls] == ["inspect_action"]
+
+
+def test_rev5_edges_people_and_scoped_attempts_are_used(w: World):
+    """Rev 5 `edges` are ingested and /people activity is authoritative for owner checks."""
+    w.request.update(subject="Gizmo uploads failing again", body="Our gizmo uploads are failing again since Monday.")
+    w.cap("ca_g", "Gizmo uploads", 0.3)
+    w.item("wk_fix", "Gizmo uploads failing in pipeline", "ca_g", "blocked", 0.4, owner="pp_quiet")
+    orig = w.respond
+
+    def respond(call):
+        out = orig(call)
+        if call["name"] == "expand_context":
+            out["data"]["edges"] = [p["edges"][0] for p in out["data"]["paths"]]
+            out["data"]["truncation"] = None
+        if call["name"] == "read_memory" and call["arguments"].get("person_ids"):
+            out["data"]["people"] = [{"id": "pp_quiet", "name": "Q", "role": "eng", "team_id": None, "active": False, "version": 1}]
+        return out
+
+    w.respond = respond
+    run(w)
+    p = proposal(w)
+    assert any("pp_quiet" in (c["arguments"].get("person_ids") or []) for c in w.calls if c["name"] == "read_memory")
+    assert p["kind"] == "escalate" and "inactive pp_quiet" in p["payload"]["reason"]
+
+
+def test_structured_record_source_is_not_documentation(w: World):
+    """A capability's own import record ($.capabilities[i]) must not be quoted as documentation in an answer."""
+    w.request.update(subject="How do we push files to our FTP box?", body="How do we push the daily file to our FTP box?")
+    w.cap("ca_ftp", "FTP delivery", 0.4)
+    w.nodes["sr_cap_rec"] = node("sr_cap_rec", "Source", "Capability record")
+    w.candidates.append({"entity_type": "source", "id": "sr_cap_rec", "title": "rec", "score": 0.9,
+                         "evidence": [ev("ev_rec", "sr_cap_rec", '{"id":"ca_ftp","name":"FTP delivery"}', loc="$.capabilities[3]")]})
+    w.edges.append(edge("SUPPORTED_BY", "ca_ftp", "sr_cap_rec"))
+    run(w)
+    assert proposal(w)["kind"] != "answer"
+
+
+def test_work_that_does_not_address_documented_gap_is_not_linked(w: World):
+    """Docs say chat delivery is unavailable; similar alert work about thresholds must not absorb the request."""
+    w.request.update(subject="Alerts in our chat channels", body="Could anomaly alerts be posted to our chat channels instead of email?")
+    w.cap("ca_al", "Metric alerts", 0.3, owner="pp_al")
+    w.item("wk_thr", "Configurable anomaly alert thresholds", "ca_al", "done", 0.4)
+    w.doc("dc_al", ["ca_al"], "Notifications go to email or a webhook endpoint. Chat channel integrations are not available.", 0.5)
+    run(w)
+    p = proposal(w)
+    assert p["kind"] != "link_work" and p["kind"] in ("create_work", "escalate")
+
+
+def test_answer_never_quotes_a_forbidden_workaround(w: World):
+    w.request.update(subject="Board access for auditors?", body="How can our auditors see the board without creating logins?")
+    w.cap("ca_b", "Board sharing", 0.4)
+    w.doc("dc_b", ["ca_b"], "Invite auditors as guest viewers with expiring access. As a temporary workaround, an admin can create a link for anyone.", 0.6)
+    w.decisions.append({"id": "dz_open", "workspace_id": "w", "rule_type": "forbidden_workaround", "value": "open_share_link", "scope": {"entity_type": "customer", "entity_id": "cu_a"},
+                        "status": "active", "rationale": "links must stay authenticated", "author_id": "pp", "effective_at": "2026-01-01T00:00:00Z", "expires_at": None,
+                        "supersedes_id": None, "evidence_ids": [], "version": 1})
+    run(w)
+    p = proposal(w)
+    if p["kind"] == "answer":
+        assert "workaround" not in p["payload"]["draft_text"].lower() and "guest" in p["payload"]["draft_text"].lower()
+
+
+def test_identical_refused_proposal_is_not_replanned_forever(w: World):
+    w.request.update(subject="Need XML export", body="We need an XML export of invoices.")
+    w.cap("ca_inv", "Invoice export", 0.3, owner="pp_x")
+    w.validity = ["invalid", "invalid", "invalid"]
+    out, ctx = run(w)
+    assert [c["name"] for c in w.calls].count("prepare_action") == 2 and out.completion == "failed" and len(ctx.extra["replans"]) == 1

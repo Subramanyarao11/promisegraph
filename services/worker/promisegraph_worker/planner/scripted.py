@@ -8,6 +8,8 @@ It never reads scenario ids, fixture names or expected outcomes, and it cannot b
 
 from __future__ import annotations
 
+import json
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -76,13 +78,19 @@ class ScriptedPlanner:
         )
 
     # -- investigation -------------------------------------------------------------------------------
-    def _read_memory(self, ctx: PlanContext, facts: Facts, caps: list[str], work_ids: list[str] | None = None):
+    def _read_memory(self, ctx: PlanContext, facts: Facts, caps: list[str], work_ids: list[str] | None = None, person_ids: list[str] | None = None):
         req = ctx.request
         scopes = [{"entity_type": "customer", "entity_id": req["customer_id"]}, {"entity_type": "request", "entity_id": req["id"]}]
         scopes += [{"entity_type": "capability", "entity_id": c} for c in caps[:4]]
-        args: dict[str, Any] = {"scopes": scopes}
+        # Attempts scoped to similar prior requests this run discovered (their outcomes inform this plan).
+        similar_reqs = [c["id"] for c in sorted(facts.candidates, key=lambda c: -float(c.get("score", 0)))
+                        if c["entity_type"] == "request" and c["id"] != req["id"] and c["id"] not in facts.near_duplicates()][:2]
+        scopes += [{"entity_type": "request", "entity_id": r} for r in similar_reqs]
+        args: dict[str, Any] = {"scopes": scopes[:8]}
         if work_ids:
             args["work_item_ids"] = work_ids[:5]
+        if person_ids:
+            args["person_ids"] = person_ids[:5]
         result = yield from self._call(ctx, "read_memory", args)
         facts.ingest("read_memory", result)
         return result
@@ -113,29 +121,45 @@ class ScriptedPlanner:
         facts.reply_text = _clip(" ".join(reply_bits), 400)
         query = _clip(f"{facts.reply_text} {req['subject']}" if facts.reply_text else f"{req['subject']} {req['body']}", 500)
 
-        r = yield from self._call(ctx, "search_context", {"query": query, "entity_types": ["capability", "work_item", "request"], "customer_id": req["customer_id"], "limit": 20})
-        facts.ingest("search_context", r)
-        if not r["ok"] and (r["error"] or {}).get("retryable"):
-            return self._tool_failure("search_context", r)
-        r = yield from self._call(ctx, "search_context", {"query": query, "entity_types": ["source"], "customer_id": None, "limit": 10})
+        # Separate slots per kind: on a reused graph earlier copies of this request would otherwise crowd out work
+        # items. Rev 5 #32: customer_id filters request candidates only.
+        for types, cust in ((["capability", "work_item"], None), (["request"], req["customer_id"])):
+            r = yield from self._call(ctx, "search_context", {"query": query, "entity_types": types, "customer_id": cust, "limit": 20})
+            facts.ingest("search_context", r)
+            if not r["ok"] and (r["error"] or {}).get("retryable"):
+                return self._tool_failure("search_context", r)
+        r = yield from self._call(ctx, "search_context", {"query": query, "entity_types": ["source"], "customer_id": None, "limit": 20})
         facts.ingest("search_context", r)
         if not r["ok"] and (r["error"] or {}).get("retryable"):
             return self._tool_failure("search_context", r)
 
         # One hop from the strongest candidates tells which capability each doc/work/request is about.
-        def top(kind: str, n: int, rel: float = 0.0) -> list[str]:
+        dups = facts.near_duplicates()
+
+        def top(kind: str, n: int, rel: float = 0.0, max_dups: int = 0) -> list[str]:
+            """Best candidates of a kind. Earlier copies of this same request (reused graphs) keep at most `max_dups`
+            slots: their tracked work matters, but they must not crowd out documentation and other evidence."""
             cands = sorted((c for c in facts.candidates if c["entity_type"] == kind and c["id"] not in (req["id"], req.get("source_id"))), key=lambda c: -float(c.get("score", 0)))
+            dup_c = [c["id"] for c in cands if c["id"] in dups][:max_dups]
+            seen_titles: set[str] = set()
+            unique = []
+            for c in cands:  # repeated copies of one request collapse to a single seed
+                if c["id"] in dups or c.get("title") in seen_titles:
+                    continue
+                seen_titles.add(c.get("title"))
+                unique.append(c)
+            cands = unique
             best = float(cands[0].get("score", 0)) if cands else 0.0
-            return [c["id"] for c in cands if float(c.get("score", 0)) >= rel * best][:n]
+            return dup_c + [c["id"] for c in cands if float(c.get("score", 0)) >= rel * best][:n]
 
         # Requests first: graph expansion returns a BFS tree, so a node reached from an earlier seed loses its edge
         # to later seeds. Then expand from every capability discovered, and union both.
         # Seeds that are themselves neighbours lose their shared edge too, so capabilities are expanded separately.
-        seeds = top("request", 2) + top("source", 3) + top("work_item", 4, 0.3)
+        seeds = top("request", 3, max_dups=1) + top("source", 3) + top("work_item", 3, 0.3)
         seeds += [w for w in req.get("linked_work_ids") or [] if w not in seeds]
         if seeds:
             r = yield from self._call(
-                ctx, "expand_context", {"entity_ids": list(dict.fromkeys(seeds))[:10], "relation_types": ["ABOUT", "IMPLEMENTED_BY", "SUPPORTED_BY", "TRACKED_BY"], "depth": 1, "limit": 100}
+                ctx, "expand_context", {"entity_ids": list(dict.fromkeys(seeds))[:10], "relation_types": ["ABOUT", "IMPLEMENTED_BY", "SUPPORTED_BY", "TRACKED_BY", "OWNED_BY"], "depth": 1, "limit": 100}
             )
             facts.ingest("expand_context", r)
             if not r["ok"] and (r["error"] or {}).get("retryable"):
@@ -145,25 +169,33 @@ class ScriptedPlanner:
         ranked = facts.capability_ranking()
         best_direct = max((sig["direct"] for _c, _s, sig in ranked), default=0.0)
         tied = [c for c, _s, sig in ranked if best_direct > 0 and sig["direct"] >= 0.9 * best_direct]
-        contenders = list(dict.fromkeys([c for c, _s, _g in ranked[:1]] + tied + [c for c, _s, _g in ranked[1:2]]))[:3]
-        for cap in contenders:
+        close = [c for c, sc, _g in ranked[1:2] if ranked and sc >= 0.8 * ranked[0][1]]
+        contenders = list(dict.fromkeys([c for c, _s, _g in ranked[:1]] + tied + close))[:3]  # only those that can change the outcome
+        budget_left = ctx.extra.get("budget_left")
+        if callable(budget_left):  # keep room for memory, a target read, prepare, commit and one replan
+            contenders = contenders[: max(1, budget_left() - 6)]
+        for cap in contenders:  # Rev 5 edges cover visited nodes only; a capability's own neighbourhood still needs this
             r = yield from self._call(ctx, "expand_context", {"entity_ids": [cap], "relation_types": ["ABOUT", "IMPLEMENTED_BY", "SUPPORTED_BY", "OWNED_BY"], "depth": 1, "limit": 100})
             facts.ingest("expand_context", r)
             if r["ok"]:
-                facts.complete_neighbourhood[cap] = not ((r["data"] or {}).get("truncated") and len((r["data"] or {}).get("paths") or []) >= 100)
+                d = r["data"] or {}
+                facts.complete_neighbourhood[cap] = d.get("truncation") != "limit" if "truncation" in d else not (d.get("truncated") and len(d.get("paths") or []) >= 100)
 
         caps, ambiguous, competing = facts.resolve_capabilities()
         compat0 = facts.work_for(caps)[0] if caps and not ambiguous else []
         if caps and not ambiguous and (set(caps) - set(caps0) or compat0):
             # Decisions scoped to the resolved capability, plus the current state of matching work (refresh
             # before relying on record excerpts that may be old).
-            r = yield from self._read_memory(ctx, facts, caps, compat0[:5])
+            owners = list(dict.fromkeys([o for w_ in compat0[:3] for o in facts.owners_of(w_)] + [o for c in caps for o in facts.owners_of(c)]))
+            people = [o for o in owners if facts.label_of(o) in ("person", "")][:5]
+            r = yield from self._read_memory(ctx, facts, caps, compat0[:5], people)
             if not r["ok"] and (r["error"] or {}).get("retryable"):
                 return self._tool_failure("read_memory", r)
 
         ctx.extra["seen_evidence_ids"] = [ref["id"] for ref in facts.bundle.get("sources") or []]
         ctx.extra["capabilities"] = caps
         replans = 0
+        tried: set[tuple[str, str, tuple[str, ...]]] = set()
         while True:
             draft = yield from self._decide(ctx, facts, caps, ambiguous, competing)
             revision = int(facts.bundle.get("based_on_revision") or ctx.extra.get("knowledge_revision") or 0)
@@ -181,7 +213,17 @@ class ScriptedPlanner:
             elif not r["ok"] and failure_code not in REVALIDATION_CODES:
                 return self._tool_failure("prepare_action", r, stage="prepare")
             reasons = [str(x) for x in ((proposal or {}).get("validation_reasons") or [failure_code or "invalid"])]
-            facts.rejections.extend(reasons)
+            facts.note_rejection(reasons)
+            signature = (draft.kind, json.dumps(draft.payload, sort_keys=True), tuple(sorted(draft.evidence_ids)))
+            if signature in tried and (proposal or {}).get("validity") != "stale":
+                # The same draft was already refused: replanning would burn budget on an identical proposal.
+                return Outcome(
+                    completion="failed", stage="prepare", run_status_hint="failed", kind=draft.kind,
+                    proposal_ids=[proposal["id"]] if proposal else [],
+                    summary=f"{LABEL}: identical proposal refused again; stopping instead of replanning: {_clip('; '.join(reasons), 400)}",
+                    error={"code": "PROPOSAL_INVALID", "message": _clip("; ".join(reasons), 500)},
+                )
+            tried.add(signature)
             replans += 1
             if (proposal or {}).get("validity") == "invalid" and replans >= 2:
                 return Outcome(
@@ -331,7 +373,10 @@ class ScriptedPlanner:
         gaps = facts.doc_gaps(caps)
         best_resolution = max(usable, key=lambda a: facts.score_of(a.get("request_id", "")), default=None)
         resolution_strength = facts.score_of(best_resolution.get("request_id", "")) if best_resolution else 0.0
-        doc_strength = max((facts.doc_relevance(sid, sc, caps) for sid, sc in docs), default=0.0) if not failed and not gaps else 0.0
+        # A failed procedure blocks documentation answers when the requester reports a malfunction (the documented
+        # remedy is what failed); an unrelated how-to question is not blocked by someone else's failed fix.
+        blocking_failures = [a for a in failed if facts.reports_problem() or a.get("procedure_key") in ("answer",)]
+        doc_strength = max((facts.doc_relevance(sid, sc, caps) for sid, sc in docs), default=0.0) if not blocking_failures and not gaps else 0.0
         # A docs-only answer must clearly beat matching work; a verified prior resolution only has to match it.
         answer_wins = (docs and resolution_strength > work_strength) or (facts.request_is_question() and doc_strength > 1.2 * work_strength)
 
@@ -339,7 +384,9 @@ class ScriptedPlanner:
         if answer_wins and permitted("answer") and not gaps:
             refs = facts.doc_evidence(caps)
             if refs and not facts.doc_gaps(caps):
-                return self._answer(facts, caps, refs, best_resolution if resolution_strength and resolution_strength >= doc_strength else None, rejected, coverage_text)
+                draft = self._answer(facts, caps, refs, best_resolution if resolution_strength and resolution_strength >= doc_strength else None, rejected, coverage_text, forbidden)
+                if draft is not None:
+                    return draft
 
         # 5. Existing compatible work.
         if targets and permitted("link_work"):
@@ -371,7 +418,8 @@ class ScriptedPlanner:
         if complete is None:
             r = yield from self._call(ctx, "expand_context", {"entity_ids": [caps[0]], "relation_types": ["IMPLEMENTED_BY", "OWNED_BY", "SUPPORTED_BY"], "depth": 1, "limit": 100})
             facts.ingest("expand_context", r)
-            complete = r["ok"] and not ((r.get("data") or {}).get("truncated") and len((r.get("data") or {}).get("paths") or []) >= 100)
+            d = r.get("data") or {}
+            complete = r["ok"] and (d.get("truncation") != "limit" if "truncation" in d else not (d.get("truncated") and len(d.get("paths") or []) >= 100))
         if not complete:
             return self._escalate_unclear(
                 facts, facts.valid_evidence(facts.known_evidence_ids[:5]),
@@ -384,14 +432,41 @@ class ScriptedPlanner:
         return self._create(ctx, facts, caps, similar, decisions, rejected, gaps, coverage_text)
 
     # -- drafts -----------------------------------------------------------------------------------------
-    def _answer(self, facts: Facts, caps: list[str], refs: list[dict[str, Any]], resolution: dict[str, Any] | None, rejected: list[dict[str, Any]], coverage_text: str) -> Draft:
+    def _answer(self, facts: Facts, caps: list[str], refs: list[dict[str, Any]], resolution: dict[str, Any] | None, rejected: list[dict[str, Any]],
+                coverage_text: str, forbidden: dict[str, dict[str, Any]] | None = None) -> Draft | None:
         req = facts.request
         cap_titles = ", ".join(facts.title_of(c) for c in caps)
-        best_ref = max(refs[:5], key=lambda r: len(tokens(r.get("excerpt")) & tokens(facts.request_text())))
+        forbidden = forbidden or {}
+
+        avoid = dict(forbidden)
+        for a in facts.failed_attempts(caps):  # never re-recommend a procedure that already failed in this scope
+            avoid.setdefault(a["procedure_key"], a)
+
+        def safe(text: str) -> str:
+            """Drop sentences that advocate a forbidden workaround or a procedure that already failed here."""
+            if not avoid:
+                return text
+            keep = [sen for sen in re.split(r"(?<=[.!?])\s+", text) if not facts.forbidden_phrase_hit(sen, avoid)]
+            return " ".join(keep)
+
+        if resolution and facts.forbidden_phrase_hit(resolution.get("summary", "") + " " + resolution.get("procedure_key", ""), forbidden):
+            resolution = None
+        want = tokens(facts.request_text()) - facts.generic_tokens(caps)
+        scored = []  # (overlap, ref, sentence) across cited documentation, forbidden advice removed
+        for ref in refs[:5]:
+            for sen in re.split(r"(?<=[.!?])\s+|\n+", safe(ref.get("excerpt", ""))):
+                sen = re.sub(r"^#+\s*", "", sen).strip()
+                if len(sen) > 20:
+                    scored.append((len(tokens(sen) & want), ref, sen))
+        scored.sort(key=lambda t: -t[0])
+        if not scored or scored[0][0] < 1:
+            return None  # nothing relevant left to say once forbidden advice is removed
+        best_ref = scored[0][1]
+        quoted = " ".join(sen for _n, ref, sen in scored[:3] if ref is best_ref)
         ev = facts.valid_evidence([r["id"] for r in refs[:3]] + list((resolution or {}).get("evidence_ids") or []))
         parts = [
             f"Thanks for reaching out about \"{_clip(req['subject'], 150)}\".",
-            f"Our documentation ({best_ref['source_id']}) says: \"{_clip(best_ref['excerpt'], 700)}\"",
+            f"Our documentation ({best_ref['source_id']}) says: \"{_clip(quoted, 700)}\"",
         ]
         if resolution:
             parts.append(f"A previously verified resolution in a matching context applies: {_clip(resolution['summary'], 500)}")
