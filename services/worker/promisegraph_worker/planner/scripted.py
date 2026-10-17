@@ -16,6 +16,7 @@ from typing import Any
 from .base import Outcome, PlanContext, PlanGenerator
 from ..markers import intent_marker
 from .facts import OPEN_WORK, Facts, tokens
+from .wording import KIND_WORDS, Words, day
 
 LABEL = "Scripted mode"
 EXPAND_RELATIONS = ["ABOUT", "IMPLEMENTED_BY", "TRACKED_BY", "DEPENDS_ON", "OWNED_BY", "SUPPORTED_BY", "APPLIES_TO", "ATTEMPTED_FOR"]
@@ -290,7 +291,9 @@ class ScriptedPlanner:
         compat, similar = facts.work_for(caps)
         decisions = facts.applicable_decisions(caps, compat)
         coverage = facts.coverage_notes()
-        coverage_text = f" Coverage limits: {'; '.join(coverage)}." if coverage else ""
+        ctx.extra["coverage_notes"] = coverage  # recorded in run events (proposal_ready), not in the prose
+        coverage_text = ""
+        say = Words(facts)
 
         # 1. Incompatible active constraints -> visible escalation, never a silent choice.
         conflicts = facts.conflicts(decisions)
@@ -298,12 +301,13 @@ class ScriptedPlanner:
             a, b, why = conflicts[0]
             ids = [a["id"], b["id"]]
             ev = facts.valid_evidence((a.get("evidence_ids") or []) + (b.get("evidence_ids") or []))
+            rules = f"'{say.rule(a)}' ({say.scope(a['scope'])}) versus '{say.rule(b)}' ({say.scope(b['scope'])})"
             return Draft(
                 kind="escalate",
-                payload={"reason": _clip(f"Conflicting active decisions {a['id']} and {b['id']} ({why}). An operator must decide which constraint applies.", 4000), "owner_id": None, "team_id": None},
+                payload={"reason": _clip(f"Two company rules conflict here: {rules}. Someone needs to decide which one applies.", 4000), "owner_id": None, "team_id": None},
                 evidence_ids=ev,
-                explanation=_clip(f"Active decisions {ids[0]} ({a['scope']['entity_type']}) and {ids[1]} ({b['scope']['entity_type']}) are incompatible: {why}. The planner may not pick one.{coverage_text}", 6000),
-                rejected_alternatives=[_alt("answer", f"Any answer would silently apply one of the conflicting decisions {ids[0]} / {ids[1]}.", ev)],
+                explanation=_clip(f"Two company rules that both apply here conflict: {rules}. We won't pick one quietly, so this needs a decision.", 6000),
+                rejected_alternatives=[_alt("answer", "Not answering yet: any reply would quietly apply one of the two conflicting rules.", ev)],
                 summary=f"Escalated: conflicting decisions {ids[0]} / {ids[1]}.",
             )
 
@@ -312,14 +316,14 @@ class ScriptedPlanner:
             titles = [c.get("title") or facts.title_of(c["id"]) for c in competing]
             ev = facts.valid_evidence([r["id"] for c in competing for r in c.get("evidence") or []] + [r["id"] for c in competing for r in facts.doc_evidence([c["id"]])[:1]])
             if ctx.clarifications >= 2:
-                return self._escalate_unclear(facts, ev, f"Still ambiguous after {ctx.clarifications} clarifications between: {', '.join(titles)}.")
+                return self._escalate_unclear(facts, ev, f"We've asked {ctx.clarifications} times and it's still unclear whether this is about {' or '.join(titles)}.")
             question = f"To make sure we help with the right thing: do you mean {' or '.join(titles)}?"
             return Draft(
                 kind="clarify",
                 payload={"question": _clip(question, 2000), "missing_fields": ["capability"]},
                 evidence_ids=ev,
-                explanation=_clip(f"The request matches {len(titles)} capabilities equally ({', '.join(titles)}) and no document, work item or prior request separates them; choosing one would be a guess.{coverage_text}", 6000),
-                rejected_alternatives=[_alt("create_work", "An underspecified task would be created just to complete the workflow.", [])],
+                explanation=_clip(f"This could mean {' or '.join(titles)}, and nothing we found tells them apart. We're asking one question instead of guessing.", 6000),
+                rejected_alternatives=[_alt("create_work", "No task yet: we'd be guessing what the customer actually needs.", [])],
                 summary=f"Clarification: ambiguous between {', '.join(titles)}.",
             )
 
@@ -328,13 +332,13 @@ class ScriptedPlanner:
             missing = [m for m in facts.missing_information if "capability" in m.lower()][:3] or ["affected capability or product area"]
             ev = facts.valid_evidence(r["id"] for r in facts.bundle.get("sources") or [] if r.get("source_id") == req.get("source_id"))
             if ctx.clarifications >= 2:
-                return self._escalate_unclear(facts, ev, "No capability could be established after clarification.")
+                return self._escalate_unclear(facts, ev, "Even after asking, we still can't tell which part of the product this is about.")
             return Draft(
                 kind="clarify",
                 payload={"question": "Could you tell us which product area or feature this concerns, and what outcome you expect?", "missing_fields": [_clip(m, 200) for m in missing]},
                 evidence_ids=ev,
-                explanation=f"No capability matched the request with supporting evidence.{coverage_text}",
-                rejected_alternatives=[_alt("create_work", "No capability or owner could be identified for a task.", [])],
+                explanation="We couldn't tell which part of the product this is about, so we're asking.",
+                rejected_alternatives=[_alt("create_work", "No task yet: there's nothing specific enough to hand to a team.", [])],
                 summary="Clarification: missing decisive field (capability).",
             )
 
@@ -348,9 +352,11 @@ class ScriptedPlanner:
         forbidden_hits = [(a, forbidden[a["procedure_key"]]) for a in verified if a["procedure_key"] in forbidden]
         rejected: list[dict[str, Any]] = []
         for a in failed[:2]:
+            when = f" on {day(a.get('observed_at'))}" if day(a.get("observed_at")) else ""
+            whom = f" {say.scope(a['scope'])}" if a["scope"]["entity_type"] in ("customer", "capability") else " on this request" if a.get("request_id") == req["id"] else " on a similar request"
             rejected.append(_alt(
                 "answer",
-                f"Procedure '{a['procedure_key']}' already failed in scope {a['scope']['entity_type']}:{a['scope']['entity_id']} under context '{a['context_signature']}' (attempt {a['id']}); not repeating it blindly.",
+                f"Not {say.procedure(a)} again: it already failed{whom}{when}.",
                 facts.valid_evidence(a.get("evidence_ids") or []),
             ))
 
@@ -366,7 +372,7 @@ class ScriptedPlanner:
         targets = [w for w in items if w["id"] not in linked and (w.get("status") in OPEN_WORK or w.get("status") in ("done", None))]
         for w in items:
             if w.get("status") == "cancelled":
-                rejected.append(_alt("link_work", f"Work '{w['title']}' ({w['id']}) is cancelled; it will not deliver this request.", facts.valid_evidence(w.get("evidence_ids") or [])))
+                rejected.append(_alt("link_work", f"Not {say.work(w['id'])}: that work was cancelled, so it won't deliver this.", facts.valid_evidence(w.get("evidence_ids") or [])))
         targets.sort(key=lambda w: (-facts.work_relevance(w["id"], caps), w.get("status") == "done", facts.age_days(w.get("observed_at")) or 0.0))
         work_strength = facts.work_relevance(targets[0]["id"], caps) if targets else 0.0
         docs = facts.doc_sources(caps)
@@ -395,6 +401,11 @@ class ScriptedPlanner:
                 r = yield from self._call(ctx, "expand_context", {"entity_ids": [target["id"]], "relation_types": ["DEPENDS_ON", "OWNED_BY", "IMPLEMENTED_BY"], "depth": 4, "limit": 40})
                 facts.ingest("expand_context", r)
                 facts.expanded_targets.add(target["id"])
+                chain_owners = [o for w_ in [target["id"]] + facts.prerequisites(target["id"]) for o in facts.owners_of(w_)
+                                if o not in facts.people and facts.label_of(o) in ("person", "")]
+                budget_left = ctx.extra.get("budget_left")
+                if chain_owners and (not callable(budget_left) or budget_left() > 3):  # who owns the critical path, and are they still here
+                    r = yield from self._read_memory(ctx, facts, caps, None, list(dict.fromkeys(chain_owners))[:5])
             return self._link_or_escalate(facts, caps, target, decisions, rejected, coverage_text, docs)
         if targets and not permitted("link_work"):
             return self._escalate_policy(facts, decisions, "link_work")
@@ -406,10 +417,10 @@ class ScriptedPlanner:
             routing, _d = facts.routing_owner(decisions)
             return Draft(
                 kind="escalate",
-                payload={"reason": _clip(f"The only verified remedy (attempt {a['id']}) is forbidden for this scope by decision {d['id']}, and no existing work covers the request.", 4000), "owner_id": routing, "team_id": None},
+                payload={"reason": _clip(f"The only fix we know is ruled out by a company rule ('{say.rule(d)}'), and no existing work covers this.", 4000), "owner_id": routing, "team_id": None},
                 evidence_ids=ev,
-                explanation=_clip(f"A verified procedure would address {cap_titles}, but decision {d['id']} forbids it ({_clip(d.get('rationale', ''), 300)}). No alternative was found.{coverage_text}", 6000),
-                rejected_alternatives=(rejected + [_alt("answer", f"Remedy from attempt {a['id']} is forbidden by decision {d['id']}.", ev)])[:5],
+                explanation=_clip(f"A fix has worked before for {say.caps(caps)}, but a company rule rules it out here: '{say.rule(d)}'. Nothing else covers this request, so it needs a decision.", 6000),
+                rejected_alternatives=(rejected + [_alt("answer", f"Not the earlier fix: a company rule rules it out ('{say.rule(d)}').", ev)])[:5],
                 summary=f"Escalated: forbidden workaround with no alternative ({d['id']}).",
             )
 
@@ -423,7 +434,7 @@ class ScriptedPlanner:
         if not complete:
             return self._escalate_unclear(
                 facts, facts.valid_evidence(facts.known_evidence_ids[:5]),
-                f"Coverage incomplete (work implementing {cap_titles} could not be fully listed): absence of existing work cannot be established, so new work is not proposed.",
+                f"We couldn't check all existing work for {say.caps(caps)}, so we can't be sure nothing already covers this. Treat this as a best guess and confirm before creating new work.",
             )
 
         # 8. Genuinely new work.
@@ -466,26 +477,30 @@ class ScriptedPlanner:
         ev = facts.valid_evidence([r["id"] for r in refs[:3]] + list((resolution or {}).get("evidence_ids") or []))
         parts = [
             f"Thanks for reaching out about \"{_clip(req['subject'], 150)}\".",
-            f"Our documentation ({best_ref['source_id']}) says: \"{_clip(quoted, 700)}\"",
+            f"Our documentation ({Words(facts).doc(best_ref['source_id'])}) says: \"{_clip(quoted, 700)}\"",
         ]
         if resolution:
-            parts.append(f"A previously verified resolution in a matching context applies: {_clip(resolution['summary'], 500)}")
+            parts.append(f"This has worked before in the same setup: {_clip(resolution['summary'], 500)}")
         parts.append("Please let us know whether this resolves it for you.")
         criteria = [_clip(f"Requester confirms that '{req['subject']}' is resolved", 1000)]
         if resolution:
-            criteria.append(_clip(f"Verified procedure '{resolution['procedure_key']}' applies in the same scope", 1000))
+            criteria.append(_clip(f"The earlier confirmed fix ({Words(facts).procedure(resolution)}) works for this customer too", 1000))
         stale = [r for r in refs[:3] if r.get("stale")]
+        say = Words(facts)
+        worked = ""
+        if resolution:
+            when = f" on {day(resolution.get('observed_at'))}" if day(resolution.get("observed_at")) else ""
+            worked = f" The same fix, {say.procedure(resolution)}, was confirmed to work{when}."
         return Draft(
             kind="answer",
             payload={"draft_text": _clip(" ".join(parts), 12000), "resolution_criteria": criteria},
             evidence_ids=ev,
             explanation=_clip(
-                f"Capability {cap_titles} is documented in {best_ref['source_id']}"
-                + (f" and attempt {resolution['id']} ({resolution['procedure_key']}) was verified in an applicable scope" if resolution else "")
-                + f"; the documentation matches this request better than any open work item, so no task is needed.{' Some cited evidence is stale.' if stale else ''}{coverage_text}",
+                f"Our documentation ({say.doc(best_ref['source_id'])}) already covers this.{worked} No new work is needed."
+                + (" Some of that documentation is old, so double-check it before sending." if stale else ""),
                 6000,
             ),
-            rejected_alternatives=(rejected + [_alt("create_work", "Documented resolution exists; a task would be unnecessary work.", ev[:3])])[:5],
+            rejected_alternatives=(rejected + [_alt("create_work", "No task needed: the documentation already answers this.", ev[:3])])[:5],
             summary=f"Answer drafted from {best_ref['source_id']}" + (f" and verified attempt {resolution['id']}." if resolution else "."),
         )
 
@@ -503,64 +518,68 @@ class ScriptedPlanner:
             + doc_ev
             + (list(routing_decision.get("evidence_ids") or []) if routing_decision else [])
         ) or facts.valid_evidence(facts.known_evidence_ids[:3])
-        notes: list[str] = []
-        owner_issues = []
-        for wid in chain:
-            status = (facts.work.get(wid) or {}).get("status")
-            if status in ("done", "cancelled"):
-                continue
-            owners = facts.owners_of(wid)
-            dead = [o for o in owners if o in inactive]
-            if not owners:
-                owner_issues.append((wid, "has no recorded owner"))
-            elif len(dead) == len(owners):
-                owner_issues.append((wid, f"is owned only by inactive {', '.join(dead)}"))
+        say = Words(facts)
         own = facts.owners_of(target["id"])
         target_unowned = target.get("status") not in ("done", None) and (not own or all(o in inactive for o in own))
+        title = say.work(target["id"])
         if target_unowned and not routing_active:
-            why = "has no owner" if not own else f"is owned only by inactive {', '.join(own)}"
+            who = "nobody owns it" if not own else f"its owner {say.person(own[0])} has left"
             return Draft(
                 kind="escalate",
-                payload={"reason": _clip(f"Matching work '{target['title']}' ({target['id']}) {why} and no active routing owner applies; the request would wait on unowned work.", 4000), "owner_id": None, "team_id": None},
+                payload={"reason": _clip(f"{title} matches this request, but {who}. Someone needs to own it before we can update the customer.", 4000), "owner_id": None, "team_id": None},
                 evidence_ids=path_ev,
-                explanation=_clip(f"Work {target['id']} ({target.get('status')}) matches {cap_titles}, but it {why}. "
-                                  f"{self._state_notes(facts, target)}{coverage_text}", 6000),
-                rejected_alternatives=(rejected + [_alt("link_work", f"Linking to {target['id']} leaves the request waiting on unowned work.", path_ev[:5])])[:5],
+                explanation=_clip(f"Engineering has matching work, {title}, but {who}, so nobody is driving it. {self._state_notes(facts, target)}", 6000),
+                rejected_alternatives=(rejected + [_alt("link_work", f"Not just linking to {title}: nobody would be driving it.", path_ev[:5])])[:5],
                 summary=f"Escalated: matching work {target['id']} has no active owner.",
             )
+        sentences: list[str] = []
+        active_own = [o for o in own if o not in inactive and say.name(o)]
+        owner_txt = f" (owner {say.name(active_own[0])})" if active_own else ""
         if target.get("status") == "done":
-            notes.append("The work is already completed: this request now needs verification against the customer's case, not waiting.")
-        notes.append(self._state_notes(facts, target))
-        if len(chain) > 1:
-            notes.append(f"Dependency path: {' -> '.join(chain)}.")
-        for wid, why in owner_issues:
-            notes.append(f"Critical-path item {wid} {why}" + (f"; routing decision {routing_decision['id']} names active owner {routing_active}." if routing_active and routing_decision else "; escalate ownership before relying on this path."))
+            sentences.append(f"Engineering already finished this: {title}{owner_txt}. We should check with the customer that it fixed their case.")
+        else:
+            sentences.append(f"Engineering already has this: {title}{owner_txt}.")
+        open_chain = [w for w in chain[1:] if (facts.work.get(w) or {}).get("status") not in ("done", "cancelled")]
+        unowned = [w for w in open_chain if not facts.owners_of(w) or all(o in inactive for o in facts.owners_of(w))]
+        blocker = (unowned or open_chain or [None])[0]  # name the blocker that actually has the ownership problem
+        no_date = target.get("status") != "done" and not target.get("forecast_at")
+        if blocker:
+            b_own = facts.owners_of(blocker)
+            left = [o for o in b_own if o in inactive]
+            clause = f"It's blocked behind {say.work(blocker)}"
+            if b_own and len(left) == len(b_own):
+                clause += f", whose owner {say.person(left[0])} has left"
+            elif not b_own:
+                clause += ", which nobody owns"
+            sentences.append(clause + (", so we can't promise a date." if no_date else "."))
+        elif no_date:
+            sentences.append("There's no delivery date on record, so we can't promise one.")
+        sentences.append(self._state_notes(facts, target, include_date=not no_date))
+        chain_issue = any((not facts.owners_of(w)) or all(o in inactive for o in facts.owners_of(w)) for w in chain[1:]
+                          if (facts.work.get(w) or {}).get("status") not in ("done", "cancelled"))
+        if routing_active and (chain_issue or not own):
+            sentences.append(f"Company rule: route these to {say.person(routing_active)}.")
         return Draft(
             kind="link_work",
             payload={"work_item_id": target["id"], "comment_text": None},
             evidence_ids=path_ev,
-            explanation=_clip(
-                f"Existing work '{target['title']}' ({target['id']}) is {target.get('status') or 'of unknown status'} and tracks {cap_titles}"
-                f"{' (owner ' + ', '.join(own) + ')' if own else ''}. {' '.join(n for n in notes if n)}{coverage_text}",
-                6000,
-            ),
-            rejected_alternatives=(rejected + [_alt("create_work", f"Existing work {target['id']} covers {cap_titles}; a new task would duplicate it.", path_ev[:5])])[:5],
+            explanation=_clip(" ".join(x for x in sentences if x), 6000),
+            rejected_alternatives=(rejected + [_alt("create_work", f"No new task: {title} already covers this.", path_ev[:5])])[:5],
             summary=f"Link to existing work {target['id']} ({target.get('status')}).",
         )
 
     @staticmethod
-    def _state_notes(facts: Facts, w: dict[str, Any]) -> str:
+    def _state_notes(facts: Facts, w: dict[str, Any], include_date: bool = True) -> str:
         notes = []
         if w.get("status") is None:
-            notes.append("Its current status is unknown (not observable through the tools); verify it before relying on this link.")
-        if w.get("status") != "done":
+            notes.append("We couldn't check its current status, so its state is unknown; confirm it before replying.")
+        if include_date and w.get("status") != "done":
             if w.get("forecast_at"):
-                notes.append(f"A forecast of {w['forecast_at']} is recorded (observed {w.get('observed_at')}); it is not a commitment.")
+                notes.append(f"It's forecast for {day(w['forecast_at'])}, which is an estimate, not a promise.")
             else:
-                notes.append("No reliable delivery forecast is recorded; no date can be promised.")
+                notes.append("There's no delivery date on record, so we can't promise one.")
         if facts.is_stale(w.get("observed_at")):
-            days = facts.age_days(w.get("observed_at")) or 0
-            notes.append(f"Its state was last observed {days:.0f} days before the reference time and may be stale; refresh before relying on it.")
+            notes.append(f"Its status was last updated on {day(w.get('observed_at'))}, so it may be out of date.")
         return " ".join(notes)
 
     def _create(self, ctx: PlanContext, facts: Facts, caps: list[str], similar: list[str], decisions: list[dict[str, Any]], rejected: list[dict[str, Any]], gaps: list[tuple[str, str]], coverage_text: str) -> Draft:
@@ -571,29 +590,31 @@ class ScriptedPlanner:
         inactive = facts.inactive_people()
         cap_people = [o for o in facts.owners_of(cap) if facts.label_of(o) in ("person", "")]
         owner = routing if routing and routing not in inactive else next((p for p in cap_people if p not in inactive), None)
+        say = Words(facts)
         if owner and routing_decision and owner == routing:
-            owner_note = f"Owner {owner} per routing decision {routing_decision['id']}."
+            owner_note = f"It would go to {say.name(owner) or 'the routed owner'}, per the company routing rule."
         elif owner:
-            owner_note = f"Owner {owner} (capability owner)."
+            owner_note = f"It would go to {say.name(owner)}, who owns {say.cap(cap)}." if say.name(owner) else f"It would go to the owner of {say.cap(cap)}."
         else:
             dead = sorted(inactive & set(cap_people))
-            owner_note = "Unassigned: no active accountable owner is recorded for this capability" + (f" (inactive: {', '.join(dead)})" if dead else "") + "."
+            owner_note = "Nobody is assigned yet" + (f": {say.person(dead[0])} owned this area but has left." if dead else ", because no one owns this area.")
         for wid in similar[:4]:
             w = facts.work.get(wid) or {}
             their = [c for c in facts.caps_of_work(wid) if c not in caps]
             reasons = []
             excluded = facts.excluded_by_request(wid, caps)
             if excluded:
-                reasons.append(f"the request explicitly rules out {', '.join(sorted(excluded))}")
+                said = facts.ruling_sentence(excluded)
+                reasons.append(f"the customer told us \"{_clip(said, 200).rstrip('.')}\"" if said else "the customer ruled that approach out")
             if their and not any(c in caps for c in facts.caps_of_work(wid)):
-                reasons.append(f"it tracks a different capability ({', '.join(facts.title_of(c) for c in their)})")
+                reasons.append(f"it's about {say.caps(their)}")
             if w.get("status") == "cancelled":
-                reasons.append("it is cancelled")
+                reasons.append("it was cancelled")
             if not reasons:
-                reasons.append(f"it matches weakly and has no confirmed link to {cap_titles}")
+                reasons.append("it doesn't cover what's being asked")
             cand_ev = [x["id"] for c in facts.candidates if c["id"] == wid for x in c.get("evidence") or []]
             ev = facts.valid_evidence(list(w.get("evidence_ids") or []) + cand_ev)
-            rejected.append(_alt("link_work", f"'{facts.title_of(wid)}' ({wid}) is similar but {'; '.join(reasons)}.", ev))
+            rejected.append(_alt("link_work", f"Not {say.work(wid)}: {'; and '.join(reasons)}.", ev))
         connector = "linear" if ctx.connector_state("linear") in ("enabled", "verified", "unverified") else "local"
         gap_ev = [r["id"] for r in facts.evidence.values() if r.get("source_id") in {g[0] for g in gaps}][:2]
         ev = facts.valid_evidence(
@@ -602,11 +623,12 @@ class ScriptedPlanner:
             + [r["id"] for r in facts.doc_evidence(caps)[:2]]
             + (list(routing_decision.get("evidence_ids") or []) if routing_decision else [])
         ) or facts.valid_evidence(facts.known_evidence_ids[:3])
-        gap_text = f" Documentation states: \"{_clip(gaps[0][1], 300)}\"." if gaps else ""
+        gap_sentence = gaps[0][1].strip().rstrip(".") if gaps else ""
+        gap_text = f" Our documentation says {gap_sentence[:1].lower() + gap_sentence[1:]}." if gap_sentence else ""
         description = (
-            f"Customer request {req['id']} ({req['customer_id']}): {_clip(req['body'], 1500)}\n\n"
-            f"Capability: {cap_titles}.{gap_text} {owner_note}\n"
-            f"Similar work reviewed and rejected: {', '.join(s for s in similar[:4]) or 'none'}.\n"
+            f"What the customer asked: {_clip(req['body'], 1500)}\n\n"
+            f"Area: {say.caps(caps)}.{gap_text} {owner_note}\n"
+            f"Existing work we checked and ruled out: {', '.join(say.work(w_) for w_ in similar[:4]) or 'none'}.\n"
             f"Intent marker: {intent_marker(req['id'], str((ctx.run or {}).get('id')), cap, req['subject'])}"
         )
         return Draft(
@@ -616,8 +638,8 @@ class ScriptedPlanner:
                 "description": _clip(description, 16000),
                 "acceptance_criteria": [
                     _clip(f"{facts.title_of(cap)} supports the requested behaviour: {req['subject']}", 2000),
-                    _clip(f"Requester of {req['id']} confirms the outcome (attributable verification)", 2000),
-                    "Documentation is updated with a citable source revision",
+                    "The customer confirms it works for them",
+                    "The documentation is updated to describe it",
                 ],
                 "owner_id": owner,
                 "capability_id": cap,
@@ -626,8 +648,8 @@ class ScriptedPlanner:
             },
             evidence_ids=ev,
             explanation=_clip(
-                f"No open or completed work covering this request was found for {cap_titles} after search and graph expansion.{gap_text} "
-                f"{owner_note} Destination connector: {connector}.{coverage_text}",
+                f"Nothing in progress covers this, so we suggest a new task for {say.caps(caps)}.{gap_text} {owner_note}"
+                + (" It would be created in Linear." if connector == "linear" else ""),
                 6000,
             ),
             rejected_alternatives=rejected[:5],
@@ -641,7 +663,7 @@ class ScriptedPlanner:
             payload={"reason": _clip(reason, 4000), "owner_id": None, "team_id": None},
             evidence_ids=ev,
             explanation=_clip(reason, 6000),
-            rejected_alternatives=[_alt("create_work", "Evidence is insufficient to justify new work.", [])],
+            rejected_alternatives=[_alt("create_work", "No new task: we don't have enough to go on yet.", [])],
             summary=_clip(f"Escalated: {reason}", 300),
         )
 
@@ -649,7 +671,9 @@ class ScriptedPlanner:
     def _escalate_policy(facts: Facts, decisions: list[dict[str, Any]], kind: str) -> Draft:
         ds = [d for d in decisions if d["rule_type"] == "allowed_action_types"]
         ev = facts.valid_evidence(e for d in ds for e in d.get("evidence_ids") or [])
-        reason = f"Action kind {kind} is not permitted by active decision(s) {', '.join(d['id'] for d in ds)}."
+        say = Words(facts)
+        rule = f" ('{say.rule(ds[0])}')" if ds else ""
+        reason = f"A company rule for this customer doesn't allow {KIND_WORDS.get(kind, kind)}{rule}, so a person needs to decide."
         return Draft(
             kind="escalate",
             payload={"reason": reason, "owner_id": None, "team_id": None},
@@ -699,18 +723,18 @@ class ScriptedPlanner:
             target_id = receipt.get("target_id")
             work = facts.work.get(target_id) or next((facts.work[w] for w in reversed(linked) if w in facts.work), None)
             if work is None:
-                body = f"{action.get('connector')} receipt {target_id} observed; current work state not available in request context."
+                body = "The work was linked, but we couldn't read its current status yet."
                 verification, ev, stage = "inconclusive", [], "observe"
             else:
                 st = work.get("status")
                 if st == "done":
-                    body = f"Work '{work['title']}' ({work['id']}) is completed as observed at {work.get('observed_at')}. Customer resolution is NOT verified; request needs operator/customer verification."
+                    body = f"'{work['title']}' is done (as of {day(work.get('observed_at'))}). The customer has NOT confirmed it's fixed yet, so check with them."
                     stage = "verify"
                 elif st == "cancelled":
-                    body = f"Work '{work['title']}' ({work['id']}) is cancelled; it will not deliver this request. Reinvestigation or escalation required."
+                    body = f"'{work['title']}' was cancelled, so it won't deliver this. This request needs another look."
                     stage = "observe"
                 else:
-                    body = f"Work '{work['title']}' ({work['id']}) is {st} as observed at {work.get('observed_at')}; request awaits the work. No delivery date is implied."
+                    body = f"'{work['title']}' is {str(st).replace('_', ' ')} (as of {day(work.get('observed_at'))}). We're waiting on that work; no delivery date is promised."
                     stage = "observe"
                 verification = "inconclusive" if st == "cancelled" else "pending"
                 ev = facts.valid_evidence(work.get("evidence_ids") or [])

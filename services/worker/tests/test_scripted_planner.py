@@ -4,6 +4,7 @@ logic does not key on seed/scenario ids. The fake responder only answers the 8 t
 from __future__ import annotations
 
 import copy
+import re
 from typing import Any
 
 import pytest
@@ -175,7 +176,7 @@ def test_problem_report_links_work_tracked_by_similar_request_and_reads_state(w:
     p = proposal(w)
     assert p["kind"] == "link_work" and p["payload"] == {"work_item_id": "wk_fix", "comment_text": None}
     assert any(c["name"] == "read_memory" and c["arguments"].get("work_item_ids") for c in w.calls)  # refresh state
-    assert "no date can be promised" in p["explanation"] and "wk_dep" in p["explanation"]
+    assert "can't promise a date" in p["explanation"] and "'Storage migration'" in p["explanation"]
     assert out.completion == "waiting" and out.awaiting == "review"  # link needs an operator
     assert not any(c["name"] == "commit_action" for c in w.calls)
 
@@ -186,7 +187,7 @@ def test_done_work_link_states_verification_needed(w: World):
     w.item("wk_font", "PDF umlauts render as boxes", "ca_pdf", "done", 0.5)
     run(w)
     p = proposal(w)
-    assert p["kind"] == "link_work" and "needs verification" in p["explanation"]
+    assert p["kind"] == "link_work" and "already finished" in p["explanation"] and "check with the customer" in p["explanation"]
 
 
 def test_create_work_rejects_similar_with_evidence_and_ruled_out_work(w: World):
@@ -199,7 +200,7 @@ def test_create_work_rejects_similar_with_evidence_and_ruled_out_work(w: World):
     assert p["kind"] == "create_work" and p["payload"]["owner_id"] == "pp_rep" and p["payload"]["capability_id"] == "ca_rep"
     assert p["payload"]["acceptance_criteria"] and p["payload"]["connector"] == "local"
     alt = [a for a in p["rejected_alternatives"] if a["kind"] == "link_work"]
-    assert alt and "wk_email" in alt[0]["reason"] and alt[0]["evidence_ids"]
+    assert alt and "'Email digest for reports'" in alt[0]["reason"] and "instead of email" in alt[0]["reason"] and alt[0]["evidence_ids"]
     assert out.completion == "waiting"
 
 
@@ -209,7 +210,7 @@ def test_create_work_unassigned_when_owner_inactive(w: World):
     w.nodes["pp_left"] = node("pp_left", "Person", "Pat (inactive)")
     run(w)
     p = proposal(w)
-    assert p["kind"] == "create_work" and p["payload"]["owner_id"] is None and "Unassigned" in p["payload"]["description"]
+    assert p["kind"] == "create_work" and p["payload"]["owner_id"] is None and "Pat" in p["explanation"] and "has left" in p["explanation"]
 
 
 def test_conflicting_active_decisions_escalate_citing_both(w: World):
@@ -220,7 +221,7 @@ def test_conflicting_active_decisions_escalate_citing_both(w: World):
                             "effective_at": "2026-01-01T00:00:00Z", "expires_at": None, "supersedes_id": None, "evidence_ids": [f"ev_{did}"], "version": 1})
     run(w)
     p = proposal(w)
-    assert p["kind"] == "escalate" and "incompatible" in p["explanation"] and {"ev_dz_1", "ev_dz_2"} <= set(p["evidence_ids"])
+    assert p["kind"] == "escalate" and "conflict" in p["explanation"] and {"ev_dz_1", "ev_dz_2"} <= set(p["evidence_ids"])
 
 
 def test_expired_decision_is_not_applied(w: World):
@@ -240,7 +241,7 @@ def test_policy_disallows_create_escalates(w: World):
                         "status": "active", "rationale": "freeze", "author_id": "pp", "effective_at": "2026-01-01T00:00:00Z", "expires_at": None, "supersedes_id": None, "evidence_ids": [], "version": 1})
     run(w)
     p = proposal(w)
-    assert p["kind"] == "escalate" and "create_work" in p["payload"]["reason"]
+    assert p["kind"] == "escalate" and "creating new work" in p["payload"]["reason"] and "freeze" in p["payload"]["reason"]
 
 
 def _scoped_failure_world(customer: str) -> World:
@@ -258,7 +259,7 @@ def test_scoped_failed_workaround_changes_plan_only_for_that_customer():
     affected = _scoped_failure_world("cu_a")
     run(affected)
     pa = proposal(affected)
-    assert pa["kind"] == "link_work" and any(a["kind"] == "answer" and "at_fail" in a["reason"] for a in pa["rejected_alternatives"])
+    assert pa["kind"] == "link_work" and any(a["kind"] == "answer" and "'Enable dedupe' again" in a["reason"] and "already failed for this customer on 15 Oct" in a["reason"] for a in pa["rejected_alternatives"])
     other = _scoped_failure_world("cu_b")
     run(other)
     assert proposal(other)["kind"] == "answer"  # another customer's failure does not apply
@@ -299,7 +300,7 @@ def test_continuation_observes_and_records_connector_status_only(w: World):
     w.action = {"id": "ac_9", "kind": "link_work", "status": "succeeded", "receipt": {"target_id": "lnk"}, "connector": "local"}
     out, _ = run(w, resume_stage="observe", pending_action_id="ac_9")
     obs = [c for c in w.calls if c["name"] == "record_observation"][0]["arguments"]
-    assert obs["kind"] == "connector_status" and obs["verification"] == "pending" and "NOT verified" in obs["body"]
+    assert obs["kind"] == "connector_status" and obs["verification"] == "pending" and "NOT confirmed" in obs["body"]
     assert out.completion == "succeeded" and out.stage == "verify"
 
 
@@ -329,7 +330,7 @@ def test_rev5_edges_people_and_scoped_attempts_are_used(w: World):
     run(w)
     p = proposal(w)
     assert any("pp_quiet" in (c["arguments"].get("person_ids") or []) for c in w.calls if c["name"] == "read_memory")
-    assert p["kind"] == "escalate" and "inactive pp_quiet" in p["payload"]["reason"]
+    assert p["kind"] == "escalate" and "Q has left" in p["payload"]["reason"]
 
 
 def test_structured_record_source_is_not_documentation(w: World):
@@ -374,3 +375,19 @@ def test_identical_refused_proposal_is_not_replanned_forever(w: World):
     w.validity = ["invalid", "invalid", "invalid"]
     out, ctx = run(w)
     assert [c["name"] for c in w.calls].count("prepare_action") == 2 and out.completion == "failed" and len(ctx.extra["replans"]) == 1
+
+
+ID_PATTERN = re.compile(r"\b(ca|cu|wk|rq|dz|at|pp|dc|ev|sr|pr|ac)_[a-z0-9_]+\b|scope |customer:|capability:|24 KB|attempt at_")
+
+
+@pytest.mark.parametrize("builder", ["test_answer_from_docs_and_verified_resolution", "test_problem_report_links_work_tracked_by_similar_request_and_reads_state",
+                                     "test_create_work_rejects_similar_with_evidence_and_ruled_out_work", "test_conflicting_active_decisions_escalate_citing_both",
+                                     "test_policy_disallows_create_escalates", "test_ambiguous_capability_asks_one_targeted_question"])
+def test_prose_has_no_internal_ids(builder):
+    """Explanations and reasons are for a support lead: titles, names and dates, never ids or scope keys."""
+    w = World()
+    globals()[builder](w)
+    p = proposal(w)
+    texts = [p["explanation"]] + [a["reason"] for a in p["rejected_alternatives"]] + [p["payload"].get("reason") or ""]
+    for t in texts:
+        assert not ID_PATTERN.search(t), t

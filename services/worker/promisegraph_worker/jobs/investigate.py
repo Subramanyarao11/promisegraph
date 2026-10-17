@@ -159,7 +159,8 @@ class InvestigateRunner:
         if name == "prepare_action" and result["ok"]:
             session.state.proposal_ids.append(data["id"])
             session.state.stage = "prepare"
-            session.emit(f"{call_id}:p", "proposal_ready", {"proposal_id": data["id"], "kind": data.get("kind"), "validity": data.get("validity")})
+            session.emit(f"{call_id}:p", "proposal_ready", {"proposal_id": data["id"], "kind": data.get("kind"), "validity": data.get("validity"),
+                                                             "coverage_notes": list(ctx.extra.get("coverage_notes") or [])[:10]})
         elif name == "commit_action" and result["ok"]:
             action = data.get("action") or {}
             if action.get("id"):

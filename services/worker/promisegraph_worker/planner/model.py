@@ -29,7 +29,13 @@ SYSTEM_PROMPT = (
     "escalate. Cite only evidence ids that tools returned. Prefer existing compatible work over new work; ask one "
     "targeted question if the request is ambiguous; escalate conflicting active decisions; never recommend a "
     "forbidden workaround or promise a date without a recorded forecast. If the proposal is valid and its kind is "
-    "in auto_commit_kinds, call commit_action. Then reply with a one-sentence summary and no tool call."
+    "in auto_commit_kinds, call commit_action. Then reply with a one-sentence summary and no tool call.\n"
+    "Write `explanation` and every rejected alternative `reason` for a support lead: short plain sentences, work "
+    "titles in quotes, people's names, dates like '13 Oct'. Never put ids, scope keys, tool names or byte limits in "
+    "that prose (ids belong only in evidence_ids). Example explanation: \"Engineering already has this: 'Restore "
+    "scheduled exports' (owner Maya Raman). It's blocked behind 'Queue v2 cutover', whose owner has left, so we "
+    "can't promise a date.\" Example reason: \"Not 'Run now' again: it already failed for Acme on 13 Oct.\" "
+    "Mention incomplete information only if it changes the recommendation, in one sentence."
 )
 RESULT_CHARS = 6000
 

@@ -578,6 +578,15 @@ class Facts:
         boost, _ = self.similar_request_boost(work_id)
         return max(self.score_of(work_id), boost) + 0.03 * min(len(self.distinctive_overlap(work_id, caps)), 5)
 
+    def ruling_sentence(self, words: set[str]) -> str | None:
+        """The requester's own sentence that rules these words out ("A CSV download is not enough ...")."""
+        text = f"{self.request.get('body', '')} {self.reply_text}"
+        for sen in re.split(r"(?<=[.!?])\s+", text):
+            low = sen.lower()
+            if words & tokens(sen) and any(cue in low for cue in _NEG_WHOLE + _NEG_AFTER):
+                return sen.strip()
+        return None
+
     def gap_need(self, caps: list[str]) -> set[str]:
         """Request words that documentation explicitly says are unsupported (e.g. 'chat'): the unmet need."""
         want = tokens(self.request_text()) - self.generic_tokens(caps)
