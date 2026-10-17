@@ -180,6 +180,17 @@ class Store:
                     raise unavailable(f"Graph database unavailable: {type(exc).__name__}") from exc
             return self._db
 
+    def close(self) -> None:
+        """Release pooled connections (called from the app lifespan on shutdown)."""
+        with self._conn_lock:
+            if self._db is not None:
+                try:
+                    self._db.connection.close()
+                except Exception:  # noqa: BLE001 - shutdown must not fail
+                    pass
+                self._db = None
+                self._schema_ready.clear()
+
     def graph_name(self, ws: str) -> str:
         if ws not in self.settings.workspaces:  # defensive: callers resolve the workspace first
             raise ApiError(404, "NOT_FOUND", f"workspace {ws} not found")
