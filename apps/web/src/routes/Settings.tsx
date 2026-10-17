@@ -1,7 +1,7 @@
 import { useHealth, useInfo } from "../api/hooks";
 import { CONTRACT_VERSION, WORKSPACE_ID } from "../api/client";
 import { Callout, ErrorPanel, Loading, Mono, Section, StatusBadge, Tag, Ts } from "../components/ui";
-import { CONNECTOR_STATE, KIND_LABEL } from "../lib/status";
+import { CONNECTOR_STATE, KIND_LABEL, labelOf } from "../lib/status";
 import { viewerZone } from "../lib/format";
 
 export function SettingsPage() {
@@ -52,7 +52,7 @@ export function SettingsPage() {
             </Section>
             <Section title="What happens without your approval">
               <p className="small">PromiseGraph may save these drafts by itself (nothing is sent):</p>
-              <div className="row" style={{ marginTop: 6 }}>{(d.auto_commit_kinds as string[]).length ? (d.auto_commit_kinds as string[]).map((k) => <Tag key={k}>{KIND_LABEL[k] ?? k}</Tag>) : <span className="muted">None</span>}</div>
+              <div className="row" style={{ marginTop: 6 }}>{d.auto_commit_kinds.length ? d.auto_commit_kinds.map((k: string) => <Tag key={k}>{labelOf(KIND_LABEL, k)}</Tag>) : <span className="muted">None</span>}</div>
               <p className="small muted" style={{ marginTop: 6 }}>Attaching to work, creating tasks and handing off always need your approval. PromiseGraph never sends messages to customers.</p>
             </Section>
           </div>

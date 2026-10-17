@@ -30,9 +30,21 @@ export class ApiError extends Error {
     this.correlationId = correlationId;
   }
   get fieldErrors(): Record<string, string> {
-    const f = (this.details as { fields?: Record<string, string> }).fields;
-    return f && typeof f === "object" ? f : {};
+    const f = this.details["fields"];
+    if (!isRecord(f)) return {};
+    return Object.fromEntries(Object.entries(f).filter((e): e is [string, string] => typeof e[1] === "string"));
   }
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+function isMeta(v: unknown): v is Meta {
+  return isRecord(v) && typeof v["knowledge_revision"] === "number" && typeof v["correlation_id"] === "string";
+}
+function errorCorrelation(json: unknown): string | null {
+  const m = isRecord(json) ? json["meta"] : undefined;
+  return isRecord(m) && typeof m["correlation_id"] === "string" ? m["correlation_id"] : null;
 }
 
 export function isUnavailable(e: unknown): boolean {
@@ -68,7 +80,7 @@ async function raw(method: string, path: string, opts: { body?: unknown; idempot
       signal: opts.signal,
     });
   } catch (err) {
-    if ((err as { name?: string }).name === "AbortError") throw err;
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
     throw new ApiError(0, "NETWORK", "The API could not be reached.", true, {}, null);
   }
   let json: unknown = null;
@@ -80,15 +92,17 @@ async function raw(method: string, path: string, opts: { body?: unknown; idempot
       json = null;
     }
   }
-  const meta = (json as { meta?: Meta } | null)?.meta;
+  const meta = isRecord(json) && isMeta(json["meta"]) ? json["meta"] : undefined;
   // Error envelopes carry knowledge_revision 0 when the database is unreachable ("unknown"): only trust successes.
-  if (res.ok && meta && typeof meta.knowledge_revision === "number") {
+  if (res.ok && meta) {
     lastMeta = meta;
     metaListeners.forEach((fn) => fn(meta));
   }
   if (!res.ok) {
-    const e = (json as { error?: { code: string; message: string; retryable: boolean; details: Record<string, unknown> } } | null)?.error;
-    if (e) throw new ApiError(res.status, e.code, e.message, e.retryable, e.details, meta?.correlation_id ?? null);
+    const e = isRecord(json) ? json["error"] : undefined;
+    if (isRecord(e) && typeof e["code"] === "string" && typeof e["message"] === "string") {
+      throw new ApiError(res.status, e["code"], e["message"], e["retryable"] === true, isRecord(e["details"]) ? e["details"] : {}, errorCorrelation(json));
+    }
     // Dev proxy reports an unreachable upstream as a bare 5xx without our envelope.
     throw new ApiError(res.status, res.status >= 500 ? "NETWORK" : `HTTP_${res.status}`, res.status >= 500 ? "The API could not be reached." : `Unexpected HTTP ${res.status}.`, res.status >= 500, {}, null);
   }

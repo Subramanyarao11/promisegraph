@@ -1,15 +1,12 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import type { APIRequestContext } from "@playwright/test";
+import { expect, expectNoHorizontalScroll, openTechnicalDetails, test, ui, WS } from "../support/fixtures";
 import { randomUUID } from "node:crypto";
 import { ScriptedDriver } from "../support/driver";
 
 const MOCK = (process.env.PG_TARGET ?? "mock") === "mock";
-const WS = "/api/v1/workspaces/ws_demo";
 let driver: ScriptedDriver;
 
-let pageErrors: string[] = [];
-test.beforeEach(async ({ page }) => {
-  pageErrors = [];
-  page.on("pageerror", (e) => pageErrors.push(String(e.stack ?? e)));
+test.beforeEach(async () => {
   test.skip(!MOCK, "Mock-driven journey; real-service runs use the real worker (G2/G5).");
   driver = new ScriptedDriver();
   await driver.reset();
@@ -17,7 +14,6 @@ test.beforeEach(async ({ page }) => {
 });
 test.afterEach(async ({}, info) => {
   driver?.stop();
-  expect(pageErrors, "uncaught page errors").toEqual([]);
   if (info.status !== info.expectedStatus) console.log(driver?.log.join("\n"));
 });
 
@@ -32,10 +28,6 @@ async function intake(api: APIRequestContext, subject: string, body: string) {
   return (await r.json()).data.request.id as string;
 }
 
-async function noHorizontalScroll(page: Page) {
-  const [sw, cw] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
-  expect(sw, "page must not scroll horizontally").toBeLessThanOrEqual(cw + 1);
-}
 
 test("T25 keyboard + 390px journey: intake → evidence → reviewed action → outcome; persists across refresh", async ({ page }) => {
   const subject = `Scheduled exports to SharePoint ${Date.now()}`;
@@ -48,9 +40,9 @@ test("T25 keyboard + 390px journey: intake → evidence → reviewed action → 
   await expect(page.getByTestId("model-state")).toContainText(/no AI model connected/);
 
   // Intake, keyboard only.
-  await page.getByTestId("new-request").focus();
+  await page.getByRole("button", { name: "New request" }).focus();
   await page.keyboard.press("Enter");
-  const dlg = page.getByTestId("new-request-dialog");
+  const dlg = page.getByRole("dialog", { name: "New customer request" });
   await expect(dlg).toBeVisible();
   await dlg.getByLabel("Customer").focus();
   const firstCustomer = (await (await page.request.get(`${WS}/customers`)).json()).data[0].name as string;
@@ -61,12 +53,12 @@ test("T25 keyboard + 390px journey: intake → evidence → reviewed action → 
   await dlg.getByLabel("Request body").focus();
   await page.keyboard.type("We need scheduled exports delivered to a SharePoint folder every Monday.");
   await expect(dlg.getByLabel("Rule-based mode")).toBeChecked();
-  await dlg.getByTestId("submit-request").focus();
+  await dlg.getByRole("button", { name: "Submit and look into it" }).focus();
   await page.keyboard.press("Enter");
 
   await expect(page).toHaveURL(/\/requests\/request_/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(subject);
-  await noHorizontalScroll(page);
+  await expectNoHorizontalScroll(page);
 
   // Evidence: proposal with finding + alternatives, sources, path text.
   await expect(page.getByTestId("proposal-kind")).toHaveText("Create a new task", { timeout: 20_000 });
@@ -81,11 +73,11 @@ test("T25 keyboard + 390px journey: intake → evidence → reviewed action → 
 
   // Source drawer by keyboard: exact excerpt + revision + freshness; Escape closes.
   // Sources are collapsed unless the suggestion cites them; open the group by keyboard when needed.
-  if ((await page.getByTestId("open-source").count()) === 0) {
+  if ((await ui.openSource(page).count()) === 0) {
     await page.getByTestId("toggle-sources").focus();
     await page.keyboard.press("Enter");
   }
-  const openSource = page.getByTestId("open-source").first();
+  const openSource = ui.openSource(page).first();
   await openSource.focus();
   await page.keyboard.press("Enter");
   const drawer = page.getByTestId("source-drawer");
@@ -96,16 +88,16 @@ test("T25 keyboard + 390px journey: intake → evidence → reviewed action → 
   await expect(drawer).not.toBeVisible();
 
   // Reviewed action: authorize via dialog, keyboard only.
-  await page.getByTestId("authorize").focus();
+  await ui.approve(page).focus();
   await page.keyboard.press("Enter");
-  await page.getByTestId("confirm-authorize").focus();
+  await ui.confirmApprove(page).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("live-polite")).toContainText(/Approved/);
   await expect(page.getByTestId("action-status")).toContainText("Done", { timeout: 20_000 });
   await expect(page.getByTestId("receipt-connector")).toHaveText("PromiseGraph task list");
   await expect(page.getByTestId("request-status")).toContainText("Waiting on engineering");
   await expect(page.getByTestId("next-step")).toContainText(/doesn.t mean the customer.s problem is solved/);
-  await noHorizontalScroll(page);
+  await expectNoHorizontalScroll(page);
 
   // Persisted refresh: everything is re-read from the API.
   const receiptText = await page.getByTestId("receipt").innerText();
@@ -119,11 +111,11 @@ test("T25 keyboard + 390px journey: intake → evidence → reviewed action → 
   await form.getByLabel("How do you know?").focus();
   await form.getByLabel("What happened").focus();
   await page.keyboard.type("Customer confirmed the Monday export arrived in SharePoint.");
-  await form.getByTestId("submit-observation").focus();
+  await form.getByRole("button", { name: "Save", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("request-status")).toContainText("Solved (confirmed)", { timeout: 15_000 });
   await expect(page.getByTestId("resolved-evidence")).toBeVisible();
-  await noHorizontalScroll(page);
+  await expectNoHorizontalScroll(page);
 });
 
 test("clarification continuation resumes the same run with history retained", async ({ page }) => {
@@ -138,7 +130,7 @@ test("clarification continuation resumes the same run with history retained", as
 
   const reply = page.getByTestId("reply-form");
   await reply.getByLabel("Customer reply").fill("We mean SCIM group synchronization.");
-  await reply.getByTestId("submit-reply").click();
+  await reply.getByRole("button", { name: "Save reply and continue" }).click();
   await expect(page.getByTestId("live-polite")).toContainText(/Reply recorded/);
 
   await expect(page.getByTestId("proposal-kind")).toHaveText("Reply with an answer", { timeout: 20_000 });
@@ -157,7 +149,7 @@ test("stale proposal has no enabled commit control", async ({ page }) => {
   await page.goto(`/requests/${id}`);
   await expect(page.getByTestId("proposal-validity")).toContainText("Out of date", { timeout: 20_000 });
   await expect(page.getByTestId("commit-blocked")).toContainText("Out of date: facts changed since this was suggested");
-  await expect(page.getByTestId("authorize")).toBeDisabled();
+  await expect(ui.approve(page)).toBeDisabled();
   await expect(page.getByTestId("validation-reasons")).toContainText("based_on_revision");
 });
 
@@ -165,12 +157,12 @@ test("dispatch timeout after effect shows outcome unknown, not a new create", as
   driver.plan("Unknown write check", [{ kind: "create_work", dispatchTimeout: true }]);
   const id = await intake(page.request, `Unknown write check ${Date.now()}`, "Need a new export destination for audit evidence.");
   await page.goto(`/requests/${id}`);
-  await expect(page.getByTestId("authorize")).toBeEnabled({ timeout: 20_000 });
-  await page.getByTestId("authorize").click();
-  await page.getByTestId("confirm-authorize").click();
+  await expect(ui.approve(page)).toBeEnabled({ timeout: 20_000 });
+  await ui.approve(page).click();
+  await ui.confirmApprove(page).click();
   await expect(page.getByTestId("action-status")).toContainText("Unclear if it went through", { timeout: 20_000 });
   await expect(page.getByTestId("dispatch-unknown")).toContainText("nothing is created again automatically");
-  await expect(page.getByTestId("authorize")).toHaveCount(0); // no second create offered
+  await expect(ui.approve(page)).toHaveCount(0); // no second create offered
 
   // Operator reconciliation (Rev 3 #20/#26). A target that does not exist is refused by the server…
   await expect(page.getByTestId("run-status")).toContainText("Paused: waiting for your approval", { timeout: 15_000 }); // auto-check gave up
@@ -195,7 +187,7 @@ test("explicit closure is distinct from verified resolution", async ({ page }) =
   const id = await intake(page.request, `Closure check ${Date.now()}`, "Please close this out; handled elsewhere.");
   await page.goto(`/requests/${id}`);
   await expect(page.getByTestId("request-status")).toContainText("Waiting for your approval", { timeout: 20_000 });
-  await page.getByTestId("close-request").click();
+  await ui.closeRequest(page).click();
   await page.getByLabel("Reason").fill("Handled by account team outside PromiseGraph.");
   await page.getByRole("dialog").getByRole("button", { name: "Close request" }).click();
   await expect(page.getByTestId("request-status")).toContainText("Closed", { timeout: 10_000 });

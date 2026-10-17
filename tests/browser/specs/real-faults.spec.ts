@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { expect, test } from "@playwright/test";
+import { expect, test, ui, WS } from "../support/fixtures";
 
 /*
  * Fault profile (PG_TARGET=real-fault): private API on a PRIVATE FalkorDB container, API FAULTS=
@@ -8,15 +8,8 @@ import { expect, test } from "@playwright/test";
  */
 test.skip(process.env.PG_TARGET !== "real-fault", "fault journeys run with PG_TARGET=real-fault");
 
-const WS = "/api/v1/workspaces/ws_demo";
 const container = process.env.PG_FAULT_DB_CONTAINER!;
 const docker = (...a: string[]) => execFileSync("docker", a, { encoding: "utf8" }).trim();
-let pageErrors: string[] = [];
-test.beforeEach(({ page }) => {
-  pageErrors = [];
-  page.on("pageerror", (e) => pageErrors.push(String(e)));
-});
-test.afterEach(() => expect(pageErrors, "uncaught page errors").toEqual([]));
 
 test("T15 real: create times out after the effect → no blind duplicate; outcome established or handed to the operator", async ({ page }) => {
   const stamp = Date.now().toString(36);
@@ -31,8 +24,8 @@ test("T15 real: create times out after the effect → no blind duplicate; outcom
 
   await page.goto(`/requests/${id}`);
   await expect(page.getByTestId("proposal-kind")).toHaveText("Create a new task", { timeout: 60_000 });
-  await page.getByTestId("authorize").click();
-  await page.getByTestId("confirm-authorize").click();
+  await ui.approve(page).click();
+  await ui.confirmApprove(page).click();
 
   // Either the worker/reconciler establishes the outcome (Executed with a receipt), or the UI hands it to the operator.
   const executed = page.getByTestId("action-status").filter({ hasText: "Done" });

@@ -12,6 +12,7 @@ import { MemoryPage } from "./routes/Memory";
 import { SourcesPage } from "./routes/Sources";
 import { SettingsPage } from "./routes/Settings";
 import { NotFoundPage } from "./routes/NotFound";
+import { RouteError } from "./routes/RouteError";
 
 const qc = new QueryClient({
   defaultOptions: {
@@ -24,6 +25,8 @@ const router = createBrowserRouter([
   {
     path: "/",
     element: <Shell />,
+    // Router-level error boundary: a render error shows a recoverable page instead of a blank screen.
+    errorElement: <RouteError />,
     children: [
       { index: true, element: <Navigate to="/requests" replace /> },
       { path: "requests", element: <RequestsPage /> },
@@ -37,7 +40,9 @@ const router = createBrowserRouter([
   },
 ]);
 
-createRoot(document.getElementById("root")!).render(
+const rootEl = document.getElementById("root");
+if (!rootEl) throw new Error("index.html is missing the #root element");
+createRoot(rootEl).render(
   <StrictMode>
     <QueryClientProvider client={qc}>
       <RouterProvider router={router} />

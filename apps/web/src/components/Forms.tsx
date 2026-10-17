@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Action, ActionReconcile, EvidenceRef, ObservationCreate, ObservationResult, ReplyCreate, ReplyResult, Request, Run, RunCancel, RunCreate, RunResume } from "@contracts";
 import { useCommand, keys, rememberRun, useInfo } from "../api/hooks";
 import { ApiError } from "../api/client";
+import { oneOf } from "../lib/format";
 import { Icon } from "./Icon";
 import { Dialog, ErrorPanel, Field, useAnnounce } from "./ui";
 import { ACTION_STATUS, KIND_LABEL, REQUEST_STATUS, RUN_STATUS, spec } from "../lib/status";
@@ -23,7 +24,7 @@ export function ReplyForm({ request, question }: { request: Request; question: s
         setBody(""); setExt("");
         announce(`Reply recorded. PromiseGraph is continuing (${spec(RUN_STATUS, r.data.run.status).label.toLowerCase()}).`);
       },
-      onError: (e) => announce(`Reply not recorded: ${(e as Error).message}`, true),
+      onError: (e) => announce(`Reply not recorded: ${e.message}`, true),
     });
   };
   const fe = reply.error instanceof ApiError ? reply.error.fieldErrors : {};
@@ -45,6 +46,7 @@ export function ReplyForm({ request, question }: { request: Request; question: s
 }
 
 /* ---------------- outcome verification ---------------- */
+const VERIFICATIONS = ["passed", "failed", "inconclusive", "pending"] as const satisfies readonly ObservationCreate["verification"][];
 const OBS_KINDS: { value: ObservationCreate["kind"]; label: string; hint: string }[] = [
   { value: "customer_confirmation", label: "The customer told us", hint: "The customer confirmed whether it works." },
   { value: "operator_confirmation", label: "I checked it myself", hint: "You tested it yourself." },
@@ -70,7 +72,7 @@ export function ObservationForm({ request, actions, refs }: { request: Request; 
         setBody(""); setEvidence([]);
         announce(`Saved. This request is now: ${spec(REQUEST_STATUS, r.data.request.status).label}.`);
       },
-      onError: (e) => announce(`Observation not recorded: ${(e as Error).message}`, true),
+      onError: (e) => announce(`Observation not recorded: ${e.message}`, true),
     });
   };
   const fe = obs.error instanceof ApiError ? obs.error.fieldErrors : {};
@@ -80,14 +82,14 @@ export function ObservationForm({ request, actions, refs }: { request: Request; 
       <div className="form-grid">
         <Field label="How do you know?" hint={OBS_KINDS.find((k) => k.value === kind)?.hint} error={fe.kind}>
           {(p) => (
-            <select {...p} value={kind} onChange={(e) => setKind(e.target.value as ObservationCreate["kind"])}>
+            <select {...p} value={kind} onChange={(e) => setKind(oneOf(OBS_KINDS.map((k) => k.value), e.target.value, kind))}>
               {OBS_KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
             </select>
           )}
         </Field>
         <Field label="Is it solved?" error={fe.verification}>
           {(p) => (
-            <select {...p} value={verification} onChange={(e) => setVerification(e.target.value as ObservationCreate["verification"])}>
+            <select {...p} value={verification} onChange={(e) => setVerification(oneOf(VERIFICATIONS, e.target.value, verification))}>
               <option value="passed">Yes, it's solved</option>
               <option value="failed">No, still a problem (look into it again)</option>
               <option value="inconclusive">Not sure yet</option>
@@ -154,17 +156,17 @@ export function RunControls({ request, run, onStarted }: { request: Request; run
   const doStart = () =>
     start.mutate({ mode, instruction: instruction.trim(), authorization_id: null }, {
       onSuccess: (r) => { rememberRun(request.id, r.data.id); onStarted?.(r.data); announce(`PromiseGraph is looking into it (${r.data.mode === "scripted" ? "rule-based mode" : "AI model"}).`); close(); },
-      onError: (e) => announce(`Couldn't start: ${(e as Error).message}`, true),
+      onError: (e) => announce(`Couldn't start: ${e.message}`, true),
     });
   const doCancel = () => run &&
     cancel.mutate({ _id: run.id, reason: reason.trim() || "Cancelled by operator" }, {
       onSuccess: () => { announce("Stopped. Anything already under way is still tracked."); close(); },
-      onError: (e) => announce(`Couldn't stop: ${(e as Error).message}`, true),
+      onError: (e) => announce(`Couldn't stop: ${e.message}`, true),
     });
   const doResume = () => run &&
     resume.mutate({ _id: run.id, expected_run_version: run.version, reason: reason.trim() || "Operator resume", additional_tool_calls: 6, additional_active_seconds: 45 }, {
       onSuccess: () => { announce("Continuing from where it stopped."); close(); },
-      onError: (e) => announce(`Couldn't continue: ${(e as Error).message}`, true),
+      onError: (e) => announce(`Couldn't continue: ${e.message}`, true),
     });
 
   return (
@@ -236,7 +238,7 @@ export function ReconcileForm({ action }: { action: Action }) {
     setErr(undefined);
     rec.mutate({ _id: action.id, outcome, target, evidence_ids: [], expected_action_version: action.version }, {
       onSuccess: (r) => announce(`Thanks. Recorded as: ${spec(ACTION_STATUS, r.data.status).label}.`),
-      onError: (e2) => announce(`Couldn't record that: ${(e2 as Error).message}`, true),
+      onError: (e2) => announce(`Couldn't record that: ${e2.message}`, true),
     });
   };
   return (
@@ -277,7 +279,7 @@ export function CloseRequest({ request }: { request: Request }) {
     if (!reason.trim()) { setErr("A reason is required."); return; }
     close.mutate({ _id: request.id, reason: reason.trim(), expected_request_version: request.version }, {
       onSuccess: () => { announce("Request closed."); setOpen(false); },
-      onError: (e2) => announce(`Close refused: ${(e2 as Error).message}`, true),
+      onError: (e2) => announce(`Close refused: ${e2.message}`, true),
     });
   };
   return (

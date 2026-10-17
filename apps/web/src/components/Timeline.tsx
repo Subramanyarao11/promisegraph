@@ -1,13 +1,13 @@
-import type { Run, RunEvent } from "@contracts";
+import type { EventType, Run, RunEvent } from "@contracts";
+import { typed, type TypedEvent } from "../api/events";
 import { Icon, type IconName } from "./Icon";
 import { Badge, Mono, StatusBadge, Tag, Ts } from "./ui";
-import { ACTION_STATUS, CONNECTOR_LABEL, KIND_LABEL, REQUEST_STATUS, RUN_STATUS, VERIFICATION } from "../lib/status";
+import { ACTION_STATUS, CONNECTOR_LABEL, KIND_LABEL, REQUEST_STATUS, RUN_STATUS, VERIFICATION, labelOf } from "../lib/status";
 import { durationMs, humanize } from "../lib/format";
 
-type P = Record<string, unknown>;
 const str = (v: unknown) => (v === null || v === undefined ? "" : typeof v === "string" ? v : JSON.stringify(v));
 
-const TOOL: Record<string, string> = {
+const TOOL = {
   search_context: "searched the knowledge base",
   expand_context: "followed connections",
   read_evidence: "read a source",
@@ -16,8 +16,8 @@ const TOOL: Record<string, string> = {
   commit_action: "saved the approved action",
   inspect_action: "checked the result",
   record_observation: "recorded a result",
-};
-const EV: Record<string, { label: string; icon: IconName }> = {
+} satisfies Record<string, string>;
+const EV = {
   run_started: { label: "Started looking into it", icon: "play" },
   tool_started: { label: "Checking", icon: "chevron" },
   tool_completed: { label: "Checked", icon: "check" },
@@ -27,14 +27,18 @@ const EV: Record<string, { label: string; icon: IconName }> = {
   observation_recorded: { label: "Result recorded", icon: "eye" },
   run_finished: { label: "Investigation finished", icon: "stop" },
   error: { label: "Problem", icon: "alert" },
-};
+} satisfies Record<EventType, { label: string; icon: IconName }>;
 
-function Args({ args }: { args: unknown }) {
-  if (!args || typeof args !== "object") return null;
-  const entries = Object.entries(args as P).slice(0, 6);
+/** Labels are exhaustive over the contract's EventType; anything unexpected on the wire is shown as-is. */
+function eventMeta(type: string): { label: string; icon: IconName } {
+  return Object.hasOwn(EV, type) ? EV[type as EventType] : { label: type, icon: "dot" };
+}
+
+function Args({ args }: { args: Record<string, unknown> | undefined }) {
+  if (!args) return null;
   return (
     <span className="ev-detail">
-      {entries.map(([k, v]) => (
+      {Object.entries(args).slice(0, 6).map(([k, v]) => (
         <span key={k}>
           {k}=<Mono>{str(v).slice(0, 80)}</Mono>{" "}
         </span>
@@ -43,79 +47,91 @@ function Args({ args }: { args: unknown }) {
   );
 }
 
-function EventBody({ ev }: { ev: RunEvent }) {
-  const p = (ev.payload ?? {}) as P;
+const toolLabel = (name: string | null) => (name ? labelOf(TOOL, name) : "a tool");
+
+/** Narrowing on the event's `type` gives the matching payload shape (see api/events.ts). */
+function EventBody({ ev }: { ev: TypedEvent }) {
   switch (ev.type) {
-    case "run_started":
+    case "run_started": {
+      const { mode, stage } = ev.payload;
       return (
         <span className="row">
-          <Tag tone={p.mode === "scripted" ? "mode" : "info"} icon="doc">{p.mode === "scripted" ? "Rule-based mode" : p.mode === "model" ? "AI model" : str(p.mode)}</Tag>
-          {p.stage ? <span className="ev-detail">stage {str(p.stage)}</span> : null}
+          <Tag tone={mode === "scripted" ? "mode" : "info"} icon="doc">{mode === "scripted" ? "Rule-based mode" : mode === "model" ? "AI model" : str(mode)}</Tag>
+          {stage ? <span className="ev-detail">stage {stage}</span> : null}
         </span>
       );
+    }
     case "tool_started":
       return (
         <span className="row">
-          <span>{TOOL[ev.tool_name ?? ""] ?? ev.tool_name ?? "a tool"}</span>
-          <Args args={p.arguments} />
+          <span>{toolLabel(ev.tool_name)}</span>
+          <Args args={ev.payload.arguments} />
         </span>
       );
-    case "tool_completed":
+    case "tool_completed": {
+      const { ok, error_code, result_count, duration_ms, ids } = ev.payload;
       return (
         <span className="row">
-          <span>{TOOL[ev.tool_name ?? ""] ?? ev.tool_name ?? "a tool"}</span>
-          {p.ok === false ? <Tag tone="danger" icon="alert">didn't work ({str(p.error_code)})</Tag> : <Tag tone="success" icon="check">ok</Tag>}
-          {typeof p.result_count === "number" && <span className="ev-detail">{p.result_count} found</span>}
-          {typeof p.duration_ms === "number" && <span className="ev-detail">{durationMs(p.duration_ms)}</span>}
-          {Array.isArray(p.ids) && p.ids.length > 0 && <span className="ev-detail">ids: {(p.ids as string[]).slice(0, 5).join(", ")}{p.ids.length > 5 ? ` +${p.ids.length - 5}` : ""}</span>}
+          <span>{toolLabel(ev.tool_name)}</span>
+          {ok === false ? <Tag tone="danger" icon="alert">didn't work ({str(error_code)})</Tag> : <Tag tone="success" icon="check">ok</Tag>}
+          {typeof result_count === "number" && <span className="ev-detail">{result_count} found</span>}
+          {typeof duration_ms === "number" && <span className="ev-detail">{durationMs(duration_ms)}</span>}
+          {ids && ids.length > 0 && <span className="ev-detail">ids: {ids.slice(0, 5).join(", ")}{ids.length > 5 ? ` +${ids.length - 5}` : ""}</span>}
         </span>
       );
-    case "proposal_ready":
+    }
+    case "proposal_ready": {
+      const { kind, proposal_id, validity } = ev.payload;
       return (
         <span className="row">
-          <span className="ev-detail">{KIND_LABEL[str(p.kind)] ?? humanize(str(p.kind))}</span>
-          <Mono>{str(p.proposal_id)}</Mono>
-          {p.validity ? <Tag tone={p.validity === "valid" ? "success" : p.validity === "stale" ? "warn" : "danger"}>{str(p.validity)}</Tag> : null}
+          <span className="ev-detail">{labelOf(KIND_LABEL, kind)}</span>
+          <Mono>{str(proposal_id)}</Mono>
+          {validity ? <Tag tone={validity === "valid" ? "success" : validity === "stale" ? "warn" : "danger"}>{validity}</Tag> : null}
         </span>
       );
-    case "action_updated":
+    }
+    case "action_updated": {
+      const { action_id, status, connector } = ev.payload;
       return (
         <span className="row">
-          <Mono>{str(p.action_id)}</Mono>
-          <StatusBadge map={ACTION_STATUS} value={str(p.status)} />
-          {p.connector ? <Tag icon={p.connector === "linear" ? "external" : "work"}>{CONNECTOR_LABEL[str(p.connector)] ?? str(p.connector)}</Tag> : null}
+          <Mono>{str(action_id)}</Mono>
+          <StatusBadge map={ACTION_STATUS} value={status} />
+          {connector ? <Tag icon={connector === "linear" ? "external" : "work"}>{labelOf(CONNECTOR_LABEL, connector)}</Tag> : null}
         </span>
       );
+    }
     case "waiting_for_input":
-      return <span className="ev-detail">Draft question (not sent): “{str(p.question)}”</span>;
-    case "observation_recorded":
+      return <span className="ev-detail">Draft question (not sent): “{str(ev.payload.question)}”</span>;
+    case "observation_recorded": {
+      const { kind, verification, observation_id } = ev.payload;
       return (
         <span className="row">
-          <span className="ev-detail">{humanize(str(p.kind))}</span>
-          <StatusBadge map={VERIFICATION} value={str(p.verification)} />
-          <Mono>{str(p.observation_id)}</Mono>
+          <span className="ev-detail">{humanize(str(kind))}</span>
+          <StatusBadge map={VERIFICATION} value={verification} />
+          <Mono>{str(observation_id)}</Mono>
         </span>
       );
-    case "run_finished":
+    }
+    case "run_finished": {
+      const { run_status, request_status } = ev.payload;
       return (
         <span className="row">
-          <StatusBadge map={RUN_STATUS} value={str(p.run_status)} prefix="Investigation" />
-          {p.request_status ? <StatusBadge map={REQUEST_STATUS} value={str(p.request_status)} prefix="Request" /> : null}
+          <StatusBadge map={RUN_STATUS} value={run_status} prefix="Investigation" />
+          {request_status ? <StatusBadge map={REQUEST_STATUS} value={request_status} prefix="Request" /> : null}
         </span>
       );
+    }
     case "error":
       return (
         <span className="row">
-          <Tag tone="danger" icon="alert">{str(p.code)}</Tag>
-          <span className="ev-detail">{str(p.message)}</span>
+          <Tag tone="danger" icon="alert">{str(ev.payload.code)}</Tag>
+          <span className="ev-detail">{str(ev.payload.message)}</span>
         </span>
       );
-    default:
-      return <span className="ev-detail">{str(p).slice(0, 200)}</span>;
   }
 }
 
-export function RunTimeline({ run, events, error, lastPolledAt, active }: { run: Run | undefined; runId: string; events: RunEvent[]; error: unknown; lastPolledAt: number | null; active: boolean }) {
+export function RunTimeline({ run, events, error, lastPolledAt, active }: { run: Run | undefined; events: RunEvent[]; error: unknown; lastPolledAt: number | null; active: boolean }) {
   return (
     <div className="stack">
       <div className="row small muted">
@@ -135,11 +151,11 @@ export function RunTimeline({ run, events, error, lastPolledAt, active }: { run:
               <span className="seq">#{ev.seq}</span>
               <div className="stack" style={{ gap: 2 }}>
                 <div className="ev-line">
-                  <Icon name={EV[ev.type]?.icon ?? "dot"} />
-                  <span className="ev-type">{EV[ev.type]?.label ?? ev.type}</span>
+                  <Icon name={eventMeta(ev.type).icon} />
+                  <span className="ev-type">{eventMeta(ev.type).label}</span>
                   <Ts iso={ev.occurred_at} />
                 </div>
-                <EventBody ev={ev} />
+                <EventBody ev={typed(ev)} />
               </div>
             </li>
           ))}

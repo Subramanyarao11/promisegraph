@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import type { Request, WorkItem } from "@contracts";
 import { api } from "../api/client";
 import { useCapabilities, useCustomers } from "../api/hooks";
@@ -18,14 +18,17 @@ export function useEntityName(type: EntityType | string, id: string | null | und
   const caps = useCapabilities();
   const single = useQuery({
     queryKey: ["entity-name", type, id],
-    enabled: Boolean(id) && (type === "person" || type === "work_item" || type === "request"),
     staleTime: 60_000,
     retry: false,
-    queryFn: async ({ signal }) => {
-      if (type === "person") return (await api.get<PersonSummary>(`/people/${encodeURIComponent(id!)}`, signal)).data.name;
-      if (type === "work_item") return (await api.get<WorkItem>(`/work-items/${encodeURIComponent(id!)}`, signal)).data.title;
-      return (await api.get<Request>(`/requests/${encodeURIComponent(id!)}`, signal)).data.subject;
-    },
+    queryFn:
+      id && (type === "person" || type === "work_item" || type === "request")
+        ? async ({ signal }) => {
+            const path = encodeURIComponent(id);
+            if (type === "person") return (await api.get<PersonSummary>(`/people/${path}`, signal)).data.name;
+            if (type === "work_item") return (await api.get<WorkItem>(`/work-items/${path}`, signal)).data.title;
+            return (await api.get<Request>(`/requests/${path}`, signal)).data.subject;
+          }
+        : skipToken,
   });
   if (!id) return { name: null, loading: false };
   if (type === "customer") return { name: customers.data?.items.find((c) => c.id === id)?.name ?? null, loading: customers.isLoading };

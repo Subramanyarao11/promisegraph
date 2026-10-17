@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useId, useRef, useSt
 import { Icon, type IconName } from "./Icon";
 import { spec, type StatusSpec } from "../lib/status";
 import { formatTs } from "../lib/format";
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { api, ApiError, isUnavailable } from "../api/client";
 
 export function Badge({ s, title, testId }: { s: StatusSpec; title?: string; testId?: string }) {
@@ -177,7 +177,7 @@ export function ErrorPanel({ error, onRetry, what }: { error: unknown; onRetry?:
       <Icon name={unavailable ? "alert" : "info"} size={16} />
       <div>
         <p className="callout-title">{errorTitle(error)}{what ? ` · ${what}` : ""}</p>
-        <p>{e?.message ?? String((error as Error)?.message ?? error)}</p>
+        <p>{error instanceof Error ? error.message : String(error)}</p>
         {unavailable && <p className="muted">We don't show old or sample data in its place. Try again once it's back.</p>}
         {e?.correlationId && <p className="muted small">Reference for support: <Mono>{e.correlationId}</Mono></p>}
         {onRetry && (
@@ -223,8 +223,7 @@ interface PersonSummary { id: string; name: string; role: string; team_id: strin
 export function Owner({ id }: { id: string | null }) {
   const q = useQuery({
     queryKey: ["person", id],
-    enabled: Boolean(id),
-    queryFn: ({ signal }) => api.get<PersonSummary>(`/people/${encodeURIComponent(id!)}`, signal),
+    queryFn: id ? ({ signal }) => api.get<PersonSummary>(`/people/${encodeURIComponent(id)}`, signal) : skipToken,
     staleTime: 60_000,
     retry: false,
   });

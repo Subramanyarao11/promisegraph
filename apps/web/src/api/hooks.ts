@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
+import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore } from "react";
+import { skipToken, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
+import { RunPoller, type Timeline } from "./poller";
 import type {
   Action, Attempt, CapabilitySummary, ContextBundle, Customer, Decision, EvidenceRef, Observation, Proposal, Request, Run, RunEvent, SourceRecord,
-  SourceSummary, WorkItem, WorkspaceInfo, EventsPage,
+  SourceSummary, WorkItem, WorkspaceInfo,
 } from "@contracts";
 import { api, ApiError, newIdempotencyKey, qs, WORKSPACE_ID } from "./client";
 import { ACTIVE_RUN } from "../lib/status";
@@ -74,7 +75,7 @@ export function useCustomers() {
 }
 export function useCustomerName() {
   const q = useCustomers();
-  return useCallback((id: string) => q.data?.items.find((c) => c.id === id)?.name ?? id, [q.data]);
+  return (id: string) => q.data?.items.find((c) => c.id === id)?.name ?? id;
 }
 export function useCapabilities() {
   return useQuery({ queryKey: keys.capabilities, queryFn: ({ signal }) => listAll<CapabilitySummary>("/capabilities", {}, signal), staleTime: 60_000 });
@@ -106,19 +107,17 @@ export function useActions(f: { request_id?: string; status?: string }, opts: { 
 export function useRun(id: string | null) {
   return useQuery({
     queryKey: keys.run(id ?? ""),
-    enabled: Boolean(id),
-    queryFn: ({ signal }) => api.get<Run>(`/runs/${encodeURIComponent(id!)}`, signal),
+    queryFn: id ? ({ signal }) => api.get<Run>(`/runs/${encodeURIComponent(id)}`, signal) : skipToken,
     refetchInterval: (q) => (q.state.data && ACTIVE_RUN.has(q.state.data.data.status) ? 1500 : 8000),
   });
 }
 export function useProposal(id: string | null) {
-  return useQuery({ queryKey: keys.proposal(id ?? ""), enabled: Boolean(id), queryFn: ({ signal }) => api.get<Proposal>(`/proposals/${encodeURIComponent(id!)}`, signal), refetchInterval: 5000 });
+  return useQuery({ queryKey: keys.proposal(id ?? ""), queryFn: id ? ({ signal }) => api.get<Proposal>(`/proposals/${encodeURIComponent(id)}`, signal) : skipToken, refetchInterval: 5000 });
 }
 export function useSource(id: string | null, revision: number | null) {
   return useQuery({
     queryKey: keys.source(id ?? "", revision),
-    enabled: Boolean(id),
-    queryFn: ({ signal }) => api.get<SourceRecord>(`/sources/${encodeURIComponent(id!)}` + qs({ revision }), signal),
+    queryFn: id ? ({ signal }) => api.get<SourceRecord>(`/sources/${encodeURIComponent(id)}` + qs({ revision }), signal) : skipToken,
     staleTime: Infinity,
   });
 }
@@ -144,111 +143,83 @@ export function rememberRun(requestId: string, runId: string) {
   } catch { /* storage unavailable: run IDs still come from actions */ }
   window.dispatchEvent(new CustomEvent("pg:runs", { detail: requestId }));
 }
+/* Browser-remembered run IDs are an external store (localStorage + "storage"/"pg:runs" events). */
+function subscribeRuns(onChange: () => void): () => void {
+  window.addEventListener("pg:runs", onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener("pg:runs", onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+function readRunsRaw(requestId: string): string {
+  try { return localStorage.getItem(runKey(requestId)) ?? "[]"; } catch { return "[]"; }
+}
+function parseRunIds(raw: string): string[] {
+  try {
+    const v: unknown = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch { return []; }
+}
 export function useKnownRunIds(requestId: string, actions: Action[] | undefined): string[] {
-  const read = useCallback(() => {
-    try { return JSON.parse(localStorage.getItem(runKey(requestId)) ?? "[]") as string[]; } catch { return []; }
-  }, [requestId]);
-  const [stored, setStored] = useState<string[]>(read);
-  useEffect(() => {
-    setStored(read());
-    const h = () => setStored(read());
-    window.addEventListener("pg:runs", h);
-    window.addEventListener("storage", h);
-    return () => { window.removeEventListener("pg:runs", h); window.removeEventListener("storage", h); };
-  }, [read]);
-  const ids = [...stored];
+  // Snapshot is the raw string (stable between reads), parsed during render.
+  const raw = useSyncExternalStore(subscribeRuns, () => readRunsRaw(requestId), () => "[]");
+  const ids = parseRunIds(raw);
   for (const a of actions ?? []) if (!ids.includes(a.run_id)) ids.push(a.run_id);
   return ids;
 }
 
-/* ---------- durable event timeline polling ----------
- * Cursor = next_after_seq. 1.5 s while the run is active, exponential backoff (3→30 s) otherwise or on error.
- * Entries are deduplicated by (run_id, seq); retries that repeat a page add nothing. */
-export interface Timeline {
-  events: RunEvent[];
-  error: unknown;
-  lastPolledAt: number | null;
-}
-export function useRunEvents(runId: string | null, active: boolean, onNew?: (evs: RunEvent[], initial: boolean) => void): Timeline {
-  const [state, setState] = useState<Timeline>({ events: [], error: null, lastPolledAt: null });
-  const seen = useRef(new Map<string, RunEvent>());
-  const cursor = useRef(0);
-  const activeRef = useRef(active);
-  activeRef.current = active;
-  const onNewRef = useRef(onNew);
-  onNewRef.current = onNew;
-  const wake = useRef<() => void>(() => {});
+/* ---------- durable event timelines for a set of runs ----------
+ * One effect keeps a RunPoller per run ID in sync with the list (the pollers are the external system);
+ * their callbacks write timeline state. No parent-notification effects. */
+export type { Timeline } from "./poller";
+export function useRunTimelines(runIds: string[], activeIds: ReadonlySet<string>, onNew: (events: RunEvent[], initial: boolean) => void): Record<string, Timeline> {
+  const [timelines, setTimelines] = useState<Record<string, Timeline>>({});
+  const pollers = useRef(new Map<string, RunPoller>());
+  const handleNew = useEffectEvent(onNew);
+  const idsKey = runIds.join("|");
+  const activeKey = [...activeIds].sort().join("|");
 
-  useEffect(() => {
-    if (!runId) return;
-    seen.current = new Map();
-    cursor.current = 0;
-    setState({ events: [], error: null, lastPolledAt: null });
-    let stopped = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let idleDelay = 3000;
-    let initialLoad = true;
-    const ctrl = new AbortController();
-    const tick = async () => {
-      timer = null;
-      let delay: number;
-      try {
-        let more = true;
-        const fresh: RunEvent[] = [];
-        while (more && !stopped) {
-          const page = (await api.rawGet(`/runs/${encodeURIComponent(runId)}/events` + qs({ after_seq: cursor.current, limit: 100 }), ctrl.signal)) as EventsPage;
-          for (const ev of page.data) {
-            const k = `${ev.run_id}:${ev.seq}`;
-            if (!seen.current.has(k)) {
-              seen.current.set(k, ev);
-              fresh.push(ev);
-            }
-          }
-          if (typeof page.next_after_seq === "number" && page.next_after_seq > cursor.current) cursor.current = page.next_after_seq;
-          more = page.has_more && page.data.length > 0;
-        }
-        if (stopped) return;
-        const events = [...seen.current.values()].sort((a, b) => a.seq - b.seq);
-        setState({ events, error: null, lastPolledAt: Date.now() });
-        const firstLoad = initialLoad;
-        initialLoad = false;
-        if (fresh.length) {
-          onNewRef.current?.(fresh, firstLoad);
-          idleDelay = 3000;
-        }
-        delay = activeRef.current ? 1500 : idleDelay;
-        if (!activeRef.current) idleDelay = Math.min(idleDelay * 2, 30_000);
-      } catch (err) {
-        if (stopped || (err as { name?: string }).name === "AbortError") return;
-        setState((s) => ({ ...s, error: err, lastPolledAt: Date.now() }));
-        delay = idleDelay;
-        idleDelay = Math.min(idleDelay * 2, 30_000);
+  useEffect(function syncPollers() {
+    const wanted = new Set(idsKey ? idsKey.split("|") : []);
+    const map = pollers.current;
+    for (const id of wanted) {
+      if (!map.has(id)) map.set(id, new RunPoller(id, (t) => setTimelines((s) => ({ ...s, [id]: t })), (evs, initial) => handleNew(evs, initial)));
+    }
+    for (const [id, p] of map) {
+      if (!wanted.has(id)) {
+        p.stop();
+        map.delete(id);
       }
-      if (!stopped) timer = setTimeout(tick, delay);
-    };
-    wake.current = () => {
-      idleDelay = 3000;
-      if (timer) { clearTimeout(timer); timer = setTimeout(tick, 0); }
-    };
-    tick();
-    return () => { stopped = true; ctrl.abort(); if (timer) clearTimeout(timer); };
-  }, [runId]);
+    }
+  }, [idsKey]);
 
-  // When the run becomes active again, poll promptly.
-  useEffect(() => { if (active) wake.current(); }, [active]);
-  return state;
+  useEffect(function syncActivity() {
+    const active = new Set(activeKey ? activeKey.split("|") : []);
+    for (const [id, p] of pollers.current) p.setActive(active.has(id));
+  }, [activeKey, idsKey]);
+
+  useEffect(function stopAllOnUnmount() {
+    const map = pollers.current;
+    return () => {
+      for (const p of map.values()) p.stop();
+      map.clear();
+    };
+  }, []);
+
+  return timelines;
 }
 
 /* ---------- commands with idempotency keys ----------
  * One key per intent: retrying the same body after a lost response reuses the key (server replays the
  * original result); any change to the body is a new intentional command with a new key. */
-export function useCommand<TBody, TResult>(method: "post" | "patch", pathFn: (b: TBody) => string, invalidate: (b: TBody, r: TResult) => QueryKey[]) {
+export function useCommand<TBody extends object, TResult>(method: "post" | "patch", pathFn: (b: TBody) => string, invalidate: (b: TBody, r: TResult | undefined) => QueryKey[]) {
   const qc = useQueryClient();
   const last = useRef<{ hash: string; key: string } | null>(null);
   return useMutation({
     mutationFn: async (body: TBody) => {
       // Keys prefixed with "_" are client-side routing params (e.g. path IDs), never part of the contract body.
-      const wire = Object.fromEntries(Object.entries(body as Record<string, unknown>).filter(([k]) => !k.startsWith("_")));
+      const wire = Object.fromEntries(Object.entries(body).filter(([k]) => !k.startsWith("_")));
       const hash = `${pathFn(body)}|${JSON.stringify(wire)}`;
       if (!last.current || last.current.hash !== hash) last.current = { hash, key: newIdempotencyKey() };
       const res = await api[method]<TResult>(pathFn(body), wire, last.current.key);
@@ -256,7 +227,7 @@ export function useCommand<TBody, TResult>(method: "post" | "patch", pathFn: (b:
       return res;
     },
     onSettled: (res, _err, body) => {
-      const ks = res ? invalidate(body, res.data) : invalidate(body, undefined as unknown as TResult);
+      const ks = invalidate(body, res?.data);
       ks.forEach((k) => qc.invalidateQueries({ queryKey: k }));
       qc.invalidateQueries({ queryKey: ["request-runs"] });
       qc.invalidateQueries({ queryKey: ["request-proposals"] });
@@ -307,10 +278,10 @@ export function useRequestProposals(requestId: string) {
 
 /* ---------- Rev 3 additive reads ---------- */
 export function useEvidence(id: string | null) {
-  return useQuery({ queryKey: ["evidence", id], enabled: Boolean(id), queryFn: ({ signal }) => api.get<EvidenceRef>(`/evidence/${encodeURIComponent(id!)}`, signal), staleTime: Infinity });
+  return useQuery({ queryKey: ["evidence", id], queryFn: id ? ({ signal }) => api.get<EvidenceRef>(`/evidence/${encodeURIComponent(id)}`, signal) : skipToken, staleTime: Infinity });
 }
 export function useWorkItem(id: string | null) {
-  return useQuery({ queryKey: ["work-item", id], enabled: Boolean(id), queryFn: ({ signal }) => api.get<WorkItem>(`/work-items/${encodeURIComponent(id!)}`, signal), refetchInterval: 10_000 });
+  return useQuery({ queryKey: ["work-item", id], queryFn: id ? ({ signal }) => api.get<WorkItem>(`/work-items/${encodeURIComponent(id)}`, signal) : skipToken, refetchInterval: 10_000 });
 }
 export function useObservations(requestId: string) {
   return useQuery({

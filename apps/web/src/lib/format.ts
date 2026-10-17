@@ -59,3 +59,8 @@ export function friendlyExcerpt(text: string, max = 220): string {
   return out.length > max ? `${out.slice(0, max)}…` : out;
 }
 
+
+/** Narrows an untyped string (e.g. a <select> value) to one of the allowed literals; keeps `fallback` otherwise. */
+export function oneOf<T extends string>(allowed: readonly T[], value: string, fallback: T): T {
+  return (allowed as readonly string[]).includes(value) ? (value as T) : fallback;
+}

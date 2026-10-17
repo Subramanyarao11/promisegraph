@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { Attempt, ContextBundle, Decision, DecisionCommand, Request } from "@contracts";
@@ -8,8 +8,9 @@ import { api, ApiError, getLastMeta, qs } from "../api/client";
 import { Icon } from "../components/Icon";
 import { Dialog, Empty, ErrorPanel, Field, Loading, Mono, Owner, Section, StatusBadge, Tag, Ts, useAnnounce } from "../components/ui";
 import { ATTEMPT_OUTCOME, DECISION_STATUS, RULE_LABEL, VERIFICATION } from "../lib/status";
-import { humanize } from "../lib/format";
+import { humanize, oneOf } from "../lib/format";
 
+const SCOPE_TYPES = ["customer", "request", "capability", "work_item"] as const satisfies readonly DecisionCommand["scope"]["entity_type"][];
 const RULES: DecisionCommand["rule_type"][] = ["forbidden_workaround", "scope_reduction_allowed", "date_extension_allowed", "allowed_action_types", "routing_owner"];
 const RULE_HINT: Record<string, string> = {
   forbidden_workaround: "The name of the workaround not to suggest, e.g. recreate_schedule_in_utc.",
@@ -45,7 +46,7 @@ function Decisions() {
   const q = useDecisions(activeOnly ? { active: "true" } : {});
   const [dialog, setDialog] = useState<{ op: DecisionCommand["operation"]; target: Decision | null } | null>(null);
   const items = q.data?.items ?? [];
-  const byId = useMemo(() => new Map(items.map((d) => [d.id, d])), [items]);
+  const byId = new Map(items.map((d) => [d.id, d]));
   // Chains: show each record with its predecessor link so history is readable.
   const sorted = [...items].sort((a, b) => b.effective_at.localeCompare(a.effective_at));
   return (
@@ -84,7 +85,7 @@ function Decisions() {
                   {(d.supersedes_id || successor) && (
                     <div className="small row">
                       <Icon name="refresh" size={12} />
-                      {d.supersedes_id && <span>replaces an earlier rule <Mono>{d.supersedes_id}</Mono>{byId.get(d.supersedes_id) ? ` (${byId.get(d.supersedes_id)!.status})` : ""}</span>}
+                      {d.supersedes_id && <span>replaces an earlier rule <Mono>{d.supersedes_id}</Mono>{(() => { const prev = byId.get(d.supersedes_id); return prev ? ` (${prev.status})` : ""; })()}</span>}
                       {successor && <span>replaced by <Mono>{successor.id}</Mono></span>}
                     </div>
                   )}
@@ -114,7 +115,7 @@ function fromLocalInput(v: string): string {
 function DecisionForm({ op, target, revision, onDone }: { op: DecisionCommand["operation"]; target: Decision | null; revision: number; onDone: () => void }) {
   const announce = useAnnounce();
   const [rule, setRule] = useState<DecisionCommand["rule_type"]>(target?.rule_type ?? "forbidden_workaround");
-  const [value, setValue] = useState(target ? (Array.isArray(target.value) ? (target.value as string[]).join(", ") : String(target.value)) : "");
+  const [value, setValue] = useState(target ? (Array.isArray(target.value) ? target.value.join(", ") : String(target.value)) : "");
   const [scopeType, setScopeType] = useState<DecisionCommand["scope"]["entity_type"]>(target?.scope.entity_type ?? "customer");
   const [scopeId, setScopeId] = useState(target?.scope.entity_id ?? "");
   const [rationale, setRationale] = useState("");
@@ -150,7 +151,7 @@ function DecisionForm({ op, target, revision, onDone }: { op: DecisionCommand["o
       expected_revision: revision,
     }, {
       onSuccess: () => { announce(op === "record" ? "Rule added." : op === "supersede" ? "Rule replaced. The old one is kept in the history." : "Rule withdrawn. It stays in the history."); onDone(); },
-      onError: (e) => announce(`Rule not saved: ${(e as Error).message}`, true),
+      onError: (e) => announce(`Rule not saved: ${e.message}`, true),
     });
   };
   const locked = op === "revoke";
@@ -160,7 +161,7 @@ function DecisionForm({ op, target, revision, onDone }: { op: DecisionCommand["o
       {op === "revoke" && <p className="small">The rule stops applying to new suggestions. It stays in the history.</p>}
       <div className="form-grid">
         <Field label="Kind of rule" error={fe.rule_type}>
-          {(p) => <select {...p} value={rule} disabled={locked || op === "supersede"} onChange={(e) => { setRule(e.target.value as DecisionCommand["rule_type"]); setValue(""); }}>{RULES.map((r) => <option key={r} value={r}>{RULE_LABEL[r]}</option>)}</select>}
+          {(p) => <select {...p} value={rule} disabled={locked || op === "supersede"} onChange={(e) => { setRule(oneOf(RULES, e.target.value, rule)); setValue(""); }}>{RULES.map((r) => <option key={r} value={r}>{RULE_LABEL[r]}</option>)}</select>}
         </Field>
         <Field label="Setting" hint={RULE_HINT[rule]} error={errs.value ?? fe.value}>
           {(p) => isBool ? (
@@ -170,7 +171,7 @@ function DecisionForm({ op, target, revision, onDone }: { op: DecisionCommand["o
           )}
         </Field>
         <Field label="Applies to a" error={fe["scope/entity_type"]}>
-          {(p) => <select {...p} value={scopeType} disabled={locked} onChange={(e) => setScopeType(e.target.value as DecisionCommand["scope"]["entity_type"])}>{["customer", "request", "capability", "work_item"].map((s) => <option key={s} value={s}>{humanize(s)}</option>)}</select>}
+          {(p) => <select {...p} value={scopeType} disabled={locked} onChange={(e) => setScopeType(oneOf(SCOPE_TYPES, e.target.value, scopeType))}>{SCOPE_TYPES.map((s) => <option key={s} value={s}>{humanize(s)}</option>)}</select>}
         </Field>
         <Field label="Which one (ID)" error={errs.scope ?? fe["scope/entity_id"]}>
           {(p) => <input {...p} type="text" value={scopeId} disabled={locked} onChange={(e) => setScopeId(e.target.value)} />}
@@ -218,7 +219,8 @@ function Attempts() {
   if (direct.data?.supported) return <AttemptList attempts={direct.data.items} note={direct.data.truncated ? "List truncated at 500 attempts." : null} />;
   if (q.isLoading) return <Loading label="Gathering attempts from request contexts" />;
   if (q.error) return <ErrorPanel error={q.error} onRetry={() => q.refetch()} what="attempts" />;
-  const d = q.data!;
+  const d = q.data;
+  if (!d) return null;
   return <AttemptList attempts={d.attempts} note={`Gathered from the context of ${d.scanned} requests${d.more ? " (first page only — more requests exist)" : ""}${d.failed ? `; ${d.failed} could not be read` : ""}.`} />;
 }
 

@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import type { EvidencePath, EvidenceRef, GraphEdge, GraphNode } from "@contracts";
 import { useEvidence, useSource } from "../api/hooks";
 import { friendlyExcerpt } from "../lib/format";
@@ -115,25 +115,24 @@ export function EvidenceChip({ id, refs }: { id: string; refs: Map<string, Evide
 }
 
 /* ---------------- graph path: text first ---------------- */
-function edgeBetween(path: EvidencePath, a: GraphNode, b: GraphNode): GraphEdge | undefined {
-  const edges = path.edges as GraphEdge[];
+function edgeBetween(path: EvidencePath, a: GraphNode, b: GraphNode | undefined): GraphEdge | undefined {
+  if (!b) return undefined;
+  const edges: readonly GraphEdge[] = path.edges;
   return edges.find((e) => (e.from_id === a.id && e.to_id === b.id) || (e.from_id === b.id && e.to_id === a.id));
 }
 
 export function PathText({ path, refs, index }: { path: EvidencePath; refs: Map<string, EvidenceRef>; index: number }) {
-  const nodes = path.nodes as GraphNode[];
+  const nodes: readonly GraphNode[] = path.nodes;
   const [showVisual, setShowVisual] = useState(false);
-  const desc = useMemo(() => {
-    const parts: string[] = [];
-    nodes.forEach((n, i) => {
-      parts.push(`${n.label} ${n.title}`);
-      if (i < nodes.length - 1) {
-        const e = edgeBetween(path, n, nodes[i + 1]);
-        parts.push(e ? `${e.from_id === n.id ? "—" : "←"}${e.type}${e.from_id === n.id ? "→" : "—"}` : "→");
-      }
-    });
-    return parts.join(" ");
-  }, [path, nodes]);
+  // Text equivalent for assistive tech: "Request X —ABOUT→ Capability Y …" (cheap; computed per render).
+  const desc = nodes
+    .map((n, i) => {
+      const next = nodes[i + 1];
+      const e = edgeBetween(path, n, next);
+      const arrow = !next ? "" : e ? ` ${e.from_id === n.id ? "—" : "←"}${e.type}${e.from_id === n.id ? "→" : "—"} ` : " → ";
+      return `${n.label} ${n.title}${arrow}`;
+    })
+    .join("");
   return (
     <div className="stack" data-testid="evidence-path">
       <div className="row small muted">
@@ -184,7 +183,7 @@ export function PathText({ path, refs, index }: { path: EvidencePath; refs: Map<
 
 /** Supplementary diagram; the ordered list above is the authoritative text equivalent. */
 function PathVisual({ path }: { path: EvidencePath }) {
-  const nodes = path.nodes as GraphNode[];
+  const nodes: readonly GraphNode[] = path.nodes;
   const W = 150, gap = 46, H = 64;
   const width = nodes.length * W + (nodes.length - 1) * gap + 8;
   return (

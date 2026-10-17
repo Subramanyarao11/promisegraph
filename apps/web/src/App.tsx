@@ -5,7 +5,7 @@ import { AnnouncerProvider, Badge } from "./components/ui";
 import { useHealth, useInfo } from "./api/hooks";
 import { WORKSPACE_ID, isUnavailable } from "./api/client";
 import { CONNECTOR_STATE, spec } from "./lib/status";
-import { formatTs, viewerZone } from "./lib/format";
+import { formatTs, oneOf, viewerZone } from "./lib/format";
 
 const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: "/requests", label: "Requests", icon: "inbox" },
@@ -15,10 +15,11 @@ const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: "/settings", label: "Settings", icon: "settings" },
 ];
 
-type Theme = "system" | "light" | "dark";
+const THEMES = ["system", "light", "dark"] as const;
+type Theme = (typeof THEMES)[number];
 function useTheme(): [Theme, () => void] {
   const [theme, setTheme] = useState<Theme>(() => {
-    try { return (localStorage.getItem("pg.theme") as Theme) || "system"; } catch { return "system"; }
+    try { return oneOf(THEMES, localStorage.getItem("pg.theme") ?? "", "system"); } catch { return "system"; }
   });
   useEffect(() => {
     const root = document.documentElement;

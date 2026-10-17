@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ImportCommit, ImportCommitResult, ImportPreview, ImportPreviewResult, SourceSummary } from "@contracts";
 import { useCommand, useSources } from "../api/hooks";
+import { oneOf } from "../lib/format";
 import { ApiError } from "../api/client";
 import { Icon } from "../components/Icon";
 import { SourceDrawerProvider, useOpenSource } from "../components/Evidence";
@@ -23,12 +24,17 @@ export function SourcesPage() {
   );
 }
 
+const FORMATS = ["markdown", "json", "csv"] as const satisfies readonly ImportPreview["format"][];
+const ORIGINS = ["synthetic", "public", "owned_permitted"] as const satisfies readonly ImportPreview["origin"][];
+
 function ImportPanel() {
   const announce = useAnnounce();
   const [form, setForm] = useState<ImportPreview>({ format: "markdown", origin: "synthetic", content: "", source_key: "" });
   const [errs, setErrs] = useState<Record<string, string>>({});
-  const [preview, setPreview] = useState<ImportPreviewResult | null>(null);
-  const [result, setResult] = useState<ImportCommitResult | null>(null);
+  // One state for the import flow: a preview and a committed result can never coexist.
+  const [stage, setStage] = useState<{ kind: "edit" } | { kind: "preview"; preview: ImportPreviewResult } | { kind: "done"; result: ImportCommitResult }>({ kind: "edit" });
+  const preview = stage.kind === "preview" ? stage.preview : null;
+  const result = stage.kind === "done" ? stage.result : null;
   const prev = useCommand<ImportPreview, ImportPreviewResult>("post", () => "/imports/preview", () => []);
   const commit = useCommand<ImportCommit & { _id: string }, ImportCommitResult>("post", (b) => `/imports/${encodeURIComponent(b._id)}/commit`, () => [["sources"], ["work"], ["requests"], ["context"], ["proposal"], ["decisions"]]);
   const fe = prev.error instanceof ApiError ? prev.error.fieldErrors : {};
@@ -48,20 +54,19 @@ function ImportPanel() {
     if (!form.content.trim()) ce.content = "Paste content or choose a file.";
     setErrs(ce);
     if (Object.keys(ce).length) return;
-    setResult(null);
     prev.mutate({ ...form, source_key: form.source_key.trim() }, {
-      onSuccess: (r) => { setPreview(r.data); announce(`Preview ready: ${r.data.valid_count} ready to add, ${r.data.rejected_count} with problems.`); },
-      onError: (e) => announce(`Preview failed: ${(e as Error).message}`, true),
+      onSuccess: (r) => { setStage({ kind: "preview", preview: r.data }); announce(`Preview ready: ${r.data.valid_count} ready to add, ${r.data.rejected_count} with problems.`); },
+      onError: (e) => announce(`Preview failed: ${e.message}`, true),
     });
   };
   const doCommit = () => {
     if (!preview) return;
     commit.mutate({ _id: preview.preview_id, expected_revision: preview.based_on_revision }, {
       onSuccess: (r) => {
-        setResult(r.data); setPreview(null);
+        setStage({ kind: "done", result: r.data });
         announce(`Saved: ${r.data.imported_count} added, ${r.data.noop_count} unchanged.`);
       },
-      onError: (e) => announce(`Not saved: ${(e as Error).message}`, true),
+      onError: (e) => announce(`Not saved: ${e.message}`, true),
     });
   };
 
@@ -71,10 +76,10 @@ function ImportPanel() {
         {prev.error && !(prev.error instanceof ApiError && prev.error.code === "INVALID_INPUT") && <ErrorPanel error={prev.error} />}
         <div className="form-grid">
           <Field label="Format" error={fe.format}>
-            {(p) => <select {...p} value={form.format} onChange={(e) => setForm({ ...form, format: e.target.value as ImportPreview["format"] })}><option value="markdown">A document (Markdown)</option><option value="json">Structured data (JSON)</option><option value="csv">Engineering tasks (CSV)</option></select>}
+            {(p) => <select {...p} value={form.format} onChange={(e) => setForm({ ...form, format: oneOf(FORMATS, e.target.value, form.format) })}><option value="markdown">A document (Markdown)</option><option value="json">Structured data (JSON)</option><option value="csv">Engineering tasks (CSV)</option></select>}
           </Field>
           <Field label="Where it comes from" hint="Only use demo, public, or data you're allowed to use." error={fe.origin}>
-            {(p) => <select {...p} value={form.origin} onChange={(e) => setForm({ ...form, origin: e.target.value as ImportPreview["origin"] })}><option value="synthetic">Demo data (made up)</option><option value="public">Public information</option><option value="owned_permitted">Our own data</option></select>}
+            {(p) => <select {...p} value={form.origin} onChange={(e) => setForm({ ...form, origin: oneOf(ORIGINS, e.target.value, form.origin) })}><option value="synthetic">Demo data (made up)</option><option value="public">Public information</option><option value="owned_permitted">Our own data</option></select>}
           </Field>
           <Field label="Name" hint="Re-importing with the same name saves a new version and keeps the old one." error={errs.source_key ?? fe.source_key}>
             {(p) => <input {...p} type="text" value={form.source_key} onChange={(e) => setForm({ ...form, source_key: e.target.value })} maxLength={200} />}
@@ -105,7 +110,7 @@ function ImportPanel() {
             <div className="table-wrap">
               <table className="table">
                 <thead><tr><th scope="col">What</th><th scope="col">ID</th><th scope="col">Change</th></tr></thead>
-                <tbody>{preview.changes.map((c, i) => <tr key={i}><td>{c.entity_type}</td><td><Mono>{c.entity_id}</Mono></td><td><Tag tone={c.change === "noop" ? "neutral" : c.change === "create" ? "success" : "info"}>{c.change === "noop" ? "no change" : c.change === "create" ? "new" : "updated"}</Tag></td></tr>)}</tbody>
+                <tbody>{preview.changes.map((c) => <tr key={`${c.entity_type}:${c.entity_id}`}><td>{c.entity_type}</td><td><Mono>{c.entity_id}</Mono></td><td><Tag tone={c.change === "noop" ? "neutral" : c.change === "create" ? "success" : "info"}>{c.change === "noop" ? "no change" : c.change === "create" ? "new" : "updated"}</Tag></td></tr>)}</tbody>
               </table>
             </div>
           )}
@@ -116,7 +121,7 @@ function ImportPanel() {
           )}
           {commit.error && <ErrorPanel error={commit.error} />}
           <div className="form-actions">
-            <button type="button" className="btn" onClick={() => setPreview(null)}>Cancel</button>
+            <button type="button" className="btn" onClick={() => setStage({ kind: "edit" })}>Cancel</button>
             <button type="button" className="btn btn-primary" onClick={doCommit} disabled={commit.isPending || preview.valid_count === 0} data-testid="commit-import">{commit.isPending ? "Saving…" : `Save ${preview.valid_count} to the knowledge base`}</button>
           </div>
         </div>

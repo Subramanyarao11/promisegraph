@@ -45,7 +45,7 @@ function Payload({ p, work }: { p: Proposal; work: WorkItem[] }) {
             <div className="draft-label"><Icon name="doc" size={12} /> Draft reply: not sent. Copy it into your helpdesk when you’re ready</div>
             <div className="draft" data-testid="draft-text">{p.payload.draft_text}</div>
           </div>
-          <Criteria title="It’s solved when" items={p.payload.resolution_criteria as string[]} />
+          <Criteria title="It’s solved when" items={p.payload.resolution_criteria} />
         </div>
       );
     case "clarify":
@@ -56,7 +56,7 @@ function Payload({ p, work }: { p: Proposal; work: WorkItem[] }) {
             <div className="draft" data-testid="draft-question">{p.payload.question}</div>
           </div>
           {p.payload.missing_fields.length > 0 && (
-            <div className="row"><span className="label">We need to know:</span>{(p.payload.missing_fields as string[]).map((f) => <Tag key={f} tone="warn">{f}</Tag>)}</div>
+            <div className="row"><span className="label">We need to know:</span>{p.payload.missing_fields.map((f) => <Tag key={f} tone="warn">{f}</Tag>)}</div>
           )}
         </div>
       );
@@ -112,7 +112,7 @@ function LinkWorkPayload({ p, work }: { p: Extract<Proposal, { kind: "link_work"
   );
 }
 
-function Criteria({ title, items, testId }: { title: string; items: string[]; testId?: string }) {
+function Criteria({ title, items, testId }: { title: string; items: readonly string[]; testId?: string }) {
   if (!items.length) return <p className="small muted">{title}: not stated.</p>;
   return (
     <div data-testid={testId}>
@@ -180,7 +180,7 @@ export function ActionArea({ request, proposal, action, refs, work, info, knowle
         announce(`Approved. ${spec(ACTION_STATUS, r.data.action.status).label}.`);
       },
       onError: (e) => {
-        announce(`Couldn’t do it: ${(e as Error).message}${e instanceof ApiError ? ` (${e.code})` : ""}`, true);
+        announce(`Couldn’t do it: ${e.message}${e instanceof ApiError ? ` (${e.code})` : ""}`, true);
       },
     });
   };

@@ -1,16 +1,9 @@
-import { expect, test } from "@playwright/test";
+import { expect, openTechnicalDetails, test, ui, WS } from "../support/fixtures";
 
 /*
  * Read-only checks: safe against the shared real API (PG_TARGET=real) as well as the mock.
  * No commands are sent; request IDs are discovered from the API (never hard-coded).
  */
-const WS = "/api/v1/workspaces/ws_demo";
-let pageErrors: string[] = [];
-test.beforeEach(({ page }) => {
-  pageErrors = [];
-  page.on("pageerror", (e) => pageErrors.push(String(e)));
-});
-test.afterEach(() => expect(pageErrors).toEqual([]));
 
 test("settings show the API's actual planner/connector states", async ({ page }) => {
   const info = (await (await page.request.get(`${WS}/info`)).json()).data;
@@ -29,7 +22,7 @@ test("inbox filters and an investigation render real evidence paths as ordered t
   await expect(page.getByTestId("request-table")).toBeVisible();
   await page.getByLabel("Status").selectOption("resolved");
   await expect(page).toHaveURL(/status=resolved/);
-  const rows = page.getByTestId("request-table").locator("tbody tr");
+  const rows = page.getByRole("table").getByRole("row").filter({ has: page.getByRole("cell") });
   await expect(rows.first()).toContainText("Solved (confirmed)");
 
   // Find a request whose context has at least one path, via the API.
@@ -43,13 +36,15 @@ test("inbox filters and an investigation render real evidence paths as ordered t
   // Graph detail lives in the collapsible Technical details; the main view shows a plain one-line chain.
   await expect(page.getByTestId("chain")).toContainText("→");
   await expect(page.getByTestId("knowledge-revision")).toBeHidden();
-  await page.getByTestId("technical-details").locator("summary").click();
+  await openTechnicalDetails(page);
   await expect(page.getByTestId("knowledge-revision")).toBeVisible();
   const path = page.getByTestId("evidence-path").first();
-  await expect(path.locator("ol.path > li").first()).toBeVisible();
-  await expect(path.locator("ol.path")).toHaveAttribute("aria-label", /Graph path 1: /);
-  if ((await page.getByTestId("open-source").count()) === 0) await page.getByTestId("toggle-sources").click();
-  await page.getByTestId("open-source").first().click();
+  // The ordered text path is a list whose accessible name spells the whole path.
+  const pathList = path.getByRole("list", { name: /^Graph path 1: / });
+  await expect(pathList).toBeVisible();
+  await expect(pathList.getByRole("listitem").first()).toBeVisible();
+  if ((await ui.openSource(page).count()) === 0) await page.getByTestId("toggle-sources").click();
+  await ui.openSource(page).first().click();
   await expect(page.getByTestId("drawer-excerpt")).not.toBeEmpty();
   await expect(page.getByTestId("drawer-revision")).toContainText("version ");
   await page.keyboard.press("Escape");
@@ -92,25 +87,26 @@ test("first-run 'How it works' explains the 4 steps; dismissal is remembered; th
   const how = page.getByTestId("how-it-works");
   await expect(how).toBeVisible();
   for (const step of ["A customer asks", "It checks what we know", "It suggests a next step", "You approve, then confirm"]) await expect(how).toContainText(step);
-  await page.getByTestId("dismiss-how").focus();
+  await page.getByRole("button", { name: "Got it, hide this" }).focus();
   await page.keyboard.press("Enter");
   await expect(how).toHaveCount(0);
   await page.reload();
   await expect(page.getByTestId("request-table")).toBeVisible();
   await expect(page.getByTestId("how-it-works")).toHaveCount(0);
-  await page.getByTestId("nav-how-it-works").click();
+  await page.getByRole("link", { name: "How it works" }).click();
   await expect(page.getByTestId("how-it-works")).toBeVisible();
 });
 
 test("'Try an example' only prefills the form (customer found by name); nothing is submitted", async ({ page }) => {
   const before = (await (await page.request.get(`${WS}/requests?limit=100`)).json()).data.length;
   await page.goto("/requests");
-  await page.getByTestId("new-request").click();
-  const dlg = page.getByTestId("new-request-dialog");
+  await page.getByRole("button", { name: "New request" }).click();
+  const dlg = page.getByRole("dialog", { name: "New customer request" });
   await dlg.getByRole("button", { name: "Vague request" }).click();
   await expect(dlg.getByLabel("Subject")).toHaveValue("Provisioning for store managers");
   await expect(dlg.getByLabel("Request body")).toHaveValue(/We need provisioning/);
-  await expect(dlg.getByLabel("Customer").locator("option:checked")).toContainText("Tamarind");
+  const tamarind = (await (await page.request.get(`${WS}/customers?limit=100`)).json()).data.find((c: { name: string }) => c.name.includes("Tamarind"));
+  await expect(dlg.getByLabel("Customer")).toHaveValue(tamarind.id);
   await expect(dlg).toContainText("PromiseGraph decides the next step itself");
   await expect(page.getByTestId("live-polite")).toContainText("Example filled in");
   await dlg.getByRole("button", { name: "Cancel" }).click();
@@ -132,9 +128,9 @@ test("'What we found' is collapsed to one count line per group; uncited items ap
   await page.goto(`/requests/${target!.id}`);
   const group = page.getByTestId("decisions");
   await expect(group).toContainText(new RegExp(`${target!.decisions} company rules? appl`));
-  await expect(group.locator("li")).toHaveCount(0);
+  await expect(group.getByRole("listitem")).toHaveCount(0);
   await page.getByTestId("toggle-decisions").click();
-  await expect(group.locator("li")).toHaveCount(target!.decisions);
+  await expect(group.getByRole("listitem")).toHaveCount(target!.decisions);
 });
 
 test("rule values and scopes show names from the API, not raw IDs", async ({ page }) => {
@@ -155,5 +151,5 @@ test("rule values and scopes show names from the API, not raw IDs", async ({ pag
   }
   test.skip(!routing && !capScoped, "no routing or capability-scoped rules to check");
   // Rendered setting/scope fragments never fall back to the raw-ID form when the name resolved.
-  await expect(list.locator("strong").filter({ hasText: /^person[ _]/ })).toHaveCount(0);
+  await expect(list.getByText(/^person_[a-z0-9_]+$/)).toHaveCount(0);
 });

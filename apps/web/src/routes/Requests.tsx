@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import type { RequestCreate, RequestCreateResult } from "@contracts";
 import { useCapabilities, useCommand, useCustomerName, useCustomers, useInfo, useRequests, rememberRun } from "../api/hooks";
 import { ApiError } from "../api/client";
 import { Icon } from "../components/Icon";
 import { Dialog, Empty, ErrorPanel, Field, Loading, StatusBadge, Ts, useAnnounce } from "../components/ui";
-import { REQUEST_STATUS } from "../lib/status";
+import { REQUEST_STATUS, spec } from "../lib/status";
 
 const STATUSES = Object.keys(REQUEST_STATUS);
 
@@ -17,7 +17,7 @@ export function RequestsPage() {
   const customers = useCustomers();
   const customerName = useCustomerName();
   const q = useRequests({ status: status || undefined, customer_id: customer || undefined });
-  const rows = useMemo(() => q.data?.pages.flatMap((p) => p.data) ?? [], [q.data]);
+  const rows = q.data?.pages.flatMap((p) => p.data) ?? [];
 
   const setFilter = (k: string, v: string) => {
     const n = new URLSearchParams(params);
@@ -45,7 +45,7 @@ export function RequestsPage() {
             <select {...p} value={status} onChange={(e) => setFilter("status", e.target.value)}>
               <option value="">All statuses</option>
               {STATUSES.map((s) => (
-                <option key={s} value={s}>{REQUEST_STATUS[s].label}</option>
+                <option key={s} value={s}>{spec(REQUEST_STATUS, s).label}</option>
               ))}
             </select>
           )}
@@ -165,7 +165,7 @@ function NewRequestForm({ onDone }: { onDone: () => void }) {
         onDone();
         nav(`/requests/${encodeURIComponent(request.id)}`);
       },
-      onError: (e) => announce(`Request not created: ${(e as Error).message}`, true),
+      onError: (e) => announce(`Request not created: ${e.message}`, true),
     });
   };
 
@@ -277,8 +277,8 @@ function HowItWorks({ forceOpen, onClose }: { forceOpen: boolean; onClose: () =>
   const [dismissed, setDismissed] = useState(() => {
     try { return localStorage.getItem(HOW_KEY) === "1"; } catch { return false; }
   });
-  useEffect(() => { if (forceOpen) setDismissed(false); }, [forceOpen]);
-  if (dismissed) return null;
+  // Shown when not dismissed, or when explicitly reopened from the nav (?help=1): derived, no reset effect.
+  if (dismissed && !forceOpen) return null;
   const dismiss = () => {
     try { localStorage.setItem(HOW_KEY, "1"); } catch { /* storage unavailable: dismiss for this visit only */ }
     setDismissed(true);

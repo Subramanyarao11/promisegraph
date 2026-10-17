@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router";
-import type { WorkItem, WorkItemUpdate, WorkItemUpdateResult } from "@contracts";
+import type { WorkItem, WorkItemUpdate, WorkItemUpdateResult, WorkStatus } from "@contracts";
+import { oneOf } from "../lib/format";
 import { useCommand, useWorkItems } from "../api/hooks";
 import { ApiError } from "../api/client";
 import { Icon } from "../components/Icon";
 import { Dialog, Empty, ErrorPanel, Field, Loading, Mono, Owner, StatusBadge, Tag, Ts, useAnnounce } from "../components/ui";
 import { CONNECTOR_LABEL, WORK_STATUS } from "../lib/status";
+
+const WORK_STATUSES = ["open", "in_progress", "blocked", "done", "cancelled"] as const satisfies readonly WorkStatus[];
 
 export function WorkPage() {
   const [params, setParams] = useSearchParams();
@@ -92,14 +95,14 @@ function WorkUpdateForm({ w, onDone }: { w: WorkItem; onDone: () => void }) {
     setErr(undefined);
     upd.mutate({ _id: w.id, expected_version: w.version, status, owner_id: owner.trim() || null, forecast_at: forecast ? new Date(forecast).toISOString().replace(/\.\d{3}Z$/, "Z") : null, reason: reason.trim() }, {
       onSuccess: () => { announce("Task updated. Any suggestion that relied on the old details will be re-checked."); onDone(); },
-      onError: (e) => announce(`Update refused: ${(e as Error).message}`, true),
+      onError: (e) => announce(`Update refused: ${e.message}`, true),
     });
   };
   return (
     <form onSubmit={submit} className="stack" noValidate>
       {upd.error && !(upd.error instanceof ApiError && upd.error.code === "INVALID_INPUT") && <ErrorPanel error={upd.error} />}
       <Field label="Status" error={fe.status}>
-        {(p) => <select {...p} value={status} onChange={(e) => setStatus(e.target.value as WorkItem["status"])}>{Object.entries(WORK_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>}
+        {(p) => <select {...p} value={status} onChange={(e) => setStatus(oneOf(WORK_STATUSES, e.target.value, status))}>{Object.entries(WORK_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>}
       </Field>
       <Field label="Owner (person ID)" hint="Leave empty if nobody owns it yet." error={fe.owner_id}>
         {(p) => <input {...p} type="text" value={owner} onChange={(e) => setOwner(e.target.value)} />}

@@ -1,4 +1,5 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import type { APIRequestContext, Page } from "@playwright/test";
+import { customerIdByName, expect, expectNoHorizontalScroll, openTechnicalDetails, test, ui, WS } from "../support/fixtures";
 import { randomUUID } from "node:crypto";
 
 /*
@@ -9,31 +10,14 @@ import { randomUUID } from "node:crypto";
  */
 test.skip((process.env.PG_TARGET ?? "mock") !== "real", "real-stack journeys run with PG_TARGET=real");
 
-const WS = "/api/v1/workspaces/ws_demo";
-let pageErrors: string[] = [];
-test.beforeEach(({ page }) => {
-  pageErrors = [];
-  page.on("pageerror", (e) => pageErrors.push(String(e)));
-});
-test.afterEach(() => expect(pageErrors, "uncaught page errors").toEqual([]));
 
-async function customerId(api: APIRequestContext, name: string): Promise<string> {
-  const cs = (await (await api.get(`${WS}/customers?limit=100`)).json()).data as { id: string; name: string }[];
-  const c = cs.find((x) => x.name.toLowerCase().includes(name));
-  expect(c, `customer named like ${name}`).toBeTruthy();
-  return c!.id;
-}
 async function intake(api: APIRequestContext, customer: string, subject: string, body: string) {
   const r = await api.post(`${WS}/requests`, {
     headers: { "Idempotency-Key": `rt-${randomUUID()}` },
-    data: { customer_id: await customerId(api, customer), subject, body, channel: "manual", capability_ids: [], external_ref: null, auto_start: true, planner_mode: "scripted" },
+    data: { customer_id: await customerIdByName(api, customer), subject, body, channel: "manual", capability_ids: [], external_ref: null, auto_start: true, planner_mode: "scripted" },
   });
   expect(r.status()).toBe(201);
   return (await r.json()).data.request.id as string;
-}
-async function noHorizontalScroll(page: Page) {
-  const [sw, cw] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
-  expect(sw).toBeLessThanOrEqual(cw + 1);
 }
 /** Wait until the run leaves queued/running: a proposal awaiting review, waiting for input, or finished. */
 async function waitForSettledRun(page: Page) {
@@ -46,9 +30,9 @@ test("T25 real: keyboard + 390px intake → evidence → reviewed action → out
   await page.goto("/requests");
   await expect(page.getByTestId("mode-badges")).toContainText("Rule-based mode");
 
-  await page.getByTestId("new-request").focus();
+  await page.getByRole("button", { name: "New request" }).focus();
   await page.keyboard.press("Enter");
-  const dlg = page.getByTestId("new-request-dialog");
+  const dlg = page.getByRole("dialog", { name: "New customer request" });
   await dlg.getByLabel("Customer").focus();
   await page.keyboard.type("Corvid");
   await expect(dlg.getByLabel("Customer")).not.toHaveValue("");
@@ -56,7 +40,7 @@ test("T25 real: keyboard + 390px intake → evidence → reviewed action → out
   await page.keyboard.type(subject);
   await dlg.getByLabel("Request body").focus();
   await page.keyboard.type("Our security operations team needs admin and sign-in audit events streamed to our SIEM over syslog with TLS in near real time. A CSV download is not enough for continuous monitoring.");
-  await dlg.getByTestId("submit-request").focus();
+  await dlg.getByRole("button", { name: "Submit and look into it" }).focus();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/requests\/[^/]+$/);
 
@@ -64,26 +48,26 @@ test("T25 real: keyboard + 390px intake → evidence → reviewed action → out
   await expect(page.getByTestId("proposal-kind")).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId("finding-text")).not.toBeEmpty();
   await expect(page.getByTestId("timeline").first()).toContainText("Rule-based mode");
-  await noHorizontalScroll(page);
+  await expectNoHorizontalScroll(page);
 
   // Evidence by keyboard (real source revision from FalkorDB).
-  if ((await page.getByTestId("open-source").count()) === 0) {
+  if ((await ui.openSource(page).count()) === 0) {
     await page.getByTestId("toggle-sources").focus();
     await page.keyboard.press("Enter");
   }
-  await page.getByTestId("open-source").first().focus();
+  await ui.openSource(page).first().focus();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("drawer-excerpt")).not.toBeEmpty();
   await expect(page.getByTestId("drawer-revision")).toContainText("version ");
   await page.keyboard.press("Escape");
 
   // Reviewed action: authorize when the policy requires it (create/link/escalate); answer/clarify drafts auto-commit.
-  const authorize = page.getByTestId("authorize");
+  const authorize = ui.approve(page);
   if (await authorize.count()) {
     await expect(authorize).toBeEnabled();
     await authorize.focus();
     await page.keyboard.press("Enter");
-    await page.getByTestId("confirm-authorize").focus();
+    await ui.confirmApprove(page).focus();
     await page.keyboard.press("Enter");
     await expect(page.getByTestId("live-polite")).toContainText(/Approved/);
   }
@@ -100,11 +84,11 @@ test("T25 real: keyboard + 390px intake → evidence → reviewed action → out
   const form = page.getByTestId("observation-form");
   await form.getByLabel("What happened").focus();
   await page.keyboard.type("Customer confirmed audit events now arrive in their SIEM.");
-  await form.getByTestId("submit-observation").focus();
+  await form.getByRole("button", { name: "Save", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("request-status")).toContainText("Solved (confirmed)", { timeout: 20_000 });
   await expect(page.getByTestId("resolved-evidence")).toBeVisible();
-  await noHorizontalScroll(page);
+  await expectNoHorizontalScroll(page);
 });
 
 test("real: clarification reply resumes the same run with history retained (T02/T03)", async ({ page }) => {
@@ -117,7 +101,7 @@ test("real: clarification reply resumes the same run with history retained (T02/
 
   const reply = page.getByTestId("reply-form");
   await reply.getByLabel("Customer reply").fill("We mean group sync: our IdP groups 'Store Managers' and 'Regional Leads' should map to the Viewer and Editor roles. Accounts are already created at first login.");
-  await reply.getByTestId("submit-reply").click();
+  await reply.getByRole("button", { name: "Save reply and continue" }).click();
   await expect(page.getByTestId("live-polite")).toContainText(/Reply recorded/);
 
   // Any valid follow-up disposition; the run is the same logical run with its earlier events.
@@ -125,7 +109,7 @@ test("real: clarification reply resumes the same run with history retained (T02/
   const headings = page.getByTestId("run-heading");
   await expect(headings).toHaveCount(1);
   await expect(headings.first()).toHaveText(runHeading!);
-  await page.getByTestId("technical-details").locator("summary").click();
+  await openTechnicalDetails(page);
   await expect(page.locator('[data-testid="timeline-event"][data-type="waiting_for_input"]').first()).toBeVisible();
   await expect(page.getByTestId("proposal-kind")).not.toHaveText("Ask the customer a question");
 });
@@ -133,7 +117,7 @@ test("real: clarification reply resumes the same run with history retained (T02/
 test("real: a knowledge change makes the waiting proposal stale and removes the commit control (T12)", async ({ page }) => {
   const id = await intake(page.request, "helix", `Webhook events lost again during maintenance ${Date.now()}`, "Events sent during last Sunday's maintenance window are missing again. We need them redelivered and this fixed permanently.");
   await page.goto(`/requests/${id}`);
-  await expect(page.getByTestId("authorize")).toBeEnabled({ timeout: 60_000 });
+  await expect(ui.approve(page)).toBeEnabled({ timeout: 60_000 });
 
   // Change a fact the proposal consulted (T12): the linked local work item. The scenario's disposition is link_work;
   // if the planner chose something else the precondition is not met and the test says exactly what it saw.
@@ -156,7 +140,7 @@ test("real: a knowledge change makes the waiting proposal stale and removes the 
   expect(r.status(), await r.text()).toBe(200);
 
   await expect(page.getByTestId("proposal-validity")).toContainText(/Out of date|Can't be done/, { timeout: 20_000 });
-  await expect(page.getByTestId("authorize")).toBeDisabled();
+  await expect(ui.approve(page)).toBeDisabled();
   await expect(page.getByTestId("commit-blocked")).toBeVisible();
 });
 
@@ -164,7 +148,7 @@ test("real: explicit closure is distinct from verified resolution", async ({ pag
   const id = await intake(page.request, "corvid", `Stream audit events to our SIEM (closure) ${Date.now()}`, "Our security operations team needs admin and sign-in audit events streamed to our SIEM over syslog with TLS.");
   await page.goto(`/requests/${id}`);
   await waitForSettledRun(page);
-  await page.getByTestId("close-request").click();
+  await ui.closeRequest(page).click();
   await page.getByLabel("Reason").fill("Handled by the account team outside PromiseGraph.");
   await page.getByRole("dialog").getByRole("button", { name: "Close request" }).click();
   await expect(page.getByTestId("request-status")).toContainText("Closed", { timeout: 15_000 });
