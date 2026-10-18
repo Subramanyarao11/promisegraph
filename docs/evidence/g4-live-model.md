@@ -20,3 +20,12 @@ What it shows honestly:
 - No tuning against the holdouts was done. A stronger model and prompt/tool-loop work are the obvious next steps.
 
 Product default: **rule-based mode** stays the default for the demo; live mode is selectable per request and labelled.
+
+## Follow-up: gpt-4.1 (2026-10-18, 22:56 IST)
+
+- Found and fixed an adapter bug: models that reply in prose before calling tools ended the run immediately
+  (`NO_PROPOSAL`). The loop now reminds the model to use the tools (max 2 reminders); unit-tested.
+- gpt-4.1 with a 20-call limit on 6 key scenarios (t01, t02, t04, t06, t09, t11): **0/6 pass** ($0.49). Runs now reach
+  proposals, but dispositions/evidence still miss the scenario expectations. Raw log: `g4-live-model-gpt-4.1-subset.log`.
+- Conclusion for this submission: the live-model loop is connected and safe, but not yet competitive with the
+  rule-based planner; improving it needs prompt and tool-loop work beyond the deadline.

@@ -44,7 +44,17 @@ class Script:
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(json.loads(request.content))
         assert request.url.host in ("api.openai.com", "api.anthropic.com")
+        if not self.responses:
+            # Script exhausted: behave like a model that keeps replying in prose (exercises the tool-use reminder).
+            return self.responses_tail(request)
         return self.responses.pop(0)
+
+    def responses_tail(self, request: httpx.Request) -> httpx.Response:
+        if request.url.host == "api.anthropic.com":
+            return httpx.Response(200, json={"content": [{"type": "text", "text": "Done."}], "stop_reason": "end_turn",
+                                             "usage": {"input_tokens": 10, "output_tokens": 2}})
+        return httpx.Response(200, json={"choices": [{"message": {"role": "assistant", "content": "Done."}, "finish_reason": "stop"}],
+                                         "usage": {"prompt_tokens": 10, "completion_tokens": 2}})
 
 
 def planner(tmp_path: Path, script: Script, *, budget: float = 8.0, provider: str = "openai", max_calls: int = 12, g: SpendGuard | None = None) -> ModelPlanner:
@@ -200,7 +210,8 @@ def test_rate_limit_and_5xx_back_off_then_succeed(tmp_path):
                      oa_reply(text="done after backoff")])
     p = ModelPlanner(enabled=True, provider="openai", api_key="k", model="m", guard=guard(tmp_path), transport=httpx.MockTransport(script), backoff=Backoff(sleep=sleeps.append))
     out, _, usage = drive(p, responder)
-    assert len(script.requests) == 3 and sleeps[0] == 3.0 and usage[-1]["ok"] is True and out.error["code"] == "NO_PROPOSAL"
+    # 429 + 503 + success, then two tool-use reminders before giving up without a proposal
+    assert len(script.requests) == 5 and sleeps[0] == 3.0 and usage[-1]["ok"] is True and out.error["code"] == "NO_PROPOSAL"
 
 
 def test_error_object_in_http_200_is_an_error(tmp_path):
@@ -323,3 +334,12 @@ def test_read_memory_gets_capability_scope_added(tmp_path):
     _out, calls, _ = drive(planner(tmp_path, script), resp)
     rm = [c for c in calls if c["name"] == "read_memory"][0]
     assert {"entity_type": "capability", "entity_id": "cap_x"} in rm["arguments"]["scopes"]
+
+
+def test_text_only_reply_gets_tool_use_reminder_then_fails(tmp_path: Path) -> None:
+    script = Script([])  # every reply is prose
+    p = planner(tmp_path, script)
+    outcome, _calls, _usage = drive(p, responder)
+    assert outcome.error and outcome.error["code"] == "NO_PROPOSAL"
+    assert len(script.requests) == 3  # first reply + two reminders
+    assert "prepare_action" in json.dumps(script.requests[-1]["messages"][-1])

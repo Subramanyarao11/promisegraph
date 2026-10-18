@@ -104,6 +104,12 @@ def capability_ids(data: Any) -> list[str]:
     return out
 
 
+NUDGE = (
+    "Do not reply with prose. Continue by calling the tools: gather evidence if needed, then call "
+    "prepare_action with exactly one disposition (answer, clarify, link_work, create_work or escalate)."
+)
+
+
 class ModelPlanner:
     mode = "model"
     label = "Model mode"
@@ -169,6 +175,7 @@ class ModelPlanner:
         proposal_ids: list[str] = []
         action_ids: list[str] = []
         kind: str | None = None
+        nudges = 0
         while True:
             if self.guard.run_calls(run_id) >= self.max_calls_per_run:
                 return self._fail("BUDGET_EXHAUSTED", f"model call limit per run reached ({self.max_calls_per_run})")
@@ -199,6 +206,11 @@ class ModelPlanner:
                     return Outcome("waiting", "decide", "awaiting_review", summary or "Awaiting review.", kind=kind, proposal_ids=proposal_ids, awaiting="review")
                 if ctx.resume_stage in ("observe", "verify"):
                     return Outcome("succeeded", "observe", "succeeded", summary or "Observed.", action_ids=[ctx.pending_action_id] if ctx.pending_action_id else [])
+                if nudges < 2:
+                    # Some models narrate before acting. Remind them that the run ends only with a proposal.
+                    nudges += 1
+                    provider.messages.append({"role": "user", "content": NUDGE})
+                    continue
                 return self._fail("NO_PROPOSAL", "model finished without a proposal")
 
             results: list[tuple[str, str, bool]] = []
