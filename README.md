@@ -2,7 +2,11 @@
 
 PromiseGraph is a customer-operations agent. You give it a customer request, and it investigates the request using company knowledge stored in **FalkorDB**. It then chooses one of five next actions: **answer, clarify, link existing work, create new work, or escalate**. It carries out that action through validated tools, records the result, and remembers scoped outcomes for later requests.
 
-Graph Hacks (FalkorDB) hackathon, Company Brain track. All data is synthetic.
+Graph Hacks (FalkorDB) hackathon. **Tracks:** Company Brain (primary), Agents That Act on Connected Data, Agent Memory and Coordination. All data is synthetic.
+
+- **Graph data model and the Cypher queries the product depends on:** [docs/GRAPH.md](docs/GRAPH.md)
+- **Demo video:** _YouTube link added at submission_
+- **Evidence of every claim below:** [docs/evidence/](docs/evidence/)
 
 ## Status (honest)
 
