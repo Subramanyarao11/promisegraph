@@ -2,6 +2,8 @@
 
 **A customer-operations agent with a graph memory, built on FalkorDB.**
 
+▶ **Demo video:** https://youtu.be/aNkvh3nrXFc
+
 A customer writes: *"Our scheduled exports stopped working. We need them before Friday."* To answer well, a support
 lead has to work out whether it's a known bug, who owns the fix, what that fix is blocked on, whether a workaround
 already failed for this customer, and whether a company rule applies. PromiseGraph does that investigation in a
