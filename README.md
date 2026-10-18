@@ -14,8 +14,8 @@ Graph Hacks (FalkorDB) hackathon, Company Brain track. All data is synthetic.
 | Browser journeys (keyboard, 390 px, stale-blocked commit, clarification, closure, DB down, unknown dispatch) | Pass on the real stack (Playwright `PG_TARGET=real` and `real-fault`) |
 | Planner | **Scripted mode** (deterministic and labelled in the UI). It uses the same tools as the live model. |
 | Generalisation of the scripted planner | 8/12 acceptable on a sealed holdout set written without seeing the planner code. Several "acceptable" answers quote weakly relevant text ([evidence](docs/evidence/g4-holdouts-v2-scripted.md)). |
-| Live model planner (OpenAI) | Implemented and tested only against mocked HTTP. **No live calls have been made yet.** A hard spend guard stops all calls at the operator's cap (≤ $10). |
-| Linear connector | **Implemented, unverified.** It has not been run against a real Linear workspace. |
+| Live model planner (OpenAI gpt-4o-mini) | **Live and working end to end** through the same validated tools, under a hard spend guard. On our tests it scores **2/18 scenarios and 1/12 holdouts** (vs 18/18 and 8/12 rule-based), for $0.28 total. Rule-based mode stays the default ([evidence](docs/evidence/g4-live-model.md)). |
+| Linear connector | **Verified** against a real Linear test team: created issue PRO-5 after operator approval and read it back ([evidence](docs/evidence/g3-linear.md)). Timeout reconciliation against Linear is tested only with mocked HTTP. |
 | Local task connector | Verified. Receipts are real records in the graph and are read back. |
 
 We don't claim measured time savings or accuracy figures beyond the evidence linked above.
