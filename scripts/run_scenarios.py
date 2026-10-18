@@ -36,6 +36,7 @@ Semantics (fixtures/scenarios/_conventions.json, plus the interpretations docume
 
 from __future__ import annotations
 
+PLANNER_MODE_OVERRIDE = None
 import argparse
 import json
 import os
@@ -270,6 +271,8 @@ class ScenarioRun:
         inp = resolve(step.get("input", {}), self.caps, self.api, ws)
         api = self.api
         if a == "create_request":
+            if PLANNER_MODE_OVERRIDE and "planner_mode" in inp:
+                inp = {**inp, "planner_mode": PLANNER_MODE_OVERRIDE}
             st, d = api.call("POST", ws, "/requests", inp, schema="RequestCreateResult")
             return self.http_capture(st, d, lambda x: {"request": x["request"], "run": x["run"]})
         if a == "await_run":
@@ -989,7 +992,10 @@ def run_holdout(api: Api, h: dict) -> dict:
     res: dict[str, Any] = {"id": h["id"], "checks": [], "error": None}
     base = sr.work_count(ws)
     try:
-        created = api.ok("POST", ws, "/requests", h["request"], schema="RequestCreateResult")
+        body = h["request"]
+        if PLANNER_MODE_OVERRIDE:
+            body = {**body, "planner_mode": PLANNER_MODE_OVERRIDE}
+        created = api.ok("POST", ws, "/requests", body, schema="RequestCreateResult")
         snap = sr.await_run(ws, {"run_id": created["run"]["id"], "timeout_seconds": 90,
                                  "until_status_in": ["succeeded", "awaiting_review", "waiting_for_input", "failed", "cancelled"]})
     except StepError as exc:
@@ -1117,7 +1123,11 @@ def main() -> int:
                     help="holdouts/ (v1, default), holdouts-v2/ (v2) or both; implies --holdouts")
     ap.add_argument("--no-scenarios", action="store_true", help="only holdouts")
     ap.add_argument("--json", dest="json_out")
+    ap.add_argument("--planner-mode", choices=["scripted", "model"], default=None,
+                    help="override planner_mode on every created request (scenarios and holdouts)")
     args = ap.parse_args()
+    global PLANNER_MODE_OVERRIDE
+    PLANNER_MODE_OVERRIDE = args.planner_mode
     if not args.manage and not args.base_url:
         ap.error("--base-url or --manage is required")
     if args.secondary_port is None:
