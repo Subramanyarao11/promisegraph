@@ -216,7 +216,7 @@ def test_max_calls_per_run_enforced(tmp_path):
 
 
 def test_anthropic_adapter_behind_same_interface(tmp_path):
-    script = Script([httpx.Response(200, json={"content": [{"type": "tool_use", "id": "tu1", "name": "prepare_action", "input": {**ANSWER, "evidence_ids": []}}],
+    script = Script([httpx.Response(200, json={"content": [{"type": "tool_use", "id": "tu1", "name": "prepare_action", "input": {**ANSWER, "kind": "clarify", "payload": {"question": "Which one?", "missing_fields": ["capability"]}, "evidence_ids": []}}],
                                                "stop_reason": "tool_use", "usage": {"input_tokens": 50, "output_tokens": 20}}),
                      httpx.Response(200, json={"content": [{"type": "text", "text": "ok"}], "stop_reason": "end_turn", "usage": {"input_tokens": 60, "output_tokens": 5}})])
     out, calls, usage = drive(planner(tmp_path, script, provider="anthropic"), responder)
@@ -263,3 +263,63 @@ def test_relative_ledger_path_resolves_against_repo_root(tmp_path):
 def test_guard_rejects_budget_over_operator_ceiling(tmp_path):
     with pytest.raises(SpendConfigError):
         guard(tmp_path, budget=10.01)
+
+
+def test_observe_continuation_uses_no_model_calls(tmp_path):
+    script = Script([])  # any provider request would fail the test
+    p = planner(tmp_path, script)
+    n = {"i": 0}
+
+    def new_id():
+        n["i"] += 1
+        return f"c{n['i']}"
+
+    ctx = PlanContext(workspace_id="w", request={"id": "rq_1", "customer_id": "cu", "subject": "s", "body": "b", "capability_ids": [], "linked_work_ids": []},
+                      run={"id": "rn_1"}, info={}, new_call_id=new_id, replan=lambda r: None, resume_stage="observe", pending_action_id="ac_1")
+    gen = p.plan(ctx)
+    call = next(gen)
+    assert call["name"] == "inspect_action"
+    try:
+        gen.send({"call_id": call["call_id"], "ok": True, "data": {"id": "ac_1", "kind": "answer", "status": "succeeded", "receipt": {"target_id": "d"}}, "error": None, "meta": {}})
+    except StopIteration as stop:
+        assert stop.value.completion == "succeeded"
+    assert script.requests == []
+
+
+def test_answer_citing_only_the_request_itself_is_rejected(tmp_path):
+    own = {**EV, "id": "ev_req", "source_id": "src_req_1", "excerpt": "the customer's own words"}
+
+    def resp(call):
+        if call["name"] == "search_context":
+            return ok(call, {"candidates": [{"entity_type": "request", "id": "rq_1", "title": "t", "score": 1, "evidence": [own]}], "truncated": False})
+        return responder(call)
+
+    script = Script([oa_reply([("search_context", {"query": "x", "entity_types": ["request"], "customer_id": None, "limit": 5})]),
+                     oa_reply([("prepare_action", {**ANSWER, "evidence_ids": ["ev_req"]})]), oa_reply(text="stop")])
+    p = planner(tmp_path, script)
+    n = {"i": 0}
+    ctx = PlanContext(workspace_id="w", request={"id": "rq_1", "customer_id": "cu", "subject": "s", "body": "b", "source_id": "src_req_1", "capability_ids": [], "linked_work_ids": []},
+                      run={"id": "rn_1"}, info={"auto_commit_kinds": ["answer"]}, new_call_id=lambda: f"c{id(n)}{len(script.requests)}", replan=lambda r: None)
+    gen = p.plan(ctx)
+    calls, result = [], None
+    try:
+        while True:
+            call = gen.send(result) if result is not None else next(gen)
+            calls.append(call["name"])
+            result = resp(call)
+    except StopIteration:
+        pass
+    assert "prepare_action" not in calls and "documentation or work-item evidence" in script.requests[2]["messages"][-1]["content"]
+
+
+def test_read_memory_gets_capability_scope_added(tmp_path):
+    def resp(call):
+        if call["name"] == "search_context":
+            return ok(call, {"candidates": [{"entity_type": "capability", "id": "cap_x", "title": "X", "score": 0.5, "evidence": []}], "truncated": False})
+        return responder(call)
+
+    script = Script([oa_reply([("search_context", {"query": "x", "entity_types": ["capability"], "customer_id": None, "limit": 5})]),
+                     oa_reply([("read_memory", {"scopes": [{"entity_type": "customer", "entity_id": "cu"}]})]), oa_reply(text="stop")])
+    _out, calls, _ = drive(planner(tmp_path, script), resp)
+    rm = [c for c in calls if c["name"] == "read_memory"][0]
+    assert {"entity_type": "capability", "entity_id": "cap_x"} in rm["arguments"]["scopes"]

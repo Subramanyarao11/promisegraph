@@ -35,7 +35,11 @@ SYSTEM_PROMPT = (
     "that prose (ids belong only in evidence_ids). Example explanation: \"Engineering already has this: 'Restore "
     "scheduled exports' (owner Maya Raman). It's blocked behind 'Queue v2 cutover', whose owner has left, so we "
     "can't promise a date.\" Example reason: \"Not 'Run now' again: it already failed for Acme on 13 Oct.\" "
-    "Mention incomplete information only if it changes the recommendation, in one sentence."
+    "Mention incomplete information only if it changes the recommendation, in one sentence.\n"
+    "Grounding: answer, link_work and create_work must cite at least one documentation or work-item evidence id "
+    "(from search_context/expand_context/read_memory results); the request's own text is never enough. Search "
+    "sources for documentation, then call read_memory with the capability you identified in `scopes` so verified "
+    "and failed prior attempts for that capability are included."
 )
 RESULT_CHARS = 6000
 
@@ -73,6 +77,31 @@ def returned_evidence_ids(data: Any, out: set[str]) -> None:
     elif isinstance(data, list):
         for v in data:
             returned_evidence_ids(v, out)
+
+
+def evidence_sources(data: Any, out: dict[str, str]) -> None:
+    """evidence id -> source id for every EvidenceRef a tool returned."""
+    if isinstance(data, dict):
+        if isinstance(data.get("id"), str) and "excerpt" in data and isinstance(data.get("source_id"), str):
+            out[data["id"]] = data["source_id"]
+        for v in data.values():
+            evidence_sources(v, out)
+    elif isinstance(data, list):
+        for v in data:
+            evidence_sources(v, out)
+
+
+def capability_ids(data: Any) -> list[str]:
+    """Capability candidates (search) and capability nodes (expand), in returned order."""
+    out: list[str] = []
+    if isinstance(data, dict):
+        for c in data.get("candidates") or []:
+            if isinstance(c, dict) and c.get("entity_type") == "capability":
+                out.append(c["id"])
+        for n in data.get("nodes") or []:
+            if isinstance(n, dict) and str(n.get("label", "")).lower() == "capability":
+                out.append(n["id"])
+    return out
 
 
 class ModelPlanner:
@@ -123,11 +152,20 @@ class ModelPlanner:
         return Outcome("retryable_failure" if retryable else "failed", stage, "queued" if retryable else "failed", f"Model mode: {message}", error=error)
 
     def plan(self, ctx: PlanContext) -> PlanGenerator:
+        if ctx.resume_stage in ("observe", "verify"):
+            # Post-dispatch observation is deterministic bookkeeping: no model calls, no spend (Rev 6 budget stays
+            # for investigation). Same tools and policies as scripted mode.
+            from .scripted import ScriptedPlanner
+
+            return (yield from ScriptedPlanner()._observe(ctx))
         run_id = str((ctx.run or {}).get("id") or "norun")
         emit: Callable[[dict[str, Any]], None] = ctx.extra.get("emit_model_usage") or (lambda _p: None)
         provider = PROVIDERS[self.provider_name](api_key=self._api_key, model=self.model, transport=self._transport, backoff=self._backoff)
         provider.start(SYSTEM_PROMPT, self.brief(ctx), self.tools())
         seen: set[str] = set()
+        evidence_source: dict[str, str] = {}
+        capabilities_seen: list[str] = []
+        own_sources = {ctx.request.get("source_id")} - {None}
         proposal_ids: list[str] = []
         action_ids: list[str] = []
         kind: str | None = None
@@ -173,14 +211,26 @@ class ModelPlanner:
                 elif tc.name == "prepare_action":
                     cited = [e for e in tc.arguments.get("evidence_ids") or [] if isinstance(e, str)]
                     unknown = [e for e in cited if e not in seen]
+                    grounded = [e for e in cited if e in seen and evidence_source.get(e) not in own_sources]
                     if unknown:
                         local_error = {"code": "EVIDENCE_INVALID", "message": f"cite only evidence ids returned by tools; not returned: {unknown[:10]}"}
+                    elif tc.arguments.get("kind") in ("answer", "link_work", "create_work") and not grounded:
+                        local_error = {"code": "EVIDENCE_INVALID", "message": "cite at least one documentation or work-item evidence id; the request's own text is not evidence. Search sources or expand the capability first."}
+                elif tc.name == "read_memory" and capabilities_seen:
+                    scopes = list(tc.arguments.get("scopes") or [])
+                    if not any(sc.get("entity_type") == "capability" for sc in scopes if isinstance(sc, dict)):
+                        # Include capability-scoped attempts/decisions, as scripted mode does.
+                        tc.arguments["scopes"] = (scopes + [{"entity_type": "capability", "entity_id": c} for c in capabilities_seen[:2]])[:8]
                 if local_error:
                     results.append((tc.id, json.dumps({"ok": False, "error": local_error}), True))
                     continue
                 result = yield {"call_id": ctx.new_call_id(), "name": tc.name, "arguments": tc.arguments}
                 if result["ok"]:
                     returned_evidence_ids(result.get("data"), seen)
+                    evidence_sources(result.get("data"), evidence_source)
+                    for cid in capability_ids(result.get("data")):
+                        if cid not in capabilities_seen:
+                            capabilities_seen.append(cid)
                     data = result.get("data") or {}
                     if tc.name == "prepare_action" and data.get("id"):
                         proposal_ids.append(data["id"])
