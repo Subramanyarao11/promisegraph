@@ -40,7 +40,7 @@ services/worker ─────────┘  claims jobs (lease + fencing), r
   - Proposals become stale when the facts they consulted change.
   - Creating a task never resolves a request. Only an attributable verification does.
 
-Contracts and specification: [`docs/spec/`](docs/spec/), [`contracts/PROTOCOL.md`](contracts/PROTOCOL.md) and the [`contracts/*.schema.json`](contracts/) files.
+API contracts: the JSON schemas in [`contracts/`](contracts/) (resources, commands, worker job protocol), with generated Python and TypeScript types. Graph model and Cypher: [`docs/GRAPH.md`](docs/GRAPH.md).
 
 ## Run it
 
