@@ -1,0 +1,4252 @@
+{
+  "started_at": "2026-10-18T17:04:54.045630+00:00",
+  "finished_at": "2026-10-18T17:19:26.908521+00:00",
+  "stem": "pgeval_20261018170454",
+  "holdout_set": "v2",
+  "model_usage_total": {
+    "calls": 317,
+    "input_tokens": 1659229,
+    "output_tokens": 30645,
+    "cost_usd": 0.267266
+  },
+  "unchecked_tokens": [],
+  "results": [
+    {
+      "id": "t01-answer-supported-export",
+      "acceptance_ids": [
+        "T01"
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "action": "create_request",
+          "seconds": 0.03,
+          "summary": "request=req_3d4b01497af54e66(open) run=run_7474a3e99d9f4dde(queued)"
+        },
+        {
+          "id": "s2",
+          "action": "await_run",
+          "seconds": 11.83,
+          "summary": "request=req_3d4b01497af54e66(awaiting_review) run=run_7474a3e99d9f4dde(awaiting_review) proposal=prop_6bdbffbdcfbc4196(link_work/valid)"
+        },
+        {
+          "id": "s3",
+          "action": "get_request",
+          "seconds": 0.0,
+          "summary": "request=req_3d4b01497af54e66(awaiting_review)"
+        },
+        {
+          "id": "s4",
+          "action": "record_observation",
+          "seconds": 0.0,
+          "summary": "ERROR reference ${s2.latest_action.id} resolved to nothing"
+        }
+      ],
+      "expectations": [
+        {
+          "assert": "run_status",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "run run_7474a3e99d9f4dde status=awaiting_review stage=decide",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "succeeded"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_kind",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_6bdbffbdcfbc4196 kind=link_work validity=valid",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "answer"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_validity",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "proposal prop_6bdbffbdcfbc4196 validity=valid reasons=[]",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "valid"
+            ]
+          }
+        },
+        {
+          "assert": "evidence_sources_include_any",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_6bdbffbdcfbc4196 (link_work) evidence sources=['src_req_3d4b01497af54e66', 'src_work_item_work_dashboard_embed_sdk']",
+          "spec": {
+            "step": "s2",
+            "source_ids": [
+              "20-docs-scheduled-exports"
+            ]
+          }
+        },
+        {
+          "assert": "context_includes",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "attempts missing=['attempt_corvid_weekly_xlsx']; present=['attempt_corvid_scim_v2']",
+          "spec": {
+            "step": "s2",
+            "field": "attempts",
+            "ids": [
+              "attempt_corvid_weekly_xlsx"
+            ]
+          }
+        },
+        {
+          "assert": "action_status",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no action (http None, error None)",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "succeeded"
+            ]
+          }
+        },
+        {
+          "assert": "action_verification",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no action (http None, error None)",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "pending"
+            ]
+          }
+        },
+        {
+          "assert": "no_action_kinds",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "actions=[]",
+          "spec": {
+            "step": "s2",
+            "kinds": [
+              "create_work",
+              "link_work",
+              "escalate"
+            ]
+          }
+        },
+        {
+          "assert": "work_item_count_delta",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "baseline=22 after s2=22 delta=0",
+          "spec": {
+            "step": "s2",
+            "value": 0
+          }
+        },
+        {
+          "assert": "request_status",
+          "step": "s3",
+          "optional": false,
+          "ok": false,
+          "detail": "request req_3d4b01497af54e66 status=awaiting_review",
+          "spec": {
+            "step": "s3",
+            "values": [
+              "awaiting_verification"
+            ]
+          }
+        },
+        {
+          "assert": "request_status",
+          "step": "s4",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s4 failed: reference ${s2.latest_action.id} resolved to nothing",
+          "spec": {
+            "step": "s4",
+            "values": [
+              "resolved"
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "seconds": 11.9,
+      "ids": {
+        "s1": {
+          "request": "req_3d4b01497af54e66",
+          "run": "run_7474a3e99d9f4dde"
+        },
+        "s2": {
+          "request": "req_3d4b01497af54e66",
+          "run": "run_7474a3e99d9f4dde",
+          "proposal": "prop_6bdbffbdcfbc4196"
+        },
+        "s3": {
+          "request": "req_3d4b01497af54e66"
+        }
+      },
+      "model_usage": {
+        "calls": 6,
+        "input_tokens": 27978,
+        "output_tokens": 449,
+        "cost_usd": 0.004466
+      },
+      "base_url": "http://127.0.0.1:8094",
+      "contract_errors": [],
+      "status": "FAIL",
+      "optional_misses": [],
+      "http_calls": 35
+    },
+    {
+      "id": "t02-clarify-provisioning",
+      "acceptance_ids": [
+        "T02"
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "action": "create_request",
+          "seconds": 0.02,
+          "summary": "request=req_65db10bc13864efc(open) run=run_e5c6be3e091242f6(queued)"
+        },
+        {
+          "id": "s2",
+          "action": "await_run",
+          "seconds": 22.13,
+          "summary": "request=req_65db10bc13864efc(investigating) run=run_e5c6be3e091242f6(failed) proposal=prop_90df8c3eba50403f(answer/stale)"
+        },
+        {
+          "id": "s3",
+          "action": "get_request",
+          "seconds": 0.0,
+          "summary": "request=req_65db10bc13864efc(investigating)"
+        }
+      ],
+      "expectations": [
+        {
+          "assert": "proposal_kind",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_90df8c3eba50403f kind=answer validity=stale",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "clarify"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_payload_matches",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_90df8c3eba50403f (answer) payload.question=<missing>",
+          "spec": {
+            "step": "s2",
+            "path": "question",
+            "regex": "(?is)(account|user).*(group|role)|(group|role).*(account|user)"
+          }
+        },
+        {
+          "assert": "proposal_payload_nonempty",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_90df8c3eba50403f (answer) payload.missing_fields=<missing>",
+          "spec": {
+            "step": "s2",
+            "path": "missing_fields"
+          }
+        },
+        {
+          "assert": "run_status",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "run run_e5c6be3e091242f6 status=failed stage=prepare",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "waiting_for_input"
+            ]
+          }
+        },
+        {
+          "assert": "action_status",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no action (http None, error None)",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "succeeded"
+            ]
+          }
+        },
+        {
+          "assert": "request_status",
+          "step": "s3",
+          "optional": false,
+          "ok": false,
+          "detail": "request req_65db10bc13864efc status=investigating",
+          "spec": {
+            "step": "s3",
+            "values": [
+              "awaiting_input"
+            ]
+          }
+        },
+        {
+          "assert": "work_item_count_delta",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "baseline=22 after s2=22 delta=0",
+          "spec": {
+            "step": "s2",
+            "value": 0
+          }
+        },
+        {
+          "assert": "no_action_kinds",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "actions=[]",
+          "spec": {
+            "step": "s2",
+            "kinds": [
+              "create_work",
+              "link_work"
+            ]
+          }
+        },
+        {
+          "assert": "candidate_capabilities_include",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "missing=[]; caps seen=['cap_scim_group_sync', 'cap_scim_user_provisioning', 'cap_sso_saml']",
+          "spec": {
+            "step": "s2",
+            "ids": [
+              "cap_scim_user_provisioning",
+              "cap_scim_group_sync"
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "seconds": 22.2,
+      "ids": {
+        "s1": {
+          "request": "req_65db10bc13864efc",
+          "run": "run_e5c6be3e091242f6"
+        },
+        "s2": {
+          "request": "req_65db10bc13864efc",
+          "run": "run_e5c6be3e091242f6",
+          "proposal": "prop_90df8c3eba50403f"
+        },
+        "s3": {
+          "request": "req_65db10bc13864efc"
+        }
+      },
+      "model_usage": {
+        "calls": 12,
+        "input_tokens": 51343,
+        "output_tokens": 1127,
+        "cost_usd": 0.008377
+      },
+      "base_url": "http://127.0.0.1:8094",
+      "contract_errors": [],
+      "status": "FAIL",
+      "optional_misses": [],
+      "http_calls": 53
+    },
+    {
+      "id": "t03-reply-resumes-run",
+      "acceptance_ids": [
+        "T02",
+        "T03"
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "action": "create_request",
+          "seconds": 0.01,
+          "summary": "request=req_0ee1c2bf97ec43fc(open) run=run_3f9acaf21abc48ef(queued)"
+        },
+        {
+          "id": "s2",
+          "action": "await_run",
+          "seconds": 22.65,
+          "summary": "request=req_0ee1c2bf97ec43fc(investigating) run=run_3f9acaf21abc48ef(failed) proposal=prop_25048441a3c64089(link_work/invalid)"
+        },
+        {
+          "id": "s3",
+          "action": "get_request",
+          "seconds": 0.0,
+          "summary": "request=req_0ee1c2bf97ec43fc(investigating)"
+        },
+        {
+          "id": "s4",
+          "action": "reply",
+          "seconds": 0.03,
+          "summary": "run=run_1637722ca0984334(queued)"
+        },
+        {
+          "id": "s5",
+          "action": "await_run",
+          "seconds": 0.05,
+          "summary": "request=req_0ee1c2bf97ec43fc(investigating) run=run_3f9acaf21abc48ef(failed) proposal=prop_25048441a3c64089(link_work/invalid)"
+        },
+        {
+          "id": "s6",
+          "action": "get_run_events",
+          "seconds": 0.01,
+          "summary": ""
+        }
+      ],
+      "expectations": [
+        {
+          "assert": "proposal_kind",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_25048441a3c64089 kind=link_work validity=invalid",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "clarify"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_payload_matches",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_25048441a3c64089 (link_work) payload.question=<missing>",
+          "spec": {
+            "step": "s2",
+            "path": "question",
+            "regex": "(?is)(account|user).*(group|role)|(group|role).*(account|user)"
+          }
+        },
+        {
+          "assert": "proposal_payload_nonempty",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_25048441a3c64089 (link_work) payload.missing_fields=<missing>",
+          "spec": {
+            "step": "s2",
+            "path": "missing_fields"
+          }
+        },
+        {
+          "assert": "run_status",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "run run_3f9acaf21abc48ef status=failed stage=prepare",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "waiting_for_input"
+            ]
+          }
+        },
+        {
+          "assert": "action_status",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no action (http None, error None)",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "succeeded"
+            ]
+          }
+        },
+        {
+          "assert": "request_status",
+          "step": "s3",
+          "optional": false,
+          "ok": false,
+          "detail": "request req_0ee1c2bf97ec43fc status=investigating",
+          "spec": {
+            "step": "s3",
+            "values": [
+              "awaiting_input"
+            ]
+          }
+        },
+        {
+          "assert": "work_item_count_delta",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "baseline=22 after s2=22 delta=0",
+          "spec": {
+            "step": "s2",
+            "value": 0
+          }
+        },
+        {
+          "assert": "no_action_kinds",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "actions=[]",
+          "spec": {
+            "step": "s2",
+            "kinds": [
+              "create_work",
+              "link_work"
+            ]
+          }
+        },
+        {
+          "assert": "candidate_capabilities_include",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "missing=[]; caps seen=['cap_scim_group_sync', 'cap_scim_user_provisioning', 'cap_sso_saml']",
+          "spec": {
+            "step": "s2",
+            "ids": [
+              "cap_scim_user_provisioning",
+              "cap_scim_group_sync"
+            ]
+          }
+        },
+        {
+          "assert": "same_id",
+          "step": null,
+          "optional": false,
+          "ok": false,
+          "detail": "a=run_1637722ca0984334 b=run_3f9acaf21abc48ef",
+          "spec": {
+            "a": "${s4.run.id}",
+            "b": "${s1.run.id}"
+          }
+        },
+        {
+          "assert": "run_status",
+          "step": "s5",
+          "optional": false,
+          "ok": false,
+          "detail": "run run_3f9acaf21abc48ef status=failed stage=prepare",
+          "spec": {
+            "step": "s5",
+            "values": [
+              "succeeded",
+              "awaiting_review"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_kind",
+          "step": "s5",
+          "optional": false,
+          "ok": true,
+          "detail": "proposal prop_25048441a3c64089 kind=link_work validity=invalid",
+          "spec": {
+            "step": "s5",
+            "values": [
+              "answer",
+              "link_work"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_payload_in",
+          "step": "s5",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_25048441a3c64089 (link_work) payload.work_item_id='cap_scim_group_sync'",
+          "spec": {
+            "step": "s5",
+            "path": "work_item_id",
+            "values": [
+              "work_scim_nested_groups"
+            ],
+            "when_kind": "link_work"
+          }
+        },
+        {
+          "assert": "evidence_sources_include_any",
+          "step": "s5",
+          "optional": false,
+          "ok": true,
+          "detail": "proposal prop_25048441a3c64089 (link_work) evidence sources=['src_capability_cap_scim_group_sync', '20-docs-sso-scim']",
+          "spec": {
+            "step": "s5",
+            "source_ids": [
+              "20-docs-sso-scim"
+            ]
+          }
+        },
+        {
+          "assert": "revision_gte",
+          "step": null,
+          "optional": false,
+          "ok": true,
+          "detail": "a=1 b=1",
+          "spec": {
+            "a": "${s5.proposal.based_on_revision}",
+            "b": "${s2.proposal.based_on_revision}"
+          }
+        },
+        {
+          "assert": "events_include_types_in_order",
+          "step": "s6",
+          "optional": false,
+          "ok": false,
+          "detail": "event types=['run_started', 'tool_completed', 'tool_started', 'tool_completed', 'tool_completed', 'tool_started', 'tool_completed', 'tool_completed', 'tool_started', 'tool_completed', 'proposal_ready', 'tool_completed', 'tool_started', 'tool_completed', 'tool_completed', 'tool_started', 'tool_completed', 'proposal_ready', 'tool_completed', 'tool_started', 'tool_completed', 'tool_completed', 'tool_started', 'tool_completed', 'tool_completed', 'tool_started', 'tool_completed', 'tool_completed', 'tool_started', 'tool_completed', 'tool_completed', 'tool_started', 'tool_completed', 'tool_completed', 'tool_started', 'tool_completed', 'tool_completed', 'tool_started', 'tool_completed', 'run_finished']",
+          "spec": {
+            "step": "s6",
+            "types": [
+              "run_started",
+              "waiting_for_input",
+              "run_started"
+            ]
+          }
+        },
+        {
+          "assert": "events_seq_contiguous",
+          "step": "s6",
+          "optional": false,
+          "ok": true,
+          "detail": "40 events, seqs=[1, 2, 3, 4, 5]..[38, 39, 40]",
+          "spec": {
+            "step": "s6"
+          }
+        },
+        {
+          "assert": "work_item_count_delta",
+          "step": "s5",
+          "optional": false,
+          "ok": true,
+          "detail": "baseline=22 after s5=22 delta=0",
+          "spec": {
+            "step": "s5",
+            "value": 0
+          }
+        }
+      ],
+      "error": null,
+      "seconds": 22.8,
+      "ids": {
+        "s1": {
+          "request": "req_0ee1c2bf97ec43fc",
+          "run": "run_3f9acaf21abc48ef"
+        },
+        "s2": {
+          "request": "req_0ee1c2bf97ec43fc",
+          "run": "run_3f9acaf21abc48ef",
+          "proposal": "prop_25048441a3c64089"
+        },
+        "s3": {
+          "request": "req_0ee1c2bf97ec43fc"
+        },
+        "s4": {
+          "run": "run_1637722ca0984334"
+        },
+        "s5": {
+          "request": "req_0ee1c2bf97ec43fc",
+          "run": "run_3f9acaf21abc48ef",
+          "proposal": "prop_25048441a3c64089"
+        }
+      },
+      "model_usage": {
+        "calls": 12,
+        "input_tokens": 58041,
+        "output_tokens": 1188,
+        "cost_usd": 0.00942
+      },
+      "base_url": "http://127.0.0.1:8094",
+      "contract_errors": [],
+      "status": "FAIL",
+      "optional_misses": [],
+      "http_calls": 65
+    },
+    {
+      "id": "t04-link-existing-export-work",
+      "acceptance_ids": [
+        "T04"
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "action": "create_request",
+          "seconds": 0.01,
+          "summary": "request=req_d3e9bdc512c446b6(open) run=run_4eaf6210d5b64d87(queued)"
+        },
+        {
+          "id": "s2",
+          "action": "await_run",
+          "seconds": 45.21,
+          "summary": "request=req_d3e9bdc512c446b6(investigating) run=run_4eaf6210d5b64d87(failed)"
+        },
+        {
+          "id": "s3",
+          "action": "commit_proposal",
+          "seconds": 0.0,
+          "summary": "ERROR reference ${s2.proposal.id} resolved to nothing"
+        },
+        {
+          "id": "s4",
+          "action": "await_run",
+          "seconds": 0.06,
+          "summary": "request=req_d3e9bdc512c446b6(investigating) run=run_4eaf6210d5b64d87(failed)"
+        },
+        {
+          "id": "s5",
+          "action": "commit_proposal",
+          "seconds": 0.0,
+          "summary": "ERROR reference ${s2.proposal.id} resolved to nothing"
+        },
+        {
+          "id": "s6",
+          "action": "get_request",
+          "seconds": 0.02,
+          "summary": "request=req_d3e9bdc512c446b6(investigating)"
+        }
+      ],
+      "expectations": [
+        {
+          "assert": "run_status",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "run run_4eaf6210d5b64d87 status=failed stage=investigate",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "awaiting_review"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_kind",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no proposal (run run_4eaf6210d5b64d87 status failed)",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "link_work"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_payload_equals",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no proposal (run run_4eaf6210d5b64d87 status failed)",
+          "spec": {
+            "step": "s2",
+            "path": "work_item_id",
+            "value": "work_export_issue"
+          }
+        },
+        {
+          "assert": "rejected_alternative_kind",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no proposal (run run_4eaf6210d5b64d87 status failed)",
+          "spec": {
+            "step": "s2",
+            "kinds": [
+              "create_work"
+            ]
+          }
+        },
+        {
+          "assert": "context_includes",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "attempts missing=[]; present=['attempt_acme_sso_jit', 'attempt_acme_utc_recreate', 'attempt_corvid_weekly_xlsx', 'attempt_exports_001', 'attempt_exports_acme_rerun']",
+          "spec": {
+            "step": "s2",
+            "field": "attempts",
+            "ids": [
+              "attempt_exports_001"
+            ]
+          }
+        },
+        {
+          "assert": "context_includes",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "decisions missing=[]; present=['decision_exports_001', 'decision_exports_routing_v2']",
+          "spec": {
+            "step": "s2",
+            "field": "decisions",
+            "ids": [
+              "decision_exports_001"
+            ]
+          }
+        },
+        {
+          "assert": "context_includes",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "related_work missing=[]; present=['work_export_dst_skip', 'work_export_issue', 'work_export_migration', 'work_queue_v2_cutover', 'work_s3_destination']",
+          "spec": {
+            "step": "s2",
+            "field": "related_work",
+            "ids": [
+              "work_export_issue",
+              "work_export_migration"
+            ]
+          }
+        },
+        {
+          "assert": "text_not_matches",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no proposal (run run_4eaf6210d5b64d87 status failed)",
+          "spec": {
+            "step": "s2",
+            "fields": [
+              "explanation",
+              "payload.comment_text"
+            ],
+            "regex": "(?i)(will|should) be (fixed|restored|ready|delivered|working)[^.]*(by|before) friday"
+          }
+        },
+        {
+          "assert": "text_not_matches",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no proposal (run run_4eaf6210d5b64d87 status failed)",
+          "spec": {
+            "step": "s2",
+            "fields": [
+              "explanation",
+              "payload.comment_text"
+            ],
+            "regex": "(?i)public (share )?link"
+          }
+        },
+        {
+          "assert": "action_status",
+          "step": "s4",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s4 has no action (http None, error None)",
+          "spec": {
+            "step": "s4",
+            "values": [
+              "succeeded"
+            ]
+          }
+        },
+        {
+          "assert": "action_verification",
+          "step": "s4",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s4 has no action (http None, error None)",
+          "spec": {
+            "step": "s4",
+            "values": [
+              "pending"
+            ]
+          }
+        },
+        {
+          "assert": "run_status",
+          "step": "s4",
+          "optional": false,
+          "ok": false,
+          "detail": "run run_4eaf6210d5b64d87 status=failed stage=investigate",
+          "spec": {
+            "step": "s4",
+            "values": [
+              "succeeded"
+            ]
+          }
+        },
+        {
+          "assert": "same_id",
+          "step": null,
+          "optional": false,
+          "ok": false,
+          "detail": "a=<unresolved: reference ${s5.action.id} resolved to nothing> b=<unresolved: reference ${s3.action.id} resolved to nothing>",
+          "spec": {
+            "a": "${s5.action.id}",
+            "b": "${s3.action.id}"
+          }
+        },
+        {
+          "assert": "request_status",
+          "step": "s6",
+          "optional": false,
+          "ok": false,
+          "detail": "request req_d3e9bdc512c446b6 status=investigating",
+          "spec": {
+            "step": "s6",
+            "values": [
+              "awaiting_work"
+            ]
+          }
+        },
+        {
+          "assert": "request_linked_work_equals",
+          "step": "s6",
+          "optional": false,
+          "ok": false,
+          "detail": "linked_work_ids=[]",
+          "spec": {
+            "step": "s6",
+            "ids": [
+              "work_export_issue"
+            ]
+          }
+        },
+        {
+          "assert": "work_item_count_delta",
+          "step": "s6",
+          "optional": false,
+          "ok": true,
+          "detail": "baseline=22 after s6=22 delta=0",
+          "spec": {
+            "step": "s6",
+            "value": 0
+          }
+        }
+      ],
+      "error": null,
+      "seconds": 45.3,
+      "ids": {
+        "s1": {
+          "request": "req_d3e9bdc512c446b6",
+          "run": "run_4eaf6210d5b64d87"
+        },
+        "s2": {
+          "request": "req_d3e9bdc512c446b6",
+          "run": "run_4eaf6210d5b64d87"
+        },
+        "s4": {
+          "request": "req_d3e9bdc512c446b6",
+          "run": "run_4eaf6210d5b64d87"
+        },
+        "s6": {
+          "request": "req_d3e9bdc512c446b6"
+        }
+      },
+      "model_usage": {
+        "calls": 12,
+        "input_tokens": 75803,
+        "output_tokens": 1348,
+        "cost_usd": 0.012179
+      },
+      "base_url": "http://127.0.0.1:8094",
+      "contract_errors": [],
+      "status": "FAIL",
+      "optional_misses": [],
+      "http_calls": 104
+    },
+    {
+      "id": "t05-similar-incompatible-task",
+      "acceptance_ids": [
+        "T05"
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "action": "create_request",
+          "seconds": 0.02,
+          "summary": "request=req_44848aedb693431a(open) run=run_3f5a3d58471846f4(queued)"
+        },
+        {
+          "id": "s2",
+          "action": "await_run",
+          "seconds": 18.09,
+          "summary": "request=req_44848aedb693431a(investigating) run=run_3f5a3d58471846f4(failed)"
+        }
+      ],
+      "expectations": [
+        {
+          "assert": "run_status",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "run run_3f5a3d58471846f4 status=failed stage=investigate",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "awaiting_review"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_kind",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no proposal (run run_3f5a3d58471846f4 status failed)",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "create_work"
+            ]
+          }
+        },
+        {
+          "assert": "rejected_alternative",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no proposal (run run_3f5a3d58471846f4 status failed)",
+          "spec": {
+            "step": "s2",
+            "kind": "link_work",
+            "mentions_any": [
+              "work_s3_destination"
+            ],
+            "evidence_required": true
+          }
+        },
+        {
+          "assert": "proposal_payload_not_in",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no proposal (run run_3f5a3d58471846f4 status failed)",
+          "spec": {
+            "step": "s2",
+            "path": "dependency_ids",
+            "values": [
+              "work_sftp_spike"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_payload_in",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no proposal (run run_3f5a3d58471846f4 status failed)",
+          "spec": {
+            "step": "s2",
+            "path": "capability_id",
+            "values": [
+              "cap_sftp_export_destination",
+              "cap_scheduled_exports"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_payload_in",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no proposal (run run_3f5a3d58471846f4 status failed)",
+          "spec": {
+            "step": "s2",
+            "path": "owner_id",
+            "values": [
+              null,
+              "person_maya",
+              "person_leo"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_payload_nonempty",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no proposal (run run_3f5a3d58471846f4 status failed)",
+          "spec": {
+            "step": "s2",
+            "path": "acceptance_criteria"
+          }
+        },
+        {
+          "assert": "no_link_to",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "linked_work_ids=[]; proposal kind=None payload=null",
+          "spec": {
+            "step": "s2",
+            "work_item_ids": [
+              "work_s3_destination",
+              "work_sftp_spike"
+            ]
+          }
+        },
+        {
+          "assert": "work_item_count_delta",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "baseline=22 after s2=22 delta=0",
+          "spec": {
+            "step": "s2",
+            "value": 0
+          }
+        }
+      ],
+      "error": null,
+      "seconds": 18.1,
+      "ids": {
+        "s1": {
+          "request": "req_44848aedb693431a",
+          "run": "run_3f5a3d58471846f4"
+        },
+        "s2": {
+          "request": "req_44848aedb693431a",
+          "run": "run_3f5a3d58471846f4"
+        }
+      },
+      "model_usage": {
+        "calls": 10,
+        "input_tokens": 42858,
+        "output_tokens": 954,
+        "cost_usd": 0.007001
+      },
+      "base_url": "http://127.0.0.1:8094",
+      "contract_errors": [],
+      "status": "FAIL",
+      "optional_misses": [],
+      "http_calls": 44
+    },
+    {
+      "id": "t06-create-work-with-receipt",
+      "acceptance_ids": [
+        "T06"
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "action": "create_request",
+          "seconds": 0.01,
+          "summary": "request=req_8268e8a8b089458c(open) run=run_dc5599cb9b1e471e(queued)"
+        },
+        {
+          "id": "s2",
+          "action": "await_run",
+          "seconds": 10.27,
+          "summary": "request=req_8268e8a8b089458c(awaiting_review) run=run_dc5599cb9b1e471e(awaiting_review) proposal=prop_37524735813740ce(clarify/valid)"
+        },
+        {
+          "id": "s3",
+          "action": "commit_proposal",
+          "seconds": 0.02,
+          "summary": "action=act_ac6843d903f84191(accepted)"
+        },
+        {
+          "id": "s4",
+          "action": "await_run",
+          "seconds": 90.53,
+          "summary": "request=req_8268e8a8b089458c(awaiting_input) run=run_dc5599cb9b1e471e(waiting_for_input) proposal=prop_37524735813740ce(clarify/valid) latest_action=act_ac6843d903f84191(succeeded) TIMED OUT trace=[('queued', 'act'), ('waiting_for_input', 'observe')]"
+        },
+        {
+          "id": "s5",
+          "action": "get_action",
+          "seconds": 0.0,
+          "summary": "action=act_ac6843d903f84191(succeeded)"
+        },
+        {
+          "id": "s6",
+          "action": "get_work_item",
+          "seconds": 0.0,
+          "summary": "HTTP 404 NOT_FOUND"
+        },
+        {
+          "id": "s7",
+          "action": "get_request",
+          "seconds": 0.01,
+          "summary": "request=req_8268e8a8b089458c(awaiting_input)"
+        }
+      ],
+      "expectations": [
+        {
+          "assert": "proposal_kind",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_37524735813740ce kind=clarify validity=valid",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "create_work"
+            ]
+          }
+        },
+        {
+          "assert": "rejected_alternative",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_37524735813740ce (clarify) rejected_alternatives=[]",
+          "spec": {
+            "step": "s2",
+            "kind": "link_work",
+            "mentions_any": [
+              "work_audit_log_csv_download"
+            ],
+            "evidence_required": true
+          }
+        },
+        {
+          "assert": "proposal_payload_equals",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_37524735813740ce (clarify) payload.connector=<missing>",
+          "spec": {
+            "step": "s2",
+            "path": "connector",
+            "value": "local"
+          }
+        },
+        {
+          "assert": "proposal_payload_in",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_37524735813740ce (clarify) payload.capability_id=<missing>",
+          "spec": {
+            "step": "s2",
+            "path": "capability_id",
+            "values": [
+              "cap_audit_log"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_payload_in",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_37524735813740ce (clarify) payload.owner_id=<missing>",
+          "spec": {
+            "step": "s2",
+            "path": "owner_id",
+            "values": [
+              "person_jonas",
+              "person_priya",
+              null
+            ]
+          }
+        },
+        {
+          "assert": "proposal_payload_min_items",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_37524735813740ce payload.acceptance_criteria has <missing> items",
+          "spec": {
+            "step": "s2",
+            "path": "acceptance_criteria",
+            "min": 1
+          }
+        },
+        {
+          "assert": "action_status",
+          "step": "s5",
+          "optional": false,
+          "ok": true,
+          "detail": "action act_ac6843d903f84191 (clarify) status=succeeded error=None",
+          "spec": {
+            "step": "s5",
+            "values": [
+              "succeeded"
+            ]
+          }
+        },
+        {
+          "assert": "receipt_present",
+          "step": "s5",
+          "optional": false,
+          "ok": true,
+          "detail": "action act_ac6843d903f84191 receipt={\"connector\": \"local\", \"id\": \"rcpt_00dc55cca4554eba\", \"observed_at\": \"2026-10-18T17:07:16Z\", \"result_hash\": \"4de387a78a18924b0df5d8c92867d73a2e20828e08dcf1bc611e5f4585983439\", \"target_id\": \"draft_act_ac6843d903f84191\", \"target_url\": null}",
+          "spec": {
+            "step": "s5",
+            "connector": "local"
+          }
+        },
+        {
+          "assert": "work_item_field_nonempty",
+          "step": "s6",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s6 has no work item",
+          "spec": {
+            "step": "s6",
+            "field": "title"
+          }
+        },
+        {
+          "assert": "work_item_count_delta",
+          "step": "s7",
+          "optional": false,
+          "ok": false,
+          "detail": "baseline=22 after s7=22 delta=0",
+          "spec": {
+            "step": "s7",
+            "value": 1
+          }
+        },
+        {
+          "assert": "request_status",
+          "step": "s7",
+          "optional": false,
+          "ok": false,
+          "detail": "request req_8268e8a8b089458c status=awaiting_input",
+          "spec": {
+            "step": "s7",
+            "values": [
+              "awaiting_work"
+            ]
+          }
+        },
+        {
+          "assert": "request_linked_work_includes",
+          "step": "s7",
+          "optional": false,
+          "ok": false,
+          "detail": "expected ['draft_act_ac6843d903f84191']; linked_work_ids=[]",
+          "spec": {
+            "step": "s7",
+            "ids": [
+              "${s5.action.receipt.target_id}"
+            ]
+          }
+        },
+        {
+          "assert": "stable_after_restart",
+          "step": null,
+          "optional": false,
+          "ok": true,
+          "detail": "after API restart {'status': 'succeeded', 'receipt.target_id': 'draft_act_ac6843d903f84191', 'receipt.result_hash': '4de387a78a18924b0df5d8c92867d73a2e20828e08dcf1bc611e5f4585983439'}; diffs=[]",
+          "spec": {
+            "resource": "action",
+            "id": "${s3.action.id}",
+            "fields": [
+              "status",
+              "receipt.target_id",
+              "receipt.result_hash"
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "seconds": 102.8,
+      "ids": {
+        "s1": {
+          "request": "req_8268e8a8b089458c",
+          "run": "run_dc5599cb9b1e471e"
+        },
+        "s2": {
+          "request": "req_8268e8a8b089458c",
+          "run": "run_dc5599cb9b1e471e",
+          "proposal": "prop_37524735813740ce"
+        },
+        "s3": {
+          "action": "act_ac6843d903f84191"
+        },
+        "s4": {
+          "request": "req_8268e8a8b089458c",
+          "run": "run_dc5599cb9b1e471e",
+          "proposal": "prop_37524735813740ce",
+          "latest_action": "act_ac6843d903f84191"
+        },
+        "s5": {
+          "action": "act_ac6843d903f84191"
+        },
+        "s7": {
+          "request": "req_8268e8a8b089458c"
+        }
+      },
+      "model_usage": {
+        "calls": 6,
+        "input_tokens": 29214,
+        "output_tokens": 520,
+        "cost_usd": 0.004694
+      },
+      "base_url": "http://127.0.0.1:8094",
+      "contract_errors": [],
+      "status": "FAIL",
+      "optional_misses": [],
+      "http_calls": 216
+    },
+    {
+      "id": "t07-four-hop-owner-path",
+      "acceptance_ids": [
+        "T07"
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "action": "create_request",
+          "seconds": 0.05,
+          "summary": "request=req_4a19dadcabda4a52(open) run=run_5d6e1eb3d87c4a65(queued)"
+        },
+        {
+          "id": "s2",
+          "action": "await_run",
+          "seconds": 18.03,
+          "summary": "request=req_4a19dadcabda4a52(awaiting_review) run=run_5d6e1eb3d87c4a65(awaiting_review) proposal=prop_6ae32f6902584f05(answer/valid)"
+        },
+        {
+          "id": "s3",
+          "action": "get_request_context",
+          "seconds": 0.02,
+          "summary": ""
+        },
+        {
+          "id": "s4",
+          "action": "context_expand",
+          "seconds": 0.06,
+          "summary": ""
+        }
+      ],
+      "expectations": [
+        {
+          "assert": "proposal_kind",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_6ae32f6902584f05 kind=answer validity=valid",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "escalate",
+              "link_work"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_payload_in",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "n/a: kind answer != link_work",
+          "spec": {
+            "step": "s2",
+            "path": "work_item_id",
+            "values": [
+              "work_export_issue"
+            ],
+            "when_kind": "link_work"
+          }
+        },
+        {
+          "assert": "proposal_payload_in",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "n/a: kind answer != escalate",
+          "spec": {
+            "step": "s2",
+            "path": "owner_id",
+            "values": [
+              "person_maya",
+              null
+            ],
+            "when_kind": "escalate"
+          }
+        },
+        {
+          "assert": "proposal_payload_in",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "n/a: kind answer != escalate",
+          "spec": {
+            "step": "s2",
+            "path": "team_id",
+            "values": [
+              "team_data_platform",
+              null
+            ],
+            "when_kind": "escalate"
+          }
+        },
+        {
+          "assert": "proposal_payload_not_in",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "proposal prop_6ae32f6902584f05 (answer) payload.owner_id=<missing>",
+          "spec": {
+            "step": "s2",
+            "path": "owner_id",
+            "values": [
+              "person_dana"
+            ]
+          }
+        },
+        {
+          "assert": "context_includes",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "decisions missing=['decision_exports_routing_v2']; present=['decision_corvid_retention_extension']",
+          "spec": {
+            "step": "s2",
+            "field": "decisions",
+            "ids": [
+              "decision_exports_routing_v2"
+            ]
+          }
+        },
+        {
+          "assert": "text_matches",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "matched in []; texts=[('explanation', 'The owner of the fix for the EU scheduled exports issue is Maya Raman, with a forecast completion date of 30 Nov 2026. This information is vital for your communication with hospital clients about the resolution status.')]",
+          "spec": {
+            "step": "s2",
+            "fields": [
+              "explanation"
+            ],
+            "regex": "(?i)(inactive|no active owner|left|work_queue_v2_cutover|queue v2)"
+          }
+        },
+        {
+          "assert": "text_not_matches",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "inspected ['explanation']; hits=[]",
+          "spec": {
+            "step": "s2",
+            "fields": [
+              "explanation",
+              "payload.comment_text",
+              "payload.reason"
+            ],
+            "regex": "(?i)(fixed|ready|delivered|restored) (by|on) (2026-10-(09|30)|oct(ober)? (9|30))"
+          }
+        },
+        {
+          "assert": "path_contains_ordered",
+          "step": "s4",
+          "optional": false,
+          "ok": true,
+          "detail": "path path_8d3cbdd443a48d071b4822d3 nodes=['work_export_issue', 'person_maya', 'work_export_migration', 'work_queue_v2_cutover', 'person_dana']",
+          "spec": {
+            "step": "s4",
+            "ids": [
+              "work_export_issue",
+              "work_export_migration",
+              "work_queue_v2_cutover",
+              "person_dana"
+            ],
+            "max_hops": 4
+          }
+        },
+        {
+          "assert": "path_contains_ordered",
+          "step": "s3",
+          "optional": true,
+          "ok": false,
+          "detail": "0 paths, 0 edges; paths=[]; edges=[]",
+          "spec": {
+            "step": "s3",
+            "ids": [
+              "cap_scheduled_exports",
+              "work_export_issue",
+              "work_export_migration",
+              "work_queue_v2_cutover"
+            ],
+            "max_hops": 4,
+            "optional": true
+          }
+        },
+        {
+          "assert": "work_item_count_delta",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "baseline=22 after s2=22 delta=0",
+          "spec": {
+            "step": "s2",
+            "value": 0
+          }
+        }
+      ],
+      "error": null,
+      "seconds": 18.2,
+      "ids": {
+        "s1": {
+          "request": "req_4a19dadcabda4a52",
+          "run": "run_5d6e1eb3d87c4a65"
+        },
+        "s2": {
+          "request": "req_4a19dadcabda4a52",
+          "run": "run_5d6e1eb3d87c4a65",
+          "proposal": "prop_6ae32f6902584f05"
+        }
+      },
+      "model_usage": {
+        "calls": 10,
+        "input_tokens": 52234,
+        "output_tokens": 933,
+        "cost_usd": 0.008396
+      },
+      "base_url": "http://127.0.0.1:8094",
+      "contract_errors": [],
+      "status": "FAIL",
+      "optional_misses": [
+        "path_contains_ordered"
+      ],
+      "http_calls": 46
+    },
+    {
+      "id": "t08-stale-truncated-uncertainty",
+      "acceptance_ids": [
+        "T08"
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "action": "create_request",
+          "seconds": 0.02,
+          "summary": "request=req_e3ab75751a62402d(open) run=run_55f18daa9eba4d0f(queued)"
+        },
+        {
+          "id": "s2",
+          "action": "await_run",
+          "seconds": 29.75,
+          "summary": "request=req_e3ab75751a62402d(investigating) run=run_55f18daa9eba4d0f(failed)"
+        },
+        {
+          "id": "s3",
+          "action": "get_request_context",
+          "seconds": 0.03,
+          "summary": ""
+        },
+        {
+          "id": "s4",
+          "action": "context_expand",
+          "seconds": 0.02,
+          "summary": ""
+        }
+      ],
+      "expectations": [
+        {
+          "assert": "proposal_kind",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no proposal (run run_55f18daa9eba4d0f status failed)",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "link_work",
+              "escalate",
+              "clarify",
+              "answer"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_payload_in",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no proposal (run run_55f18daa9eba4d0f status failed)",
+          "spec": {
+            "step": "s2",
+            "path": "work_item_id",
+            "values": [
+              "work_retention_legal_hold"
+            ],
+            "when_kind": "link_work"
+          }
+        },
+        {
+          "assert": "evidence_marked_stale",
+          "step": "s3",
+          "optional": false,
+          "ok": true,
+          "detail": "evidence refs=[('work_retention_legal_hold', [('ev_src_work_item_work_retention_legal_hold_r1_1', True)])]",
+          "spec": {
+            "step": "s3",
+            "entity_ids": [
+              "work_retention_legal_hold"
+            ]
+          }
+        },
+        {
+          "assert": "context_missing_information_or_explanation",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "hits=[]; texts=[\"No product area is confirmed for this request yet. From the request text it looks like 'Data retention policies', but that is a guess to check, not a \", \"The owner of 'Legal hold exemption for retention purge', Dana Whitlock, is no longer active (work_retention_legal_hold, person_dana).\", \"The status of 'Legal hold exemption for retention purge' may be out of date: last checked 25 Sep 2026 (work_retention_legal_hold).\"]",
+          "spec": {
+            "step": "s2",
+            "regex": "(?i)(stale|not current|last (observed|updated)|unconfirmed|no forecast|unknown|inactive)"
+          }
+        },
+        {
+          "assert": "text_not_matches",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no proposal (run run_55f18daa9eba4d0f status failed)",
+          "spec": {
+            "step": "s2",
+            "fields": [
+              "payload.draft_text",
+              "payload.comment_text",
+              "explanation"
+            ],
+            "regex": "(?i)(will|should) (be available|ship|land) (by|on|in) "
+          }
+        },
+        {
+          "assert": "expand_truncated",
+          "step": "s4",
+          "optional": false,
+          "ok": true,
+          "detail": "truncated=True truncation=limit visited=5",
+          "spec": {
+            "step": "s4",
+            "value": true
+          }
+        },
+        {
+          "assert": "work_item_count_delta",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "baseline=22 after s2=22 delta=0",
+          "spec": {
+            "step": "s2",
+            "value": 0
+          }
+        }
+      ],
+      "error": null,
+      "seconds": 29.8,
+      "ids": {
+        "s1": {
+          "request": "req_e3ab75751a62402d",
+          "run": "run_55f18daa9eba4d0f"
+        },
+        "s2": {
+          "request": "req_e3ab75751a62402d",
+          "run": "run_55f18daa9eba4d0f"
+        }
+      },
+      "model_usage": {
+        "calls": 12,
+        "input_tokens": 81028,
+        "output_tokens": 2004,
+        "cost_usd": 0.013355
+      },
+      "base_url": "http://127.0.0.1:8094",
+      "contract_errors": [],
+      "status": "FAIL",
+      "optional_misses": [],
+      "http_calls": 69
+    },
+    {
+      "id": "t09-scoped-failed-workaround",
+      "acceptance_ids": [
+        "T09"
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "action": "create_request",
+          "seconds": 0.02,
+          "summary": "request=req_71a390e724ec4a4e(open) run=run_8bdd6c0e3d7444d1(queued)"
+        },
+        {
+          "id": "s2",
+          "action": "await_run",
+          "seconds": 23.23,
+          "summary": "request=req_71a390e724ec4a4e(awaiting_verification) run=run_8bdd6c0e3d7444d1(succeeded) proposal=prop_2c158e175e7f4030(answer/valid) latest_action=act_a5ed6a5f312b445b(succeeded)"
+        },
+        {
+          "id": "s3",
+          "action": "create_request",
+          "seconds": 0.03,
+          "summary": "request=req_5e0304cb5f0943d5(open) run=run_bfdb71b4f6fa442a(queued)"
+        },
+        {
+          "id": "s4",
+          "action": "await_run",
+          "seconds": 15.45,
+          "summary": "request=req_5e0304cb5f0943d5(awaiting_verification) run=run_bfdb71b4f6fa442a(succeeded) proposal=prop_3a0f827b808543e2(answer/valid) latest_action=act_737a417c15ea4db0(succeeded)"
+        }
+      ],
+      "expectations": [
+        {
+          "assert": "context_includes",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "attempts missing=[]; present=['attempt_acme_sso_jit', 'attempt_acme_utc_recreate', 'attempt_corvid_weekly_xlsx', 'attempt_exports_001', 'attempt_exports_acme_rerun']",
+          "spec": {
+            "step": "s2",
+            "field": "attempts",
+            "ids": [
+              "attempt_acme_utc_recreate"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_kind",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_2c158e175e7f4030 kind=answer validity=valid",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "link_work",
+              "escalate"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_payload_in",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "n/a: kind answer != link_work",
+          "spec": {
+            "step": "s2",
+            "path": "work_item_id",
+            "values": [
+              "work_export_dst_skip"
+            ],
+            "when_kind": "link_work"
+          }
+        },
+        {
+          "assert": "text_not_matches",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "inspected ['payload.draft_text']; hits=[]",
+          "spec": {
+            "step": "s2",
+            "fields": [
+              "payload.draft_text",
+              "payload.comment_text"
+            ],
+            "regex": "(?i)recreate[^.]*\\bUTC\\b"
+          }
+        },
+        {
+          "assert": "proposal_kind",
+          "step": "s4",
+          "optional": false,
+          "ok": true,
+          "detail": "proposal prop_3a0f827b808543e2 kind=answer validity=valid",
+          "spec": {
+            "step": "s4",
+            "values": [
+              "answer",
+              "link_work"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_payload_in",
+          "step": "s4",
+          "optional": false,
+          "ok": true,
+          "detail": "n/a: kind answer != link_work",
+          "spec": {
+            "step": "s4",
+            "path": "work_item_id",
+            "values": [
+              "work_export_dst_skip"
+            ],
+            "when_kind": "link_work"
+          }
+        },
+        {
+          "assert": "context_excludes",
+          "step": "s4",
+          "optional": false,
+          "ok": true,
+          "detail": "attempts unexpectedly present=[]",
+          "spec": {
+            "step": "s4",
+            "field": "attempts",
+            "ids": [
+              "attempt_acme_utc_recreate",
+              "attempt_exports_acme_rerun",
+              "attempt_acme_sso_jit"
+            ]
+          }
+        },
+        {
+          "assert": "context_excludes",
+          "step": "s4",
+          "optional": false,
+          "ok": true,
+          "detail": "decisions unexpectedly present=[]",
+          "spec": {
+            "step": "s4",
+            "field": "decisions",
+            "ids": [
+              "decision_exports_001"
+            ]
+          }
+        },
+        {
+          "assert": "evidence_sources_include_any",
+          "step": "s4",
+          "optional": false,
+          "ok": true,
+          "detail": "proposal prop_3a0f827b808543e2 (answer) evidence sources=['20-docs-export-troubleshooting', 'src_work_item_work_export_dst_skip']",
+          "spec": {
+            "step": "s4",
+            "source_ids": [
+              "20-docs-export-troubleshooting"
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "seconds": 38.7,
+      "ids": {
+        "s1": {
+          "request": "req_71a390e724ec4a4e",
+          "run": "run_8bdd6c0e3d7444d1"
+        },
+        "s2": {
+          "request": "req_71a390e724ec4a4e",
+          "run": "run_8bdd6c0e3d7444d1",
+          "proposal": "prop_2c158e175e7f4030",
+          "latest_action": "act_a5ed6a5f312b445b"
+        },
+        "s3": {
+          "request": "req_5e0304cb5f0943d5",
+          "run": "run_bfdb71b4f6fa442a"
+        },
+        "s4": {
+          "request": "req_5e0304cb5f0943d5",
+          "run": "run_bfdb71b4f6fa442a",
+          "proposal": "prop_3a0f827b808543e2",
+          "latest_action": "act_737a417c15ea4db0"
+        }
+      },
+      "model_usage": {
+        "calls": 20,
+        "input_tokens": 104870,
+        "output_tokens": 1821,
+        "cost_usd": 0.016823
+      },
+      "base_url": "http://127.0.0.1:8094",
+      "contract_errors": [],
+      "status": "FAIL",
+      "optional_misses": [],
+      "http_calls": 92
+    },
+    {
+      "id": "t11-conflicting-active-decisions",
+      "acceptance_ids": [
+        "T11"
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "action": "create_request",
+          "seconds": 0.03,
+          "summary": "request=req_878ef5f66c9d443f(open) run=run_cca99cec3c3145e5(queued)"
+        },
+        {
+          "id": "s2",
+          "action": "await_run",
+          "seconds": 13.6,
+          "summary": "request=req_878ef5f66c9d443f(awaiting_review) run=run_cca99cec3c3145e5(awaiting_review) proposal=prop_00b8fd6450f14784(link_work/stale)"
+        },
+        {
+          "id": "s3",
+          "action": "get_request",
+          "seconds": 0.0,
+          "summary": "request=req_878ef5f66c9d443f(awaiting_review)"
+        }
+      ],
+      "expectations": [
+        {
+          "assert": "context_includes",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "decisions missing=['decision_retention_no_extension']; present=['decision_corvid_retention_extension']",
+          "spec": {
+            "step": "s2",
+            "field": "decisions",
+            "ids": [
+              "decision_corvid_retention_extension",
+              "decision_retention_no_extension"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_kind",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_00b8fd6450f14784 kind=link_work validity=stale",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "escalate",
+              "clarify"
+            ]
+          }
+        },
+        {
+          "assert": "text_matches",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "matched in []; texts=[('explanation', 'The retention purge job is relevant to the request, making it important to link it for further tracking.')]",
+          "spec": {
+            "step": "s2",
+            "fields": [
+              "explanation"
+            ],
+            "regex": "(?i)(conflict|contradict|incompatible)"
+          }
+        },
+        {
+          "assert": "proposal_cites_ids",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_00b8fd6450f14784 evidence_ids=['ev_src_work_item_work_retention_purge_job_r1_1'] missing=['decision_corvid_retention_extension', 'decision_retention_no_extension']",
+          "spec": {
+            "step": "s2",
+            "ids": [
+              "decision_corvid_retention_extension",
+              "decision_retention_no_extension"
+            ]
+          }
+        },
+        {
+          "assert": "request_status",
+          "step": "s3",
+          "optional": false,
+          "ok": true,
+          "detail": "request req_878ef5f66c9d443f status=awaiting_review",
+          "spec": {
+            "step": "s3",
+            "values": [
+              "awaiting_review",
+              "awaiting_input",
+              "escalated"
+            ]
+          }
+        },
+        {
+          "assert": "work_item_count_delta",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "baseline=22 after s2=22 delta=0",
+          "spec": {
+            "step": "s2",
+            "value": 0
+          }
+        }
+      ],
+      "error": null,
+      "seconds": 13.6,
+      "ids": {
+        "s1": {
+          "request": "req_878ef5f66c9d443f",
+          "run": "run_cca99cec3c3145e5"
+        },
+        "s2": {
+          "request": "req_878ef5f66c9d443f",
+          "run": "run_cca99cec3c3145e5",
+          "proposal": "prop_00b8fd6450f14784"
+        },
+        "s3": {
+          "request": "req_878ef5f66c9d443f"
+        }
+      },
+      "model_usage": {
+        "calls": 8,
+        "input_tokens": 34803,
+        "output_tokens": 556,
+        "cost_usd": 0.005555
+      },
+      "base_url": "http://127.0.0.1:8094",
+      "contract_errors": [],
+      "status": "FAIL",
+      "optional_misses": [],
+      "http_calls": 37
+    },
+    {
+      "id": "t17-completed-work-needs-verification",
+      "acceptance_ids": [
+        "T17"
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "action": "create_request",
+          "seconds": 0.01,
+          "summary": "request=req_5ed683c68d284aeb(open) run=run_d0ca5ad079224384(queued)"
+        },
+        {
+          "id": "s2",
+          "action": "await_run",
+          "seconds": 11.75,
+          "summary": "request=req_5ed683c68d284aeb(awaiting_review) run=run_d0ca5ad079224384(awaiting_review) proposal=prop_2495a585da4b49b8(clarify/valid)"
+        },
+        {
+          "id": "s3",
+          "action": "commit_proposal_if_awaiting_review",
+          "seconds": 0.03,
+          "summary": "action=act_4ec8bf7a3d0548ba(accepted)"
+        },
+        {
+          "id": "s4",
+          "action": "await_run",
+          "seconds": 90.13,
+          "summary": "request=req_5ed683c68d284aeb(awaiting_input) run=run_d0ca5ad079224384(waiting_for_input) proposal=prop_2495a585da4b49b8(clarify/valid) latest_action=act_4ec8bf7a3d0548ba(succeeded) TIMED OUT trace=[('queued', 'act'), ('waiting_for_input', 'observe')]"
+        },
+        {
+          "id": "s5",
+          "action": "get_request",
+          "seconds": 0.01,
+          "summary": "request=req_5ed683c68d284aeb(awaiting_input)"
+        },
+        {
+          "id": "s6",
+          "action": "record_observation",
+          "seconds": 0.03,
+          "summary": "request=req_5ed683c68d284aeb(awaiting_input)"
+        },
+        {
+          "id": "s7",
+          "action": "get_request",
+          "seconds": 0.01,
+          "summary": "request=req_5ed683c68d284aeb(awaiting_input)"
+        },
+        {
+          "id": "s8",
+          "action": "record_observation",
+          "seconds": 0.04,
+          "summary": "request=req_5ed683c68d284aeb(resolved)"
+        }
+      ],
+      "expectations": [
+        {
+          "assert": "proposal_kind",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_2495a585da4b49b8 kind=clarify validity=valid",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "link_work",
+              "answer"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_payload_in",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "n/a: kind clarify != link_work",
+          "spec": {
+            "step": "s2",
+            "path": "work_item_id",
+            "values": [
+              "work_csv_utf8_bom"
+            ],
+            "when_kind": "link_work"
+          }
+        },
+        {
+          "assert": "request_status",
+          "step": "s5",
+          "optional": false,
+          "ok": false,
+          "detail": "request req_5ed683c68d284aeb status=awaiting_input",
+          "spec": {
+            "step": "s5",
+            "values": [
+              "awaiting_verification"
+            ]
+          }
+        },
+        {
+          "assert": "request_status",
+          "step": "s7",
+          "optional": false,
+          "ok": false,
+          "detail": "request req_5ed683c68d284aeb status=awaiting_input",
+          "spec": {
+            "step": "s7",
+            "values": [
+              "awaiting_verification"
+            ]
+          }
+        },
+        {
+          "assert": "request_status",
+          "step": "s8",
+          "optional": false,
+          "ok": true,
+          "detail": "request req_5ed683c68d284aeb status=resolved",
+          "spec": {
+            "step": "s8",
+            "values": [
+              "resolved"
+            ]
+          }
+        },
+        {
+          "assert": "work_item_count_delta",
+          "step": "s5",
+          "optional": false,
+          "ok": true,
+          "detail": "baseline=22 after s5=22 delta=0",
+          "spec": {
+            "step": "s5",
+            "value": 0
+          }
+        }
+      ],
+      "error": null,
+      "seconds": 102.0,
+      "ids": {
+        "s1": {
+          "request": "req_5ed683c68d284aeb",
+          "run": "run_d0ca5ad079224384"
+        },
+        "s2": {
+          "request": "req_5ed683c68d284aeb",
+          "run": "run_d0ca5ad079224384",
+          "proposal": "prop_2495a585da4b49b8"
+        },
+        "s3": {
+          "action": "act_4ec8bf7a3d0548ba"
+        },
+        "s4": {
+          "request": "req_5ed683c68d284aeb",
+          "run": "run_d0ca5ad079224384",
+          "proposal": "prop_2495a585da4b49b8",
+          "latest_action": "act_4ec8bf7a3d0548ba"
+        },
+        "s5": {
+          "request": "req_5ed683c68d284aeb"
+        },
+        "s6": {
+          "request": "req_5ed683c68d284aeb"
+        },
+        "s7": {
+          "request": "req_5ed683c68d284aeb"
+        },
+        "s8": {
+          "request": "req_5ed683c68d284aeb"
+        }
+      },
+      "model_usage": {
+        "calls": 7,
+        "input_tokens": 32826,
+        "output_tokens": 579,
+        "cost_usd": 0.005272
+      },
+      "base_url": "http://127.0.0.1:8094",
+      "contract_errors": [],
+      "status": "FAIL",
+      "optional_misses": [],
+      "http_calls": 219
+    },
+    {
+      "id": "t18-failed-verification-reopens",
+      "acceptance_ids": [
+        "T18"
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "action": "create_request",
+          "seconds": 0.02,
+          "summary": "request=req_b8936dc88c4c4d72(open) run=run_239d357153ef4ba9(queued)"
+        },
+        {
+          "id": "s2",
+          "action": "await_run",
+          "seconds": 26.32,
+          "summary": "request=req_b8936dc88c4c4d72(investigating) run=run_239d357153ef4ba9(failed) proposal=prop_c5867637bea14205(link_work/stale)"
+        },
+        {
+          "id": "s3",
+          "action": "get_request",
+          "seconds": 0.0,
+          "summary": "request=req_b8936dc88c4c4d72(investigating)"
+        },
+        {
+          "id": "s4",
+          "action": "record_observation",
+          "seconds": 0.0,
+          "summary": "ERROR reference ${s2.latest_action.id} resolved to nothing"
+        },
+        {
+          "id": "s5",
+          "action": "get_request",
+          "seconds": 0.0,
+          "summary": "request=req_b8936dc88c4c4d72(investigating)"
+        },
+        {
+          "id": "s6",
+          "action": "list_runs",
+          "seconds": 0.0,
+          "summary": ""
+        },
+        {
+          "id": "s7",
+          "action": "await_run",
+          "seconds": 0.03,
+          "summary": "request=req_b8936dc88c4c4d72(investigating) run=run_239d357153ef4ba9(failed) proposal=prop_c5867637bea14205(link_work/stale)"
+        },
+        {
+          "id": "s8",
+          "action": "get_request_context",
+          "seconds": 0.01,
+          "summary": ""
+        }
+      ],
+      "expectations": [
+        {
+          "assert": "proposal_kind",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_c5867637bea14205 kind=link_work validity=stale",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "answer"
+            ]
+          }
+        },
+        {
+          "assert": "evidence_sources_include_any",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_c5867637bea14205 (link_work) evidence sources=['src_work_item_work_webhook_retry_queue']",
+          "spec": {
+            "step": "s2",
+            "source_ids": [
+              "20-docs-webhooks"
+            ]
+          }
+        },
+        {
+          "assert": "request_status",
+          "step": "s3",
+          "optional": false,
+          "ok": false,
+          "detail": "request req_b8936dc88c4c4d72 status=investigating",
+          "spec": {
+            "step": "s3",
+            "values": [
+              "awaiting_verification"
+            ]
+          }
+        },
+        {
+          "assert": "request_status",
+          "step": "s5",
+          "optional": false,
+          "ok": true,
+          "detail": "request req_b8936dc88c4c4d72 status=investigating",
+          "spec": {
+            "step": "s5",
+            "values": [
+              "investigating"
+            ]
+          }
+        },
+        {
+          "assert": "count_runs",
+          "step": "s6",
+          "optional": false,
+          "ok": false,
+          "detail": "runs=[('run_239d357153ef4ba9', 'failed')]",
+          "spec": {
+            "step": "s6",
+            "min": 2
+          }
+        },
+        {
+          "assert": "context_attempt_recorded",
+          "step": "s8",
+          "optional": false,
+          "ok": false,
+          "detail": "context attempts=[('att_e8619f82acf74543', 'req_5ed683c68d284aeb', 'succeeded', 'passed'), ('attempt_tamarind_split_export', 'request_tamarind_csv_large', 'succeeded', 'passed')]; GET /attempts?request_id=req_b8936dc88c4c4d72 -> []",
+          "spec": {
+            "step": "s8",
+            "request_id": "${s1.request.id}",
+            "outcome_in": [
+              "failed",
+              "succeeded",
+              "unknown"
+            ],
+            "verification": "failed"
+          }
+        },
+        {
+          "assert": "text_matches",
+          "step": "s7",
+          "optional": true,
+          "ok": false,
+          "detail": "matched in []; texts=[('explanation', \"Linking the existing work item about the durable webhook retry queue may provide additional context and solutions relevant to the customer's issue.\")]",
+          "spec": {
+            "step": "s7",
+            "fields": [
+              "explanation",
+              "payload.draft_text",
+              "payload.question"
+            ],
+            "regex": "(?i)(raw body|re-?serial|previous|earlier|failed)",
+            "optional": true
+          }
+        }
+      ],
+      "error": null,
+      "seconds": 26.4,
+      "ids": {
+        "s1": {
+          "request": "req_b8936dc88c4c4d72",
+          "run": "run_239d357153ef4ba9"
+        },
+        "s2": {
+          "request": "req_b8936dc88c4c4d72",
+          "run": "run_239d357153ef4ba9",
+          "proposal": "prop_c5867637bea14205"
+        },
+        "s3": {
+          "request": "req_b8936dc88c4c4d72"
+        },
+        "s5": {
+          "request": "req_b8936dc88c4c4d72"
+        },
+        "s7": {
+          "request": "req_b8936dc88c4c4d72",
+          "run": "run_239d357153ef4ba9",
+          "proposal": "prop_c5867637bea14205"
+        }
+      },
+      "model_usage": {
+        "calls": 12,
+        "input_tokens": 63711,
+        "output_tokens": 1285,
+        "cost_usd": 0.010327
+      },
+      "base_url": "http://127.0.0.1:8094",
+      "contract_errors": [],
+      "status": "FAIL",
+      "optional_misses": [
+        "text_matches"
+      ],
+      "http_calls": 70
+    },
+    {
+      "id": "t20-workspace-isolation",
+      "acceptance_ids": [
+        "T20"
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "action": "context_search",
+          "seconds": 0.03,
+          "summary": ""
+        },
+        {
+          "id": "s2",
+          "action": "context_search",
+          "seconds": 0.02,
+          "summary": ""
+        },
+        {
+          "id": "s3",
+          "action": "get_request",
+          "seconds": 0.0,
+          "summary": "HTTP 404 NOT_FOUND"
+        },
+        {
+          "id": "s4",
+          "action": "get_work_item",
+          "seconds": 0.0,
+          "summary": "HTTP 404 NOT_FOUND"
+        },
+        {
+          "id": "s5",
+          "action": "create_request",
+          "seconds": 0.0,
+          "summary": "HTTP 422 INVALID_INPUT"
+        },
+        {
+          "id": "s6",
+          "action": "create_request",
+          "seconds": 0.01,
+          "summary": "request=req_3857d061b4274e86(open) run=run_da8d9e7685c248e7(queued)"
+        },
+        {
+          "id": "s7",
+          "action": "await_run",
+          "seconds": 16.01,
+          "summary": "request=req_3857d061b4274e86(awaiting_verification) run=run_da8d9e7685c248e7(succeeded) proposal=prop_a7834250eb624cc6(answer/valid) latest_action=act_ee0aec5740f64b71(succeeded)"
+        }
+      ],
+      "expectations": [
+        {
+          "assert": "result_ids_exclude_pattern",
+          "step": "s1",
+          "optional": false,
+          "ok": true,
+          "detail": "ids=['req_d3e9bdc512c446b6', 'request_tamarind_sftp_old', '20-docs-scheduled-exports', 'src_req_d3e9bdc512c446b6', 'src_request_request_tamarind_sftp_old', 'src_work_item_work_s3_destination', 'src_work_item_work_sftp_spike', 'work_s3_destination', 'work_sftp_spike', 'cap_scheduled_exports', 'cap_sftp_export_destination', 'req_44848aedb693431a', 'req_4a19dadcabda4a52', 'req_71a390e724ec4a4e', 'request_corvid_eu_exports', 'request_exports_prior', 'request_tamarind_schedule_s3', '20-docs-export-troubleshooting', 'src_attempt_attempt_acme_utc_recreate', 'src_attempt_attempt_corvid_weekly_xlsx']",
+          "spec": {
+            "step": "s1",
+            "regex": "_ox_"
+          }
+        },
+        {
+          "assert": "result_ids_exclude",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "present=[]; ids=['cap_ox_scheduled_exports', 'request_ox_ferro_sftp', 'request_ox_quill_exports', '20-docs-scheduled-exports', 'src_capability_cap_ox_scheduled_exports', 'src_request_request_ox_ferro_sftp', 'src_request_request_ox_quill_exports', 'src_work_item_work_ox_export_outage', 'src_work_item_work_ox_sftp_delivery', 'work_ox_export_outage', 'work_ox_sftp_delivery', 'src_customer_customer_ox_ferro', 'src_request_request_ox_quill_webhooks', 'src_work_item_work_ox_webhook_signing']",
+          "spec": {
+            "step": "s2",
+            "ids": [
+              "cap_scheduled_exports",
+              "work_export_issue",
+              "work_s3_destination",
+              "request_exports_prior",
+              "20-docs-scheduled-exports@ws_demo"
+            ]
+          }
+        },
+        {
+          "assert": "result_ids_include_any",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "ids=['cap_ox_scheduled_exports', 'request_ox_ferro_sftp', 'request_ox_quill_exports', '20-docs-scheduled-exports', 'src_capability_cap_ox_scheduled_exports', 'src_request_request_ox_ferro_sftp', 'src_request_request_ox_quill_exports', 'src_work_item_work_ox_export_outage', 'src_work_item_work_ox_sftp_delivery', 'work_ox_export_outage', 'work_ox_sftp_delivery', 'src_customer_customer_ox_ferro', 'src_request_request_ox_quill_webhooks', 'src_work_item_work_ox_webhook_signing']",
+          "spec": {
+            "step": "s2",
+            "ids": [
+              "work_ox_export_outage",
+              "cap_ox_scheduled_exports",
+              "request_ox_quill_exports"
+            ]
+          }
+        },
+        {
+          "assert": "http_error",
+          "step": "s3",
+          "optional": false,
+          "ok": true,
+          "detail": "http 404 code=NOT_FOUND message=request request_ox_quill_exports not found",
+          "spec": {
+            "step": "s3",
+            "status": [
+              404
+            ],
+            "codes": [
+              "NOT_FOUND"
+            ]
+          }
+        },
+        {
+          "assert": "http_error",
+          "step": "s4",
+          "optional": false,
+          "ok": true,
+          "detail": "http 404 code=NOT_FOUND message=work item work_export_issue not found",
+          "spec": {
+            "step": "s4",
+            "status": [
+              404
+            ],
+            "codes": [
+              "NOT_FOUND"
+            ]
+          }
+        },
+        {
+          "assert": "http_error",
+          "step": "s5",
+          "optional": false,
+          "ok": true,
+          "detail": "http 422 code=INVALID_INPUT message=unknown customer",
+          "spec": {
+            "step": "s5",
+            "status": [
+              404,
+              422
+            ],
+            "codes": [
+              "NOT_FOUND",
+              "INVALID_INPUT"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_payload_in",
+          "step": "s7",
+          "optional": false,
+          "ok": true,
+          "detail": "n/a: kind answer != link_work",
+          "spec": {
+            "step": "s7",
+            "path": "work_item_id",
+            "values": [
+              "work_ox_export_outage"
+            ],
+            "when_kind": "link_work"
+          }
+        },
+        {
+          "assert": "context_ids_exclude_pattern",
+          "step": "s7",
+          "optional": false,
+          "ok": true,
+          "detail": "matching ids=[]",
+          "spec": {
+            "step": "s7",
+            "regex": "^(cap|work|request|decision|attempt|customer|person)_(?!ox_)"
+          }
+        }
+      ],
+      "error": null,
+      "seconds": 16.1,
+      "ids": {
+        "s6": {
+          "request": "req_3857d061b4274e86",
+          "run": "run_da8d9e7685c248e7"
+        },
+        "s7": {
+          "request": "req_3857d061b4274e86",
+          "run": "run_da8d9e7685c248e7",
+          "proposal": "prop_a7834250eb624cc6",
+          "latest_action": "act_ee0aec5740f64b71"
+        }
+      },
+      "model_usage": {
+        "calls": 9,
+        "input_tokens": 55905,
+        "output_tokens": 849,
+        "cost_usd": 0.008895
+      },
+      "base_url": "http://127.0.0.1:8094",
+      "contract_errors": [],
+      "status": "PASS",
+      "optional_misses": [],
+      "http_calls": 45
+    },
+    {
+      "id": "t26-reimport-noop-and-revision",
+      "acceptance_ids": [
+        "T26"
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "action": "import_file",
+          "seconds": 0.01,
+          "summary": ""
+        },
+        {
+          "id": "s2",
+          "action": "import_content",
+          "seconds": 0.02,
+          "summary": ""
+        },
+        {
+          "id": "s3",
+          "action": "get_source",
+          "seconds": 0.0,
+          "summary": ""
+        }
+      ],
+      "expectations": [
+        {
+          "assert": "import_counts",
+          "step": "s1",
+          "optional": false,
+          "ok": true,
+          "detail": "imported=0 noop=1 rejected=0 preview changes=['noop']",
+          "spec": {
+            "step": "s1",
+            "imported": 0,
+            "noop_min": 1,
+            "rejected": 0
+          }
+        },
+        {
+          "assert": "import_counts",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "imported=1 noop=0 rejected=0 preview changes=['update']",
+          "spec": {
+            "step": "s2",
+            "imported": 1,
+            "rejected": 0
+          }
+        },
+        {
+          "assert": "source_revision",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "source_revisions=[('20-docs-api-rate-limits', 2)]",
+          "spec": {
+            "step": "s2",
+            "source_id": "20-docs-api-rate-limits",
+            "revision": 2
+          }
+        },
+        {
+          "assert": "source_body_unchanged",
+          "step": "s3",
+          "optional": false,
+          "ok": true,
+          "detail": "source 20-docs-api-rate-limits@1 body length 617 vs file 617",
+          "spec": {
+            "step": "s3",
+            "content_from": "fixtures/seed/ws_demo/20-docs-api-rate-limits.md",
+            "strip_front_matter": true
+          }
+        }
+      ],
+      "error": null,
+      "seconds": 0.0,
+      "ids": {},
+      "model_usage": {},
+      "base_url": "http://127.0.0.1:8094",
+      "contract_errors": [],
+      "status": "PASS",
+      "optional_misses": [],
+      "http_calls": 6
+    },
+    {
+      "id": "t28-similarity-not-duplicate",
+      "acceptance_ids": [
+        "T28"
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "action": "create_request",
+          "seconds": 0.01,
+          "summary": "request=req_1f181d31f8934495(open) run=run_99700fb9f8234f1a(queued)"
+        },
+        {
+          "id": "s2",
+          "action": "await_run",
+          "seconds": 21.45,
+          "summary": "request=req_1f181d31f8934495(investigating) run=run_99700fb9f8234f1a(failed)"
+        },
+        {
+          "id": "s3",
+          "action": "get_request_context",
+          "seconds": 0.01,
+          "summary": ""
+        },
+        {
+          "id": "s4",
+          "action": "context_expand",
+          "seconds": 0.0,
+          "summary": ""
+        }
+      ],
+      "expectations": [
+        {
+          "assert": "proposal_kind",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no proposal (run run_99700fb9f8234f1a status failed)",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "clarify",
+              "answer",
+              "link_work",
+              "escalate"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_payload_not_in",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no proposal (run run_99700fb9f8234f1a status failed)",
+          "spec": {
+            "step": "s2",
+            "path": "work_item_id",
+            "values": [
+              "work_export_issue"
+            ]
+          }
+        },
+        {
+          "assert": "no_confirmed_edge",
+          "step": "s4",
+          "optional": false,
+          "ok": true,
+          "detail": "RELATED_TO edges=[]",
+          "spec": {
+            "step": "s4",
+            "type": "RELATED_TO",
+            "from_id": "${s1.request.id}",
+            "to_id": "request_helix_webhook_retries"
+          }
+        },
+        {
+          "assert": "text_not_matches",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s2 has no proposal (run run_99700fb9f8234f1a status failed)",
+          "spec": {
+            "step": "s2",
+            "fields": [
+              "explanation",
+              "payload.draft_text",
+              "payload.comment_text"
+            ],
+            "regex": "(?i)(duplicate of|same (root cause|outage|issue) as|caused by the same)"
+          }
+        },
+        {
+          "assert": "path_claim_kind_not",
+          "step": "s3",
+          "optional": false,
+          "ok": true,
+          "detail": "paths involving ids=[]; violating=[]",
+          "spec": {
+            "step": "s3",
+            "involving_ids": [
+              "request_helix_webhook_retries"
+            ],
+            "claim_kinds": [
+              "source_assertion"
+            ]
+          }
+        },
+        {
+          "assert": "context_excludes",
+          "step": "s3",
+          "optional": true,
+          "ok": true,
+          "detail": "attempts unexpectedly present=[]",
+          "spec": {
+            "step": "s3",
+            "field": "attempts",
+            "ids": [
+              "attempt_helix_webhook_retry_backoff"
+            ],
+            "optional": true
+          }
+        }
+      ],
+      "error": null,
+      "seconds": 21.5,
+      "ids": {
+        "s1": {
+          "request": "req_1f181d31f8934495",
+          "run": "run_99700fb9f8234f1a"
+        },
+        "s2": {
+          "request": "req_1f181d31f8934495",
+          "run": "run_99700fb9f8234f1a"
+        }
+      },
+      "model_usage": {
+        "calls": 12,
+        "input_tokens": 72008,
+        "output_tokens": 1088,
+        "cost_usd": 0.011455
+      },
+      "base_url": "http://127.0.0.1:8094",
+      "contract_errors": [],
+      "status": "FAIL",
+      "optional_misses": [],
+      "http_calls": 52
+    },
+    {
+      "id": "t10-superseded-expired-decision",
+      "acceptance_ids": [
+        "T10"
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "action": "create_request",
+          "seconds": 0.02,
+          "summary": "request=req_5e3262300b13492b(open) run=run_6b9daef6b2374a11(queued)"
+        },
+        {
+          "id": "s2",
+          "action": "await_run",
+          "seconds": 23.61,
+          "summary": "request=req_5e3262300b13492b(awaiting_review) run=run_6b9daef6b2374a11(awaiting_review) proposal=prop_b3661936543f4299(answer/valid)"
+        },
+        {
+          "id": "s3",
+          "action": "decision_command",
+          "seconds": 0.02,
+          "summary": "decision=dec_a77b420b5d8d476c(active)"
+        },
+        {
+          "id": "s4",
+          "action": "get_proposal",
+          "seconds": 0.0,
+          "summary": "proposal=prop_b3661936543f4299(answer/stale)"
+        },
+        {
+          "id": "s5",
+          "action": "start_run",
+          "seconds": 0.01,
+          "summary": "run=run_2e0b322de65d47cf(queued)"
+        },
+        {
+          "id": "s6",
+          "action": "await_run",
+          "seconds": 1.09,
+          "summary": "request=req_5e3262300b13492b(awaiting_review) run=run_2e0b322de65d47cf(awaiting_review) proposal=prop_438d966e1f9348d7(create_work/valid)"
+        },
+        {
+          "id": "s7",
+          "action": "list_decisions",
+          "seconds": 0.01,
+          "summary": ""
+        },
+        {
+          "id": "s8",
+          "action": "create_request",
+          "seconds": 0.02,
+          "summary": "request=req_95a244ab1b54493f(open) run=run_e6fec89055bf4632(queued)"
+        },
+        {
+          "id": "s9",
+          "action": "await_run",
+          "seconds": 21.56,
+          "summary": "request=req_95a244ab1b54493f(investigating) run=run_e6fec89055bf4632(failed)"
+        }
+      ],
+      "expectations": [
+        {
+          "assert": "context_includes",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "decisions missing=[]; present=['decision_brightpath_actions', 'decision_exports_routing_v1', 'decision_exports_routing_v2']",
+          "spec": {
+            "step": "s2",
+            "field": "decisions",
+            "ids": [
+              "decision_brightpath_actions"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_kind",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_b3661936543f4299 kind=answer validity=valid",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "escalate"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_validity",
+          "step": "s4",
+          "optional": false,
+          "ok": true,
+          "detail": "proposal prop_b3661936543f4299 validity=stale reasons=['REVISION_CONFLICT: decision supersede on customer customer_brightpath']",
+          "spec": {
+            "step": "s4",
+            "values": [
+              "stale"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_kind",
+          "step": "s6",
+          "optional": false,
+          "ok": true,
+          "detail": "proposal prop_438d966e1f9348d7 kind=create_work validity=valid",
+          "spec": {
+            "step": "s6",
+            "values": [
+              "create_work"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_payload_in",
+          "step": "s6",
+          "optional": false,
+          "ok": true,
+          "detail": "proposal prop_438d966e1f9348d7 (create_work) payload.capability_id='cap_scheduled_exports'",
+          "spec": {
+            "step": "s6",
+            "path": "capability_id",
+            "values": [
+              "cap_scheduled_exports"
+            ]
+          }
+        },
+        {
+          "assert": "decision_state",
+          "step": "s7",
+          "optional": false,
+          "ok": true,
+          "detail": "decision decision_brightpath_actions status=superseded supersedes_id=None",
+          "spec": {
+            "step": "s7",
+            "id": "decision_brightpath_actions",
+            "status": "superseded"
+          }
+        },
+        {
+          "assert": "decision_state",
+          "step": "s7",
+          "optional": false,
+          "ok": true,
+          "detail": "decision dec_a77b420b5d8d476c status=active supersedes_id=decision_brightpath_actions",
+          "spec": {
+            "step": "s7",
+            "id": "${s3.decision.id}",
+            "status": "active",
+            "supersedes_id": "decision_brightpath_actions"
+          }
+        },
+        {
+          "assert": "context_excludes_active",
+          "step": "s9",
+          "optional": false,
+          "ok": true,
+          "detail": "active in context=[]; decision status={'decision_helix_scope_reduction': 'expired'}",
+          "spec": {
+            "step": "s9",
+            "field": "decisions",
+            "ids": [
+              "decision_helix_scope_reduction"
+            ]
+          }
+        },
+        {
+          "assert": "text_not_matches",
+          "step": "s9",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s9 has no proposal (run run_e6fec89055bf4632 status failed)",
+          "spec": {
+            "step": "s9",
+            "fields": [
+              "explanation",
+              "payload.draft_text"
+            ],
+            "regex": "(?i)scope reduction (is )?(allowed|approved|permitted)"
+          }
+        }
+      ],
+      "error": null,
+      "seconds": 46.3,
+      "ids": {
+        "s1": {
+          "request": "req_5e3262300b13492b",
+          "run": "run_6b9daef6b2374a11"
+        },
+        "s2": {
+          "request": "req_5e3262300b13492b",
+          "run": "run_6b9daef6b2374a11",
+          "proposal": "prop_b3661936543f4299"
+        },
+        "s4": {
+          "proposal": "prop_b3661936543f4299"
+        },
+        "s5": {
+          "run": "run_2e0b322de65d47cf"
+        },
+        "s6": {
+          "request": "req_5e3262300b13492b",
+          "run": "run_2e0b322de65d47cf",
+          "proposal": "prop_438d966e1f9348d7"
+        },
+        "s8": {
+          "request": "req_95a244ab1b54493f",
+          "run": "run_e6fec89055bf4632"
+        },
+        "s9": {
+          "request": "req_95a244ab1b54493f",
+          "run": "run_e6fec89055bf4632"
+        }
+      },
+      "model_usage": {
+        "calls": 23,
+        "input_tokens": 136741,
+        "output_tokens": 2515,
+        "cost_usd": 0.02202
+      },
+      "base_url": "http://127.0.0.1:8095",
+      "contract_errors": [],
+      "status": "FAIL",
+      "optional_misses": [],
+      "http_calls": 117
+    },
+    {
+      "id": "t12-owner-change-invalidates-proposal",
+      "acceptance_ids": [
+        "T12"
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "action": "create_request",
+          "seconds": 0.02,
+          "summary": "request=req_1ba8bdd48ee047f3(open) run=run_fd557ef2d5134104(queued)"
+        },
+        {
+          "id": "s2",
+          "action": "await_run",
+          "seconds": 23.52,
+          "summary": "request=req_1ba8bdd48ee047f3(investigating) run=run_fd557ef2d5134104(failed) proposal=prop_639e4b5d30794884(answer/stale)"
+        },
+        {
+          "id": "s3",
+          "action": "get_work_item",
+          "seconds": 0.0,
+          "summary": "work_item=work_webhook_retry_queue(in_progress)"
+        },
+        {
+          "id": "s4",
+          "action": "patch_work_item",
+          "seconds": 0.02,
+          "summary": "work_item=work_webhook_retry_queue(in_progress)"
+        },
+        {
+          "id": "s5",
+          "action": "commit_proposal",
+          "seconds": 0.01,
+          "summary": "HTTP 409 REVISION_CONFLICT"
+        },
+        {
+          "id": "s6",
+          "action": "get_proposal",
+          "seconds": 0.0,
+          "summary": "proposal=prop_639e4b5d30794884(answer/stale)"
+        },
+        {
+          "id": "s7",
+          "action": "list_actions",
+          "seconds": 0.0,
+          "summary": ""
+        },
+        {
+          "id": "s8",
+          "action": "start_run",
+          "seconds": 0.01,
+          "summary": "run=run_262b49d48db4403f(queued)"
+        },
+        {
+          "id": "s9",
+          "action": "await_run",
+          "seconds": 1.05,
+          "summary": "request=req_1ba8bdd48ee047f3(awaiting_review) run=run_262b49d48db4403f(awaiting_review) proposal=prop_6fac5ff76a2b4220(link_work/valid)"
+        }
+      ],
+      "expectations": [
+        {
+          "assert": "proposal_kind",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_639e4b5d30794884 kind=answer validity=stale",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "link_work"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_payload_equals",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_639e4b5d30794884 (answer) payload.work_item_id=<missing>",
+          "spec": {
+            "step": "s2",
+            "path": "work_item_id",
+            "value": "work_webhook_retry_queue"
+          }
+        },
+        {
+          "assert": "context_includes",
+          "step": "s2",
+          "optional": false,
+          "ok": true,
+          "detail": "attempts missing=[]; present=['attempt_helix_alert_sensitivity', 'attempt_helix_scim_accounts', 'attempt_helix_webhook_retry_backoff']",
+          "spec": {
+            "step": "s2",
+            "field": "attempts",
+            "ids": [
+              "attempt_helix_webhook_retry_backoff"
+            ]
+          }
+        },
+        {
+          "assert": "http_error",
+          "step": "s5",
+          "optional": false,
+          "ok": true,
+          "detail": "http 409 code=REVISION_CONFLICT message=proposal is stale; re-investigate",
+          "spec": {
+            "step": "s5",
+            "status": [
+              409,
+              422
+            ],
+            "codes": [
+              "REVISION_CONFLICT",
+              "POLICY_VIOLATION"
+            ]
+          }
+        },
+        {
+          "assert": "proposal_validity",
+          "step": "s6",
+          "optional": false,
+          "ok": true,
+          "detail": "proposal prop_639e4b5d30794884 validity=stale reasons=['REVISION_CONFLICT: knowledge revision is 15 at commit (proposal basis 15, expected 0)']",
+          "spec": {
+            "step": "s6",
+            "values": [
+              "stale"
+            ]
+          }
+        },
+        {
+          "assert": "no_action_status",
+          "step": "s7",
+          "optional": false,
+          "ok": true,
+          "detail": "actions=[]",
+          "spec": {
+            "step": "s7",
+            "statuses": [
+              "dispatching",
+              "succeeded"
+            ]
+          }
+        },
+        {
+          "assert": "revision_gt",
+          "step": null,
+          "optional": false,
+          "ok": true,
+          "detail": "a=16 b=15",
+          "spec": {
+            "a": "${s9.proposal.based_on_revision}",
+            "b": "${s2.proposal.based_on_revision}"
+          }
+        },
+        {
+          "assert": "text_matches",
+          "step": "s9",
+          "optional": true,
+          "ok": true,
+          "detail": "matched in ['explanation']; texts=[('explanation', \"Engineering already has this: 'Durable webhook retry queue (24h)' (owner Leo Okafor). It's blocked behind 'Queue v2 cutover for eu-west export workers', whose owner Dana Whitlock has left, so we can't promise a date. We couldn't check its current status, so its state is unknown; confirm it before re\")]",
+          "spec": {
+            "step": "s9",
+            "fields": [
+              "explanation",
+              "payload.comment_text"
+            ],
+            "regex": "(?i)(leo|person_leo)",
+            "optional": true
+          }
+        }
+      ],
+      "error": null,
+      "seconds": 24.6,
+      "ids": {
+        "s1": {
+          "request": "req_1ba8bdd48ee047f3",
+          "run": "run_fd557ef2d5134104"
+        },
+        "s2": {
+          "request": "req_1ba8bdd48ee047f3",
+          "run": "run_fd557ef2d5134104",
+          "proposal": "prop_639e4b5d30794884"
+        },
+        "s6": {
+          "proposal": "prop_639e4b5d30794884"
+        },
+        "s8": {
+          "run": "run_262b49d48db4403f"
+        },
+        "s9": {
+          "request": "req_1ba8bdd48ee047f3",
+          "run": "run_262b49d48db4403f",
+          "proposal": "prop_6fac5ff76a2b4220"
+        }
+      },
+      "model_usage": {
+        "calls": 12,
+        "input_tokens": 63570,
+        "output_tokens": 1122,
+        "cost_usd": 0.01021
+      },
+      "base_url": "http://127.0.0.1:8095",
+      "contract_errors": [],
+      "status": "FAIL",
+      "optional_misses": [],
+      "http_calls": 68
+    },
+    {
+      "id": "t15-unknown-create-reconciles",
+      "acceptance_ids": [
+        "T15"
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "action": "create_request",
+          "seconds": 0.01,
+          "summary": "request=req_c338ddcf86d54fe8(open) run=run_48cf08f1f0704f96(queued)"
+        },
+        {
+          "id": "s2",
+          "action": "await_run",
+          "seconds": 19.94,
+          "summary": "request=req_c338ddcf86d54fe8(awaiting_verification) run=run_48cf08f1f0704f96(succeeded) proposal=prop_161b4a20a38d4133(answer/valid) latest_action=act_a5dc833b8a6a4914(succeeded)"
+        },
+        {
+          "id": "s3",
+          "action": "commit_proposal",
+          "seconds": 0.0,
+          "summary": "HTTP 409 INVALID_TRANSITION"
+        },
+        {
+          "id": "s4",
+          "action": "await_run",
+          "seconds": 0.02,
+          "summary": "request=req_c338ddcf86d54fe8(awaiting_verification) run=run_48cf08f1f0704f96(succeeded) proposal=prop_161b4a20a38d4133(answer/valid) latest_action=act_a5dc833b8a6a4914(succeeded)"
+        },
+        {
+          "id": "s5",
+          "action": "get_action",
+          "seconds": 0.0,
+          "summary": "ERROR reference ${s3.action.id} resolved to nothing"
+        },
+        {
+          "id": "s6",
+          "action": "get_run_events",
+          "seconds": 0.01,
+          "summary": ""
+        },
+        {
+          "id": "s7",
+          "action": "list_actions",
+          "seconds": 0.01,
+          "summary": ""
+        }
+      ],
+      "expectations": [
+        {
+          "assert": "proposal_kind",
+          "step": "s2",
+          "optional": false,
+          "ok": false,
+          "detail": "proposal prop_161b4a20a38d4133 kind=answer validity=valid",
+          "spec": {
+            "step": "s2",
+            "values": [
+              "create_work"
+            ]
+          }
+        },
+        {
+          "assert": "rejected_alternative",
+          "step": "s2",
+          "optional": true,
+          "ok": false,
+          "detail": "proposal prop_161b4a20a38d4133 (answer) rejected_alternatives=[]",
+          "spec": {
+            "step": "s2",
+            "kind": "link_work",
+            "mentions_any": [
+              "work_alert_digest"
+            ],
+            "evidence_required": false,
+            "optional": true
+          }
+        },
+        {
+          "assert": "event_payload_seen",
+          "step": "s6",
+          "optional": true,
+          "ok": false,
+          "detail": "action_updated payloads=[{'action_id': 'act_a5dc833b8a6a4914', 'connector': 'local', 'status': 'succeeded'}]",
+          "spec": {
+            "step": "s6",
+            "type": "action_updated",
+            "payload": {
+              "status": "unknown"
+            },
+            "optional": true,
+            "note": "Only observable when the API itself cannot establish the effect; the real API commits the local effect atomically before the injected 503, so the action may go straight to succeeded. Invariants: one action, receipt present, no duplicate work item."
+          }
+        },
+        {
+          "assert": "action_status",
+          "step": "s5",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s5 failed: reference ${s3.action.id} resolved to nothing",
+          "spec": {
+            "step": "s5",
+            "values": [
+              "succeeded"
+            ]
+          }
+        },
+        {
+          "assert": "receipt_present",
+          "step": "s5",
+          "optional": false,
+          "ok": false,
+          "detail": "error: step s5 failed: reference ${s3.action.id} resolved to nothing",
+          "spec": {
+            "step": "s5",
+            "connector": "local"
+          }
+        },
+        {
+          "assert": "count_actions",
+          "step": "s7",
+          "optional": false,
+          "ok": false,
+          "detail": "create_work actions=[]",
+          "spec": {
+            "step": "s7",
+            "kind": "create_work",
+            "value": 1
+          }
+        },
+        {
+          "assert": "work_item_count_delta",
+          "step": "s7",
+          "optional": false,
+          "ok": false,
+          "detail": "baseline=22 after s7=22 delta=0",
+          "spec": {
+            "step": "s7",
+            "value": 1
+          }
+        },
+        {
+          "assert": "run_status",
+          "step": "s4",
+          "optional": false,
+          "ok": true,
+          "detail": "run run_48cf08f1f0704f96 status=succeeded stage=verify",
+          "spec": {
+            "step": "s4",
+            "values": [
+              "succeeded"
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "seconds": 20.0,
+      "ids": {
+        "s1": {
+          "request": "req_c338ddcf86d54fe8",
+          "run": "run_48cf08f1f0704f96"
+        },
+        "s2": {
+          "request": "req_c338ddcf86d54fe8",
+          "run": "run_48cf08f1f0704f96",
+          "proposal": "prop_161b4a20a38d4133",
+          "latest_action": "act_a5dc833b8a6a4914"
+        },
+        "s4": {
+          "request": "req_c338ddcf86d54fe8",
+          "run": "run_48cf08f1f0704f96",
+          "proposal": "prop_161b4a20a38d4133",
+          "latest_action": "act_a5dc833b8a6a4914"
+        }
+      },
+      "model_usage": {
+        "calls": 11,
+        "input_tokens": 45427,
+        "output_tokens": 901,
+        "cost_usd": 0.007354
+      },
+      "base_url": "http://127.0.0.1:8095",
+      "contract_errors": [],
+      "status": "FAIL",
+      "optional_misses": [
+        "rejected_alternative",
+        "event_payload_seen"
+      ],
+      "http_calls": 57
+    }
+  ],
+  "holdouts": [
+    {
+      "id": "h101-throttle-and-callback-auth-brightpath",
+      "checks": [
+        {
+          "check": "acceptable_disposition",
+          "ok": false,
+          "detail": "kind=link_work payload={\"comment_text\": \"Documentation on webhook event verification.\", \"work_item_id\": \"cap_webhooks\"}"
+        },
+        {
+          "check": "must_not create_work",
+          "ok": true,
+          "detail": "kind=link_work work_item_id='cap_webhooks'"
+        },
+        {
+          "check": "must_not link_work:work_rate_limit_burst",
+          "ok": true,
+          "detail": "kind=link_work work_item_id='cap_webhooks'"
+        },
+        {
+          "check": "must_not escalate",
+          "ok": true,
+          "detail": "kind=link_work work_item_id='cap_webhooks'"
+        },
+        {
+          "check": "must_not promise_quota_increase (text, file pattern)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "no work item created",
+          "ok": true,
+          "detail": "delta=0"
+        }
+      ],
+      "error": null,
+      "request_id": "req_2aea8425293045f9",
+      "run_id": "run_f66a9b8191f84cd0",
+      "run_status": "awaiting_review",
+      "proposal_id": "prop_76859a2d7f1a4bc6",
+      "kind": "link_work",
+      "payload": {
+        "comment_text": "Documentation on webhook event verification.",
+        "work_item_id": "cap_webhooks"
+      },
+      "explanation": "Linking this work to provide the customer with the relevant resources on webhook verification.",
+      "run_mode": "model",
+      "run_error": null,
+      "model_usage": {
+        "calls": 12,
+        "input_tokens": 66619,
+        "output_tokens": 1157,
+        "cost_usd": 0.010687
+      },
+      "unchecked_tokens": [],
+      "contract_ok": true,
+      "contract_errors": []
+    },
+    {
+      "id": "h102-who-touched-schedules-tamarind",
+      "checks": [
+        {
+          "check": "acceptable_disposition",
+          "ok": false,
+          "detail": "kind=link_work payload={\"comment_text\": \"This outlines the current capabilities related to scheduled exports.\", \"work_item_id\": \"cap_scheduled_exports\"}"
+        },
+        {
+          "check": "must_not create_work",
+          "ok": true,
+          "detail": "kind=link_work work_item_id='cap_scheduled_exports'"
+        },
+        {
+          "check": "must_not link_work:work_audit_log_csv_download",
+          "ok": true,
+          "detail": "kind=link_work work_item_id='cap_scheduled_exports'"
+        },
+        {
+          "check": "must_not escalate",
+          "ok": true,
+          "detail": "kind=link_work work_item_id='cap_scheduled_exports'"
+        },
+        {
+          "check": "must_not claim_audit_data_lost (text, file pattern)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "no work item created",
+          "ok": true,
+          "detail": "delta=0"
+        }
+      ],
+      "error": null,
+      "request_id": "req_62fa93505d624331",
+      "run_id": "run_774d71fe613844bd",
+      "run_status": "failed",
+      "proposal_id": "prop_162f40e400a246e7",
+      "kind": "link_work",
+      "payload": {
+        "comment_text": "This outlines the current capabilities related to scheduled exports.",
+        "work_item_id": "cap_scheduled_exports"
+      },
+      "explanation": "This links to the capability relevant for scheduled exports that may be pertaining to the request.",
+      "run_mode": "model",
+      "run_error": {
+        "code": "BUDGET_EXHAUSTED",
+        "details": {},
+        "message": "model call limit per run reached (12)",
+        "retryable": false
+      },
+      "model_usage": {
+        "calls": 12,
+        "input_tokens": 73554,
+        "output_tokens": 942,
+        "cost_usd": 0.011597
+      },
+      "unchecked_tokens": [],
+      "contract_ok": true,
+      "contract_errors": []
+    },
+    {
+      "id": "h103-stale-finance-numbers-acme",
+      "checks": [
+        {
+          "check": "acceptable_disposition",
+          "ok": false,
+          "detail": "kind=None payload=null"
+        },
+        {
+          "check": "must_not create_work",
+          "ok": true,
+          "detail": "kind=None work_item_id=None"
+        },
+        {
+          "check": "must_not promise_date (text, built-in heuristic)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "no work item created",
+          "ok": true,
+          "detail": "delta=0"
+        }
+      ],
+      "error": null,
+      "request_id": "req_2215c914e41e4275",
+      "run_id": "run_2869b4c244c5442e",
+      "run_status": "failed",
+      "proposal_id": null,
+      "kind": null,
+      "payload": null,
+      "explanation": null,
+      "run_mode": "model",
+      "run_error": {
+        "code": "BUDGET_EXHAUSTED",
+        "details": {},
+        "message": "model call limit per run reached (12)",
+        "retryable": false
+      },
+      "model_usage": {
+        "calls": 12,
+        "input_tokens": 44238,
+        "output_tokens": 1022,
+        "cost_usd": 0.007248
+      },
+      "unchecked_tokens": [],
+      "contract_ok": true,
+      "contract_errors": []
+    },
+    {
+      "id": "h104-partner-visibility-helix",
+      "checks": [
+        {
+          "check": "acceptable_disposition",
+          "ok": false,
+          "detail": "kind=link_work payload={\"comment_text\": \"This work item can provide embedded access to dashboards for external partners.\", \"work_item_id\": \"work_dashboard_embed_sdk\"}"
+        },
+        {
+          "check": "must_not create_work",
+          "ok": true,
+          "detail": "kind=link_work work_item_id='work_dashboard_embed_sdk'"
+        },
+        {
+          "check": "must_not promise_date (text, built-in heuristic)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "no work item created",
+          "ok": true,
+          "detail": "delta=0"
+        }
+      ],
+      "error": null,
+      "request_id": "req_8a3d52e76b374069",
+      "run_id": "run_82f5c07a58784ddd",
+      "run_status": "failed",
+      "proposal_id": "prop_135718000afc4a76",
+      "kind": "link_work",
+      "payload": {
+        "comment_text": "This work item can provide embedded access to dashboards for external partners.",
+        "work_item_id": "work_dashboard_embed_sdk"
+      },
+      "explanation": "Linking the 'Signed embed SDK for dashboards' work item to explore embedding options for external partners.",
+      "run_mode": "model",
+      "run_error": {
+        "code": "BUDGET_EXHAUSTED",
+        "details": {},
+        "message": "model call limit per run reached (12)",
+        "retryable": false
+      },
+      "model_usage": {
+        "calls": 12,
+        "input_tokens": 55435,
+        "output_tokens": 1318,
+        "cost_usd": 0.009106
+      },
+      "unchecked_tokens": [],
+      "contract_ok": true,
+      "contract_errors": []
+    },
+    {
+      "id": "h105-callbacks-lost-during-migration-brightpath",
+      "checks": [
+        {
+          "check": "acceptable_disposition",
+          "ok": false,
+          "detail": "kind=answer payload={\"draft_text\": \"Unfortunately, we cannot resend expired events as they are marked after the delivery system's retry attempts.\", \"resolution_criteria\": [\"The delivery system will retry non-2xx responses or timeouts for up to 30 minutes, after which events appear as expired and cannot be resent.\"]}"
+        },
+        {
+          "check": "must_not create_work",
+          "ok": true,
+          "detail": "kind=answer work_item_id=None"
+        },
+        {
+          "check": "must_not promise_date (text, built-in heuristic)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "must_not claim_self_serve_replay (text, file pattern)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "must_not claim_resolved (text, file pattern)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "no work item created",
+          "ok": true,
+          "detail": "delta=0"
+        }
+      ],
+      "error": null,
+      "request_id": "req_ae255e6ea4b44fef",
+      "run_id": "run_edd307efeec24fa5",
+      "run_status": "succeeded",
+      "proposal_id": "prop_d5e488e28d044ea7",
+      "kind": "answer",
+      "payload": {
+        "draft_text": "Unfortunately, we cannot resend expired events as they are marked after the delivery system's retry attempts.",
+        "resolution_criteria": [
+          "The delivery system will retry non-2xx responses or timeouts for up to 30 minutes, after which events appear as expired and cannot be resent."
+        ]
+      },
+      "explanation": "The webhook documentation clarifies that expired events cannot be replayed because they exceed the retry limits. Thus, no self-service option is available for replaying these events.",
+      "run_mode": "model",
+      "run_error": null,
+      "model_usage": {
+        "calls": 7,
+        "input_tokens": 28881,
+        "output_tokens": 660,
+        "cost_usd": 0.004727
+      },
+      "unchecked_tokens": [],
+      "contract_ok": true,
+      "contract_errors": []
+    },
+    {
+      "id": "h106-big-dump-still-timing-out-tamarind",
+      "checks": [
+        {
+          "check": "acceptable_disposition",
+          "ok": true,
+          "detail": "kind=link_work payload={\"comment_text\": \"Related feature for async exports in development.\", \"work_item_id\": \"work_csv_async_large\"}"
+        },
+        {
+          "check": "must_not create_work",
+          "ok": true,
+          "detail": "kind=link_work work_item_id='work_csv_async_large'"
+        },
+        {
+          "check": "must_not promise_date (text, built-in heuristic)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "must_not claim_resolved (text, file pattern)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "no work item created",
+          "ok": true,
+          "detail": "delta=0"
+        }
+      ],
+      "error": null,
+      "request_id": "req_ef2ed61fdd9943ba",
+      "run_id": "run_7c882040048e4254",
+      "run_status": "awaiting_review",
+      "proposal_id": "prop_41d63ed0401c49e9",
+      "kind": "link_work",
+      "payload": {
+        "comment_text": "Related feature for async exports in development.",
+        "work_item_id": "work_csv_async_large"
+      },
+      "explanation": "Linking the ongoing work on async exports to the customer's request for updates on background export capabilities.",
+      "run_mode": "model",
+      "run_error": null,
+      "model_usage": {
+        "calls": 10,
+        "input_tokens": 51756,
+        "output_tokens": 841,
+        "cost_usd": 0.008268
+      },
+      "unchecked_tokens": [],
+      "contract_ok": true,
+      "contract_errors": []
+    },
+    {
+      "id": "h107-security-feed-corvid",
+      "checks": [
+        {
+          "check": "acceptable_disposition",
+          "ok": false,
+          "detail": "kind=link_work payload={\"comment_text\": \"Linking the Audit log capability to address how admin events can be monitored and the current limitations.\", \"work_item_id\": \"cap_audit_log\"}"
+        },
+        {
+          "check": "must_not link_work:work_audit_log_csv_download",
+          "ok": true,
+          "detail": "kind=link_work work_item_id='cap_audit_log'"
+        },
+        {
+          "check": "must_not link_work:work_webhook_retry_queue",
+          "ok": true,
+          "detail": "kind=link_work work_item_id='cap_audit_log'"
+        },
+        {
+          "check": "must_not claim_siem_supported (text, file pattern)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "no work item created",
+          "ok": true,
+          "detail": "delta=0"
+        }
+      ],
+      "error": null,
+      "request_id": "req_9435729b7de64c0e",
+      "run_id": "run_231a185eedbb4101",
+      "run_status": "awaiting_review",
+      "proposal_id": "prop_2dcd465bfb634617",
+      "kind": "link_work",
+      "payload": {
+        "comment_text": "Linking the Audit log capability to address how admin events can be monitored and the current limitations.",
+        "work_item_id": "cap_audit_log"
+      },
+      "explanation": "Linking the 'Audit log', which addresses the continuous feed of admin activity into security monitoring while noting the limitation that external streaming is not supported.",
+      "run_mode": "model",
+      "run_error": null,
+      "model_usage": {
+        "calls": 11,
+        "input_tokens": 46629,
+        "output_tokens": 866,
+        "cost_usd": 0.007512
+      },
+      "unchecked_tokens": [],
+      "contract_ok": true,
+      "contract_errors": []
+    },
+    {
+      "id": "h108-columnar-extract-helix",
+      "checks": [
+        {
+          "check": "acceptable_disposition",
+          "ok": false,
+          "detail": "kind=None payload=null"
+        },
+        {
+          "check": "must_not link_work:work_csv_utf8_bom",
+          "ok": true,
+          "detail": "kind=None work_item_id=None"
+        },
+        {
+          "check": "must_not link_work:work_s3_destination",
+          "ok": true,
+          "detail": "kind=None work_item_id=None"
+        },
+        {
+          "check": "must_not link_work:work_export_issue",
+          "ok": true,
+          "detail": "kind=None work_item_id=None"
+        },
+        {
+          "check": "must_not claim_parquet_supported (text, file pattern)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "no work item created",
+          "ok": true,
+          "detail": "delta=0"
+        }
+      ],
+      "error": null,
+      "request_id": "req_99c81f9353c74f20",
+      "run_id": "run_5693c3d94d58408a",
+      "run_status": "failed",
+      "proposal_id": null,
+      "kind": null,
+      "payload": null,
+      "explanation": null,
+      "run_mode": "model",
+      "run_error": {
+        "code": "BUDGET_EXHAUSTED",
+        "details": {},
+        "message": "model call limit per run reached (12)",
+        "retryable": false
+      },
+      "model_usage": {
+        "calls": 12,
+        "input_tokens": 85654,
+        "output_tokens": 1382,
+        "cost_usd": 0.013677
+      },
+      "unchecked_tokens": [],
+      "contract_ok": true,
+      "contract_errors": []
+    },
+    {
+      "id": "h109-who-owns-the-eu-switchover-corvid",
+      "checks": [
+        {
+          "check": "acceptable_disposition",
+          "ok": false,
+          "detail": "kind=link_work payload={\"comment_text\": \"This work item is currently owned by Maya Raman, responsible for the Q2 cutover, which is critical for EU exports.\", \"work_item_id\": \"work_queue_v2_cutover\"}"
+        },
+        {
+          "check": "must_not create_work",
+          "ok": true,
+          "detail": "kind=link_work work_item_id='work_queue_v2_cutover'"
+        },
+        {
+          "check": "must_not promise_date (text, built-in heuristic)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "must_not escalate_owner:person_dana",
+          "ok": true,
+          "detail": "kind=link_work owner_id=None"
+        },
+        {
+          "check": "must_not claim_resolved (text, file pattern)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "no work item created",
+          "ok": true,
+          "detail": "delta=0"
+        }
+      ],
+      "error": null,
+      "request_id": "req_57beee5498d342ca",
+      "run_id": "run_50f77e005ad74e89",
+      "run_status": "awaiting_review",
+      "proposal_id": "prop_b871eed0f9794b27",
+      "kind": "link_work",
+      "payload": {
+        "comment_text": "This work item is currently owned by Maya Raman, responsible for the Q2 cutover, which is critical for EU exports.",
+        "work_item_id": "work_queue_v2_cutover"
+      },
+      "explanation": "Linking the work surrounding the 'Queue v2 cutover for eu-west export workers' to ensure the customer knows the ownership amid their ongoing concerns about EU exports.",
+      "run_mode": "model",
+      "run_error": null,
+      "model_usage": {
+        "calls": 8,
+        "input_tokens": 34717,
+        "output_tokens": 580,
+        "cost_usd": 0.005555
+      },
+      "unchecked_tokens": [],
+      "contract_ok": true,
+      "contract_errors": []
+    },
+    {
+      "id": "h110-faster-alert-checks-brightpath",
+      "checks": [
+        {
+          "check": "acceptable_disposition",
+          "ok": false,
+          "detail": "kind=clarify payload={\"missing_fields\": [\"confirmation on contract freeze impact on engineering requests\"], \"question\": \"Can the account team provide clarity on whether the Brightpath contract freeze can be lifted for engineering requests like faster alert checks?\"}"
+        },
+        {
+          "check": "must_not create_work",
+          "ok": true,
+          "detail": "kind=clarify work_item_id=None"
+        },
+        {
+          "check": "must_not link_work:work_alert_digest",
+          "ok": true,
+          "detail": "kind=clarify work_item_id=None"
+        },
+        {
+          "check": "must_not link_work:work_alert_sensitivity",
+          "ok": true,
+          "detail": "kind=clarify work_item_id=None"
+        },
+        {
+          "check": "must_not promise_date (text, built-in heuristic)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "must_not claim_one_minute_supported (text, file pattern)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "no work item created",
+          "ok": true,
+          "detail": "delta=0"
+        }
+      ],
+      "error": null,
+      "request_id": "req_1f3ca26d47f24ea4",
+      "run_id": "run_1251380c669241f6",
+      "run_status": "awaiting_review",
+      "proposal_id": "prop_6d8be75e171d4312",
+      "kind": "clarify",
+      "payload": {
+        "missing_fields": [
+          "confirmation on contract freeze impact on engineering requests"
+        ],
+        "question": "Can the account team provide clarity on whether the Brightpath contract freeze can be lifted for engineering requests like faster alert checks?"
+      },
+      "explanation": "Brightpath's contract freeze prevents new engineering work without review. We need confirmation on its impact on this request.",
+      "run_mode": "model",
+      "run_error": null,
+      "model_usage": {
+        "calls": 6,
+        "input_tokens": 29052,
+        "output_tokens": 426,
+        "cost_usd": 0.004613
+      },
+      "unchecked_tokens": [],
+      "contract_ok": true,
+      "contract_errors": []
+    },
+    {
+      "id": "h111-clocks-go-back-fiscal-acme",
+      "checks": [
+        {
+          "check": "acceptable_disposition",
+          "ok": false,
+          "detail": "kind=None payload=null"
+        },
+        {
+          "check": "must_not recommend_utc_recreate (text, file pattern)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "must_not create_work",
+          "ok": true,
+          "detail": "kind=None work_item_id=None"
+        },
+        {
+          "check": "must_not promise_date (text, built-in heuristic)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "must_not claim_resolved (text, file pattern)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "no work item created",
+          "ok": true,
+          "detail": "delta=0"
+        }
+      ],
+      "error": null,
+      "request_id": "req_8df5d41aa8a1425b",
+      "run_id": "run_a2e2b45754d94d0f",
+      "run_status": "failed",
+      "proposal_id": null,
+      "kind": null,
+      "payload": null,
+      "explanation": null,
+      "run_mode": "model",
+      "run_error": {
+        "code": "BUDGET_EXHAUSTED",
+        "details": {},
+        "message": "model call limit per run reached (12)",
+        "retryable": false
+      },
+      "model_usage": {
+        "calls": 12,
+        "input_tokens": 65041,
+        "output_tokens": 1597,
+        "cost_usd": 0.010714
+      },
+      "unchecked_tokens": [],
+      "contract_ok": true,
+      "contract_errors": []
+    },
+    {
+      "id": "h112-board-pack-not-landing-acme",
+      "checks": [
+        {
+          "check": "acceptable_disposition",
+          "ok": false,
+          "detail": "kind=answer payload={\"draft_text\": \"Scheduled exports are currently not delivering properly for Acme, as per the work item 'Restore scheduled exports', which is tracking this issue.\", \"resolution_criteria\": [\"Resolve periodic failures in scheduled exports\", \"Confirm that scheduled exports deliver on time for the affect"
+        },
+        {
+          "check": "must_not recommend_public_link (text, built-in heuristic)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "must_not recommend_run_now (text, file pattern)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "must_not recommend_recreate_schedule (text, file pattern)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "must_not create_work",
+          "ok": true,
+          "detail": "kind=answer work_item_id=None"
+        },
+        {
+          "check": "must_not promise_date (text, built-in heuristic)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "must_not claim_resolved (text, file pattern)",
+          "ok": true,
+          "detail": "hit=None"
+        },
+        {
+          "check": "no work item created",
+          "ok": true,
+          "detail": "delta=0"
+        }
+      ],
+      "error": null,
+      "request_id": "req_c079f68766634b37",
+      "run_id": "run_eb6207037b794154",
+      "run_status": "succeeded",
+      "proposal_id": "prop_2904feb0f8404168",
+      "kind": "answer",
+      "payload": {
+        "draft_text": "Scheduled exports are currently not delivering properly for Acme, as per the work item 'Restore scheduled exports', which is tracking this issue.",
+        "resolution_criteria": [
+          "Resolve periodic failures in scheduled exports",
+          "Confirm that scheduled exports deliver on time for the affected customers."
+        ]
+      },
+      "explanation": "Scheduled exports are currently not delivering properly; see 'Restore scheduled exports' (tracked by weekly revenue export missing since Monday).",
+      "run_mode": "model",
+      "run_error": null,
+      "model_usage": {
+        "calls": 9,
+        "input_tokens": 49293,
+        "output_tokens": 615,
+        "cost_usd": 0.007763
+      },
+      "unchecked_tokens": [],
+      "contract_ok": true,
+      "contract_errors": []
+    }
+  ]
+}
